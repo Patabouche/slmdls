@@ -23,16 +23,130 @@ All I/O methods dispatch to QThread workers and emit results via pyqtSignal.
 Only trivial getters use synchronous result= slots.
 """
 
+import hashlib
 import json
 import logging
+import os
 import shutil
+import subprocess
 import sys
+import time
+import urllib.request
+import urllib.error
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QFileDialog
 
 logger = logging.getLogger(__name__)
+
+# ── Launcher auth helpers ────────────────────────────────────────────────────
+_API_BASE   = os.getenv("SLIMEDEALS_API", "https://slimedeals.fr")
+_AUTH_FILE  = Path.home() / ".slimedeals" / "auth.json"
+# Deep-link salon #avis (https://discord.com/channels/<guild>/<channel>). Sinon → invite.
+_SLIMEDEALS_DISCORD_GUILD_ID = os.getenv("SLIMEDEALS_DISCORD_GUILD_ID", "").strip()
+_DISCORD_AVIS_CHANNEL_ID = "1502728174356660274"
+
+
+def _get_hwid() -> str:
+    """Return a stable hardware fingerprint for this machine (SHA-256, 32 hex chars)."""
+    try:
+        raw = subprocess.run(
+            ["wmic", "csproduct", "get", "uuid"],
+            capture_output=True, text=True, timeout=8
+        )
+        lines = [l.strip() for l in raw.stdout.strip().splitlines() if l.strip() and l.strip() != "UUID"]
+        uuid = lines[0] if lines else "unknown"
+    except Exception:
+        uuid = "unknown"
+    return hashlib.sha256(uuid.encode()).hexdigest()[:32]
+
+
+def _api_post(path: str, payload: dict) -> dict:
+    data  = json.dumps(payload).encode()
+    req   = urllib.request.Request(
+        f"{_API_BASE}{path}",
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.loads(e.read().decode())
+        except Exception:
+            body = {}
+        return {"ok": False, "error": body.get("error", f"Erreur HTTP {e.code}")}
+    except Exception as exc:
+        return {"ok": False, "error": f"Serveur injoignable : {exc}"}
+
+
+def _save_auth(token: str, username: str, rank: str = "free", free_claimed=None) -> None:
+    _AUTH_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _AUTH_FILE.write_text(json.dumps({
+        "token": token,
+        "username": username,
+        "rank": rank,
+        "free_claimed": free_claimed,
+    }))
+
+
+def _load_auth() -> dict:
+    try:
+        return json.loads(_AUTH_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def _clear_auth() -> None:
+    try:
+        _AUTH_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+# Jeux catalogue plan FREE (doit rester aligné avec le bot / store.js)
+_LAUNCHER_FREE_CATALOG_IDS = frozenset({"2416450", "284160", "3241660", "1943950"})
+
+
+def _norm_saved_launcher_rank(rank) -> str:
+    if rank is None:
+        return "free"
+    r = str(rank).strip().lower().replace(" ", "_")
+    if not r or r in ("none", "null"):
+        return "free"
+    return r
+
+
+def _launcher_free_catalog_download_allowed(app_id: str) -> tuple[bool, str]:
+    """Compte FREE : uniquement un des 4 jeux, après réclamation enregistrée (auth.json)."""
+    saved = _load_auth()
+    if _norm_saved_launcher_rank(saved.get("rank")) != "free":
+        return True, ""
+    aid = str(app_id).strip()
+    if aid not in _LAUNCHER_FREE_CATALOG_IDS:
+        return False, (
+            "Plan FREE : seuls les 4 jeux du catalogue (onglet « Télécharger ») sont autorisés. "
+            "Passe au rang Triple Monstre pour installer n'importe quel jeu Steam."
+        )
+    claimed = saved.get("free_claimed")
+    if claimed is None or str(claimed).strip() != aid:
+        return False, (
+            "Plan FREE : sur la carte du jeu dans « Télécharger », clique d'abord sur "
+            "« Choisir ce jeu » pour enregistrer ta réclamation, puis lance l'installation."
+        )
+    return True, ""
+
+
+def launcher_verify_saved_token() -> dict:
+    """Called at startup. Returns {ok, username} if saved token still valid."""
+    saved = _load_auth()
+    if not saved.get("token"):
+        return {"ok": False}
+    hwid = _get_hwid()
+    return _api_post("/api/launcher/verify", {"token": saved["token"], "hwid": hwid})
 
 
 class _Worker(QObject):
@@ -67,6 +181,8 @@ class WebBridge(QObject):
     download_progress = pyqtSignal(str)
     task_finished = pyqtSignal(str)
     log_message = pyqtSignal(str)
+    ttc_game_info   = pyqtSignal(str)
+    auth_done       = pyqtSignal(str)   # emitted with username after successful login
 
     def __init__(self, ui, steam_path, parent=None):
         super().__init__(parent)
@@ -139,7 +255,161 @@ class WebBridge(QObject):
             self._store_client = StoreApiClient(self._api_key)
         return self._store_client
 
+    # ── Auth slots ───────────────────────────────────────────────
+
+    @pyqtSlot()
+    def auth_check_saved(self) -> None:
+        """Called by auth.html on load — checks saved token in background.
+        Emits auth_done(token) if valid, or auth_done('') to show login form."""
+        def _check():
+            return launcher_verify_saved_token()
+
+        def _done(result):
+            if result and result.get("ok"):
+                # Send the saved token back to JS so it can pass it to auth_success
+                saved = _load_auth()
+                self.auth_done.emit(saved.get("token", ""))
+            else:
+                _clear_auth()
+                self.auth_done.emit("")  # empty → show login form
+
+        self._run_async(_check, on_done=_done)
+
+    @pyqtSlot(str, str, result=str)
+    def auth_login(self, username: str, password: str) -> str:
+        """Called from auth.html — performs login and returns JSON with token."""
+        hwid   = _get_hwid()
+        result = _api_post("/api/launcher/login", {
+            "username": username.strip().lower(),
+            "password": password,
+            "hwid": hwid,
+        })
+        if result.get("ok"):
+            _save_auth(result["token"], result["username"],
+                       result.get("rank", "free"), result.get("free_claimed"))
+        return json.dumps(result)
+
+    @pyqtSlot(str, str, result=str)
+    def auth_register(self, username: str, password: str) -> str:
+        """Called from auth.html — creates account and returns JSON with token."""
+        hwid   = _get_hwid()
+        result = _api_post("/api/launcher/register", {
+            "username": username.strip().lower(),
+            "password": password,
+            "hwid": hwid,
+        })
+        if result.get("ok"):
+            _save_auth(result["token"], result["username"],
+                       result.get("rank", "free"), result.get("free_claimed"))
+        return json.dumps(result)
+
+    @pyqtSlot(str)
+    def auth_success(self, token: str) -> None:
+        """Called from auth.html with the session token.
+        Python re-verifies the token + HWID with the server — no bypass possible.
+        If valid, loads the main UI. If invalid, stays on auth page silently."""
+        if not token or len(token) < 16:
+            logger.warning("[Auth] auth_success called with empty/short token — ignored")
+            return
+
+        def _verify():
+            hwid   = _get_hwid()
+            saved  = _load_auth()
+            # Token passed by JS must match what Python saved
+            if saved.get("token") != token:
+                return None
+            return _api_post("/api/launcher/verify", {"token": token, "hwid": hwid})
+
+        def _done(result):
+            if result and result.get("ok"):
+                # Persist fresh rank / free_claimed from server
+                saved = _load_auth()
+                _save_auth(
+                    saved.get("token", token),
+                    result.get("username", ""),
+                    result.get("rank", "free"),
+                    result.get("free_claimed"),
+                )
+                parent = self.parent()
+                if parent and hasattr(parent, "_on_auth_success"):
+                    parent._on_auth_success(
+                        result.get("username", ""),
+                        result.get("rank", "free"),
+                    )
+            else:
+                logger.warning("[Auth] Server rejected token during auth_success — staying on login page")
+                # Wipe invalid token so next launch shows login form
+                _clear_auth()
+
+        self._run_async(_verify, on_done=_done)
+
+    @pyqtSlot(result=str)
+    def get_user_rank(self) -> str:
+        """Returns JSON {rank, free_claimed, username} from local auth.json.
+        Called by store.js to know which UI to display."""
+        saved = _load_auth()
+        return json.dumps({
+            "rank": saved.get("rank", "free"),
+            "free_claimed": saved.get("free_claimed"),
+            "username": saved.get("username", ""),
+        })
+
+    @pyqtSlot(str, result=str)
+    def record_free_claim(self, app_id: str) -> str:
+        """Records a free-plan game claim on the server.
+        Returns JSON {ok, app_id} or {ok:false, error}."""
+        saved = _load_auth()
+        token = saved.get("token", "")
+        if not token:
+            return json.dumps({"ok": False, "error": "Non connecté"})
+        hwid   = _get_hwid()
+        result = _api_post("/api/launcher/free-claim", {
+            "token": token,
+            "hwid": hwid,
+            "app_id": str(app_id).strip(),
+        })
+        if result.get("ok"):
+            # Update local auth.json (toujours string pour cohérence avec la vérif d'install)
+            _save_auth(token, saved.get("username", ""), "free", str(app_id).strip())
+        return json.dumps(result)
+
+    @pyqtSlot(result=str)
+    def discord_avis_url(self) -> str:
+        """URL vers le salon #avis (deep-link si SLIMEDEALS_DISCORD_GUILD_ID est défini)."""
+        if _SLIMEDEALS_DISCORD_GUILD_ID.isdigit():
+            return (
+                f"https://discord.com/channels/{_SLIMEDEALS_DISCORD_GUILD_ID}/"
+                f"{_DISCORD_AVIS_CHANNEL_ID}"
+            )
+        return "https://discord.gg/slimedeals"
+
     # ── ASYNC slots — dispatch to QThread ────────────────────────
+
+    @pyqtSlot(str)
+    def lookup_ttc_game(self, app_id):
+        """Appelle l'API TwentyTwoCloud /info pour un app_id donné.
+        Émet ttc_game_info avec un JSON contenant name, header_image, available."""
+        def _do():
+            from sff.lua.endpoints import ttc_get_game_info
+            info = ttc_get_game_info(str(app_id))
+            if info is None:
+                return {"app_id": app_id, "available": False, "name": f"App {app_id}",
+                        "header_image": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg"}
+            data = info.get("data", info)
+            common = data.get("common", {}) if isinstance(data, dict) else {}
+            name = (common.get("name") or data.get("name") or
+                    info.get("name") or f"App {app_id}")
+            return {
+                "app_id": app_id,
+                "available": True,
+                "name": name,
+                "header_image": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg",
+            }
+
+        def _on_done(result):
+            self.ttc_game_info.emit(json.dumps(result))
+
+        self._run_async(_do, on_done=_on_done)
 
     @pyqtSlot(str, int, int, str)
     def search_games(self, query, offset, per_page, sort_by='updated'):
@@ -255,6 +525,15 @@ class WebBridge(QObject):
         Linux: auto-selects latest manifests, wraps process_from_store().
         Emits download_progress + task_finished signals."""
         def _do():
+            allow, deny_msg = _launcher_free_catalog_download_allowed(str(app_id))
+            if not allow:
+                self._emit_task_result(
+                    "download_fastest",
+                    False,
+                    deny_msg,
+                    app_id=str(app_id),
+                )
+                return False
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Starting", "progress": 0
             }))
@@ -269,7 +548,11 @@ class WebBridge(QObject):
             self._emit_task_result(
                 "download_fastest",
                 success,
-                f"Download {'completed' if success else 'failed'} for App {app_id}",
+                (
+                    f"Installation terminée (App {app_id})"
+                    if success
+                    else f"Échec de l'installation (App {app_id})"
+                ),
                 app_id=app_id,
             )
 
@@ -280,6 +563,15 @@ class WebBridge(QObject):
         """Fastest download with explicit source choice ('hubcap' or 'oureveryday').
         Emits download_progress + task_finished signals."""
         def _do():
+            allow, deny_msg = _launcher_free_catalog_download_allowed(str(app_id))
+            if not allow:
+                self._emit_task_result(
+                    "download_fastest",
+                    False,
+                    deny_msg,
+                    app_id=str(app_id),
+                )
+                return False
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Starting", "progress": 0
             }))
@@ -293,7 +585,11 @@ class WebBridge(QObject):
             self._emit_task_result(
                 "download_fastest",
                 success,
-                f"Download {'completed' if success else 'failed'} for App {app_id}",
+                (
+                    f"Installation terminée (App {app_id})"
+                    if success
+                    else f"Échec de l'installation (App {app_id})"
+                ),
                 app_id=app_id,
             )
 
@@ -323,6 +619,8 @@ class WebBridge(QObject):
                 selected_source = LuaEndpoint.OUREVERYDAY
             elif source == "ryuu":
                 selected_source = LuaEndpoint.RYUU
+            elif source == "twentytwocloud":
+                selected_source = LuaEndpoint.TWENTYTWOCLOUD
             else:
                 selected_source = LuaEndpoint.HUBCAP if self._api_key else LuaEndpoint.OUREVERYDAY
             lua_path = download_lua_direct(

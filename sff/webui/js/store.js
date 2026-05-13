@@ -1,258 +1,361 @@
 /**
- * SteaMidra — Store Page
- * Search, grid/list rendering, pagination
+ * SlimeDeals — Store Page
+ * - Plan FREE  → catalogue de 4 jeux (1 choix définitif)
+ * - Triple Monstre → recherche TwentyTwoCloud libre
  */
 
-window.Store = (function() {
+window.Store = (function () {
     'use strict';
 
-    var _page = 1;
-    var _perPage = 20;
-    var _totalPages = 1;
-    var _total = 0;
-    var _searchQuery = '';
-    var _sortBy = 'updated';
-    var _viewMode = 'grid';
-    var _apiKeyConnected = false;
-    var _debounceTimer = null;
-    var _initialized = false;
-    var _imagesHidden = false;
-    var _activeGenre = '';
+    var _currentAppId  = null;
+    var _initialized   = false;
+    var _userRank      = null;   // 'free' | 'triple_monstre'
+    var _freeClaimed   = null;   // null | app_id string
+
+    var FREE_CATALOG = [
+        {
+            app_id : '2416450',
+            name   : 'MOUSE: P.I. For Hire',
+            url    : 'https://store.steampowered.com/app/2416450/MOUSE_PI_For_Hire/',
+        },
+        {
+            app_id : '284160',
+            name   : 'BeamNG.drive',
+            url    : 'https://store.steampowered.com/app/284160/BeamNGdrive/',
+        },
+        {
+            app_id : '3241660',
+            name   : 'R.E.P.O.',
+            url    : 'https://store.steampowered.com/app/3241660/REPO/',
+        },
+        {
+            app_id : '1943950',
+            name   : 'Escape the Backrooms',
+            url    : 'https://store.steampowered.com/app/1943950/Escape_the_Backrooms/',
+        },
+    ];
+
+    function _steamHeader(appId) {
+        return 'https://cdn.cloudflare.steamstatic.com/steam/apps/' + appId + '/header.jpg';
+    }
+
+    // ── Rank detection ────────────────────────────────────────────────────────
+
+    function _loadRankAndDisplay() {
+        var loadEl = document.getElementById('store-rank-loading');
+        if (loadEl) loadEl.classList.remove('hidden');
+
+        Bridge.onReady(function(py) {
+            py.get_user_rank(function(jsonStr) {
+                var d;
+                try { d = JSON.parse(jsonStr); } catch(e) { d = {rank:'free', free_claimed: null}; }
+                _userRank    = d.rank || 'free';
+                _freeClaimed = d.free_claimed || null;
+                if (loadEl) loadEl.classList.add('hidden');
+                _renderStore();
+            });
+        });
+    }
+
+    function _renderStore() {
+        var freeSection    = document.getElementById('store-free-section');
+        var premiumSection = document.getElementById('store-premium-section');
+        var subtitle       = document.getElementById('store-subtitle');
+
+        if (_userRank === 'triple_monstre') {
+            if (freeSection)    freeSection.classList.add('hidden');
+            if (premiumSection) premiumSection.classList.remove('hidden');
+            if (subtitle) subtitle.textContent = 'Colle un lien Steam — Triple Monstre, jeux illimités';
+            _initPremiumListeners();
+        } else {
+            if (premiumSection) premiumSection.classList.add('hidden');
+            if (freeSection)    freeSection.classList.remove('hidden');
+            if (subtitle) subtitle.textContent = 'Plan FREE — choisis un jeu parmi le catalogue';
+            _renderFreeCatalog();
+            _bindFreePlanGuide();
+        }
+    }
+
+    var _freePlanGuideBound = false;
+    var _discordAvisUrl = 'https://discord.gg/slimedeals';
+
+    function _bindFreePlanGuide() {
+        if (_freePlanGuideBound) return;
+        var btnT = document.getElementById('free-cta-tarifs');
+        var btnA = document.getElementById('free-cta-avis');
+        if (!btnT || !btnA) return;
+        _freePlanGuideBound = true;
+        btnT.addEventListener('click', function (e) {
+            e.preventDefault();
+            Bridge.call('open_url', 'https://slimedeals.fr/#tarifs');
+        });
+        btnA.addEventListener('click', function (e) {
+            e.preventDefault();
+            Bridge.call('open_url', _discordAvisUrl);
+        });
+        Bridge.onReady(function (py) {
+            if (typeof py.discord_avis_url !== 'function') return;
+            py.discord_avis_url(function (url) {
+                if (url && typeof url === 'string' && url.indexOf('http') === 0) {
+                    _discordAvisUrl = url;
+                }
+            });
+        });
+    }
+
+    // ── FREE catalog ──────────────────────────────────────────────────────────
+
+    function _renderFreeCatalog() {
+        var grid = document.getElementById('free-catalog-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+        var hasClaimed  = !!_freeClaimed;
+        var badge       = document.getElementById('free-plan-claimed-badge');
+        var alreadyMsg  = document.getElementById('free-already-claimed-msg');
+
+        if (badge)      badge.classList.toggle('hidden', !hasClaimed);
+        if (alreadyMsg) alreadyMsg.classList.toggle('hidden', !hasClaimed);
+
+        FREE_CATALOG.forEach(function(game) {
+            var isMine  = hasClaimed && _freeClaimed === game.app_id;
+            var isOther = hasClaimed && _freeClaimed !== game.app_id;
+
+            var card = document.createElement('div');
+            card.className = 'free-catalog-card' +
+                (isMine  ? ' is-claimed'       : '') +
+                (isOther ? ' is-other-claimed' : '');
+
+            var ribbon = '<div class="free-catalog-card-claimed-ribbon">Ton choix</div>';
+
+            var btnLabel, btnDisabled;
+            if (isMine) {
+                btnLabel    = '✅ Installé / réclamé';
+                btnDisabled = 'disabled';
+            } else if (isOther) {
+                btnLabel    = 'Non disponible';
+                btnDisabled = 'disabled';
+            } else {
+                btnLabel    = '⬇ Choisir ce jeu';
+                btnDisabled = '';
+            }
+
+            card.innerHTML =
+                ribbon +
+                '<img src="' + _steamHeader(game.app_id) + '" alt="' + game.name + '" loading="lazy">' +
+                '<div class="free-catalog-card-body">' +
+                    '<div class="free-catalog-card-name">' + game.name + '</div>' +
+                    '<button class="free-catalog-card-btn" data-appid="' + game.app_id + '" ' + btnDisabled + '>' +
+                        btnLabel +
+                    '</button>' +
+                '</div>';
+
+            if (!hasClaimed) {
+                card.addEventListener('click', function(e) {
+                    var btn = e.target.closest('button.free-catalog-card-btn');
+                    if (btn) _claimFreeGame(game.app_id, game.name);
+                });
+            }
+
+            grid.appendChild(card);
+        });
+    }
+
+    function _claimFreeGame(appId, gameName) {
+        // Confirm
+        if (!confirm('Confirmer la sélection de "' + gameName + '" ?\nCe choix est définitif et ne peut pas être changé.')) return;
+
+        // Disable all buttons during processing
+        var allBtns = document.querySelectorAll('.free-catalog-card-btn');
+        allBtns.forEach(function(b) { b.disabled = true; b.textContent = 'Traitement…'; });
+
+        Bridge.onReady(function(py) {
+            py.record_free_claim(appId, function(jsonStr) {
+                var result;
+                try { result = JSON.parse(jsonStr); } catch(e) { result = {ok: false, error: 'Erreur interne'}; }
+
+                if (result.ok) {
+                    _freeClaimed = String(appId);
+                    // Laisser le disque enregistrer auth.json avant le téléchargement (évite faux refus plan FREE)
+                    setTimeout(function () {
+                        Bridge.call('download_game_with_source', String(appId), 'twentytwocloud', '0');
+                    }, 0);
+                    if (typeof showToast === 'function') {
+                        showToast('Téléchargement de ' + gameName + ' lancé !', 'success');
+                    }
+                    _renderFreeCatalog();
+                } else if (result.error === 'already_claimed') {
+                    _freeClaimed = result.app_id || appId;
+                    _renderFreeCatalog();
+                } else {
+                    // Restore buttons on error
+                    allBtns.forEach(function(b) { b.disabled = false; b.textContent = '⬇ Choisir ce jeu'; });
+                    if (typeof showToast === 'function') {
+                        showToast('Erreur : ' + (result.error || 'Impossible de valider.'), 'error');
+                    }
+                }
+            });
+        });
+    }
+
+    // ── Premium TwentyTwoCloud ─────────────────────────────────────────────────
+
+    function _extractAppId(input) {
+        input = (input || '').trim();
+        var m = input.match(/store\.steampowered\.com\/app\/(\d+)/i);
+        if (m) return m[1];
+        if (/^\d+$/.test(input)) return input;
+        return null;
+    }
+
+    function _setLoading(on) {
+        var l = document.getElementById('ttc-loading');
+        var r = document.getElementById('ttc-result');
+        var e = document.getElementById('ttc-error');
+        if (l) l.classList.toggle('hidden', !on);
+        if (r) r.classList.add('hidden');
+        if (e) e.classList.add('hidden');
+    }
+
+    function _showError(msg) {
+        var l = document.getElementById('ttc-loading');
+        var e = document.getElementById('ttc-error');
+        var m = document.getElementById('ttc-error-msg');
+        if (l) l.classList.add('hidden');
+        if (e) e.classList.remove('hidden');
+        if (m) m.textContent = msg || 'Erreur inconnue.';
+    }
+
+    function _showResult(data) {
+        var l = document.getElementById('ttc-loading');
+        var r = document.getElementById('ttc-result');
+        if (l) l.classList.add('hidden');
+        if (!r) return;
+
+        document.getElementById('ttc-game-name').textContent   = data.name || ('App ' + data.app_id);
+        document.getElementById('ttc-app-id-badge').textContent = 'App ID : ' + data.app_id;
+
+        var img = document.getElementById('ttc-header-img');
+        if (img) { img.src = data.header_image || ''; img.style.display = ''; }
+
+        var status = document.getElementById('ttc-status-badge');
+        if (status) {
+            if (data.available) {
+                status.textContent = '✓ Disponible';
+                status.className   = 'ttc-status available';
+            } else {
+                status.textContent = '✗ Introuvable';
+                status.className   = 'ttc-status unavailable';
+            }
+        }
+
+        var dlBtn    = document.getElementById('ttc-download-btn');
+        var depotBtn = document.getElementById('ttc-depot-btn');
+        if (dlBtn)    dlBtn.disabled = !data.available;
+        if (depotBtn) depotBtn.dataset.appid = data.app_id;
+
+        _resetProgress();
+        r.classList.remove('hidden');
+        _currentAppId = data.app_id;
+    }
+
+    function _resetProgress() {
+        var wrap  = document.getElementById('ttc-progress-wrap');
+        var fill  = document.getElementById('ttc-progress-fill');
+        var label = document.getElementById('ttc-progress-label');
+        if (wrap)  wrap.classList.add('hidden');
+        if (fill)  fill.style.width = '0%';
+        if (label) label.textContent = 'Démarrage…';
+    }
+
+    function _showProgress(status, progress) {
+        var wrap  = document.getElementById('ttc-progress-wrap');
+        var fill  = document.getElementById('ttc-progress-fill');
+        var label = document.getElementById('ttc-progress-label');
+        if (wrap)  wrap.classList.remove('hidden');
+        if (fill)  fill.style.width = (progress || 0) + '%';
+        if (label) label.textContent = status || '…';
+    }
+
+    function _doSearch() {
+        var input = document.getElementById('ttc-url-input');
+        if (!input) return;
+        var appId = _extractAppId(input.value);
+        if (!appId) {
+            _showError('Lien Steam invalide ou App ID introuvable. Exemple : https://store.steampowered.com/app/1971870/');
+            return;
+        }
+        _setLoading(true);
+        Bridge.call('lookup_ttc_game', appId);
+    }
+
+    var _premiumListenersAttached = false;
+    function _initPremiumListeners() {
+        if (_premiumListenersAttached) return;
+        _premiumListenersAttached = true;
+
+        var searchBtn = document.getElementById('ttc-search-btn');
+        var urlInput  = document.getElementById('ttc-url-input');
+        var dlBtn     = document.getElementById('ttc-download-btn');
+        var depotBtn  = document.getElementById('ttc-depot-btn');
+
+        if (searchBtn) searchBtn.addEventListener('click', _doSearch);
+        if (urlInput)  urlInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') _doSearch(); });
+
+        if (dlBtn) {
+            dlBtn.addEventListener('click', function() {
+                if (!_currentAppId) return;
+                _resetProgress();
+                _showProgress('Démarrage du téléchargement…', 5);
+                Bridge.call('download_game_with_source', _currentAppId, 'twentytwocloud', '0');
+            });
+        }
+        if (depotBtn) {
+            depotBtn.addEventListener('click', function() {
+                var appId = depotBtn.dataset.appid || _currentAppId;
+                if (!appId) return;
+                Bridge.call('run_game_action', appId, 'download_games');
+            });
+        }
+
+        Bridge.on('ttc_game_info', function(jsonStr) {
+            var data;
+            try { data = JSON.parse(jsonStr); } catch(e) {
+                _showError('Réponse invalide du serveur.'); return;
+            }
+            _showResult(data);
+        });
+        Bridge.on('download_progress', function(jsonStr) {
+            var d; try { d = JSON.parse(jsonStr); } catch(e) { return; }
+            _showProgress(d.status, d.progress);
+        });
+        Bridge.on('task_finished', function(jsonStr) {
+            var d; try { d = JSON.parse(jsonStr); } catch(e) { return; }
+            if (d.task !== 'download_fastest') return;
+            if (d.success) { _showProgress('✅ Installation terminée !', 100); }
+            else           { _showProgress('❌ Échec du téléchargement.', 0); }
+        });
+    }
+
+    // ── Public API ────────────────────────────────────────────────────────────
 
     function init() {
         if (_initialized) return;
         _initialized = true;
-
-        var searchInput = document.getElementById('store-search');
-        var searchBtn = document.getElementById('store-search-btn');
-        var sortSelect = document.getElementById('store-sort');
-        var viewGrid = document.getElementById('view-grid');
-        var viewList = document.getElementById('view-list');
-        var prevBtn = document.getElementById('page-prev');
-        var nextBtn = document.getElementById('page-next');
-        var apiKeyConnect = document.getElementById('api-key-connect');
-        var toggleImagesBtn = document.getElementById('store-toggle-images');
-
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                clearTimeout(_debounceTimer);
-                _debounceTimer = setTimeout(function() {
-                    _searchQuery = searchInput.value.trim();
-                    _page = 1;
-                    _fetchGames();
-                }, 300);
-            });
-            searchInput.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    clearTimeout(_debounceTimer);
-                    _searchQuery = searchInput.value.trim();
-                    _page = 1;
-                    _fetchGames();
-                }
-            });
-        }
-
-        if (searchBtn) {
-            searchBtn.addEventListener('click', function() {
-                _searchQuery = searchInput ? searchInput.value.trim() : '';
-                _page = 1;
-                _fetchGames();
-            });
-        }
-
-        if (sortSelect) {
-            sortSelect.addEventListener('change', function() {
-                _sortBy = this.value;
-                _page = 1;
-                _fetchGames();
-            });
-        }
-
-        if (viewGrid) viewGrid.addEventListener('click', function() { _setViewMode('grid'); });
-        if (viewList) viewList.addEventListener('click', function() { _setViewMode('list'); });
-
-        if (toggleImagesBtn) {
-            toggleImagesBtn.addEventListener('click', function() {
-                _imagesHidden = !_imagesHidden;
-                Components.setHideImages(_imagesHidden);
-                Bridge.call('set_setting', 'hide_store_images', _imagesHidden ? 'True' : 'False');
-                toggleImagesBtn.classList.toggle('active', _imagesHidden);
-                _fetchGames();
-            });
-        }
-
-        var genreChips = document.querySelectorAll('.genre-chip');
-        genreChips.forEach(function(chip) {
-            chip.addEventListener('click', function() {
-                _activeGenre = chip.dataset.genre || '';
-                genreChips.forEach(function(c) { c.classList.remove('active'); });
-                chip.classList.add('active');
-                _page = 1;
-                _fetchGames();
-            });
-        });
-
-        if (prevBtn) prevBtn.addEventListener('click', function() { if (_page > 1) { _page--; _fetchGames(); } });
-        if (nextBtn) nextBtn.addEventListener('click', function() { if (_page < _totalPages) { _page++; _fetchGames(); } });
-
-        if (apiKeyConnect) {
-            apiKeyConnect.addEventListener('click', function() {
-                var input = document.getElementById('api-key-input');
-                var key = input ? input.value.trim() : '';
-                if (!key) {
-                    Components.showToast('warning', 'Please enter an API key');
-                    return;
-                }
-                Bridge.call('connect_store', key);
-                _apiKeyConnected = true;
-                _hideConnectBanner();
-                _fetchGames();
-                Components.showToast('success', 'API key saved. Loading store...');
-            });
-        }
-
-        // Listen for search results
-        Bridge.on('search_results', function(json) {
-            _hideLoading();
-            try {
-                var data = JSON.parse(json);
-                _renderGames(data.games || []);
-                _total = data.total || 0;
-                _totalPages = Math.max(1, Math.ceil(_total / _perPage));
-                _updatePagination();
-                if (!data.fallback) {
-                    _hideConnectBanner();
-                } else {
-                    _showConnectBanner();
-                    var msgEl = document.getElementById('store-banner-msg');
-                    if (msgEl) {
-                        var gamesLen = (data.games || []).length;
-                        if (data.hubcap_error) {
-                            msgEl.textContent = 'Your Hubcap API key is invalid or expired. Enter a new one to restore full store access.';
-                        } else if (gamesLen > 0) {
-                            msgEl.textContent = 'Browsing Steam catalog (' + _total + ' games). Enter a Hubcap key to see manifest availability.';
-                        } else {
-                            msgEl.textContent = 'Could not load store — check your internet or enter a Hubcap API key.';
-                        }
-                    }
-                }
-            } catch(e) {
-                Components.showToast('error', 'Failed to parse search results');
-            }
-        });
-    }
-
-    function onApiKeyAvailable(key) {
-        _apiKeyConnected = true;
     }
 
     function onPageEnter() {
         init();
-        _page = 1;
-        Bridge.callSync('get_setting', 'hide_store_images', function(val) {
-            _imagesHidden = (val === 'True');
-            Components.setHideImages(_imagesHidden);
-            var btn = document.getElementById('store-toggle-images');
-            if (btn) btn.classList.toggle('active', _imagesHidden);
-        });
-        _fetchGames();
+        _loadRankAndDisplay();
+        // Focus input only if premium section ends up visible
+        setTimeout(function() {
+            var input = document.getElementById('ttc-url-input');
+            var premSec = document.getElementById('store-premium-section');
+            if (input && premSec && !premSec.classList.contains('hidden')) input.focus();
+        }, 200);
     }
 
-    function _fetchGames() {
-        _showLoading();
-        var offset = (_page - 1) * _perPage;
-        var effectiveQuery = _activeGenre
-            ? (_searchQuery ? _searchQuery + ' ' + _activeGenre : _activeGenre)
-            : _searchQuery;
-        Bridge.call('search_games', effectiveQuery, offset, _perPage, _sortBy);
-    }
+    function onApiKeyAvailable(_key) { /* conservé pour compatibilité */ }
 
-    function _renderGames(games) {
-        var grid = document.getElementById('store-grid');
-        var list = document.getElementById('store-list');
-        var pagination = document.getElementById('store-pagination');
-
-        if (grid) grid.innerHTML = '';
-        if (list) list.innerHTML = '';
-
-        if (games.length === 0) {
-            if (grid) grid.innerHTML = '<div class="empty-state"><p>No games found. Try a different search.</p></div>';
-            if (pagination) pagination.classList.add('hidden');
-            return;
-        }
-
-        games.forEach(function(game, index) {
-            if (grid) grid.appendChild(Components.createGameCard(game, { index: index }));
-            if (list) list.appendChild(Components.createGameListItem(game));
-        });
-
-        if (pagination) pagination.classList.remove('hidden');
-    }
-
-    function _updatePagination() {
-        var info = document.getElementById('page-info');
-        var prevBtn = document.getElementById('page-prev');
-        var nextBtn = document.getElementById('page-next');
-
-        if (info) info.textContent = 'Page ' + _page + ' of ' + _totalPages + ' (' + _total + ' games)';
-        if (prevBtn) prevBtn.disabled = _page <= 1;
-        if (nextBtn) nextBtn.disabled = _page >= _totalPages;
-    }
-
-    function _setViewMode(mode) {
-        _viewMode = mode;
-        var grid = document.getElementById('store-grid');
-        var list = document.getElementById('store-list');
-        var viewGrid = document.getElementById('view-grid');
-        var viewList = document.getElementById('view-list');
-
-        if (mode === 'grid') {
-            if (grid) grid.classList.remove('hidden');
-            if (list) list.classList.add('hidden');
-            if (viewGrid) viewGrid.classList.add('active');
-            if (viewList) viewList.classList.remove('active');
-        } else {
-            if (grid) grid.classList.add('hidden');
-            if (list) list.classList.remove('hidden');
-            if (viewGrid) viewGrid.classList.remove('active');
-            if (viewList) viewList.classList.add('active');
-        }
-    }
-
-    function _showLoading() {
-        var loading = document.getElementById('store-loading');
-        var grid = document.getElementById('store-grid');
-        var list = document.getElementById('store-list');
-        if (loading) loading.classList.remove('hidden');
-        if (grid) grid.classList.add('hidden');
-        if (list) list.classList.add('hidden');
-    }
-
-    function _hideLoading() {
-        var loading = document.getElementById('store-loading');
-        if (loading) loading.classList.add('hidden');
-        var grid = document.getElementById('store-grid');
-        var list = document.getElementById('store-list');
-        if (_viewMode === 'list') {
-            if (list) list.classList.remove('hidden');
-        } else {
-            if (grid) grid.classList.remove('hidden');
-        }
-    }
-
-    function _hideConnectBanner() {
-        var banner = document.getElementById('store-connect-banner');
-        if (banner) banner.classList.add('hidden');
-    }
-
-    function _showConnectBanner() {
-        var banner = document.getElementById('store-connect-banner');
-        if (banner) banner.classList.remove('hidden');
-    }
-
-    return {
-        init: init,
-        onPageEnter: onPageEnter,
-        onApiKeyAvailable: onApiKeyAvailable
-    };
+    return { init: init, onPageEnter: onPageEnter, onApiKeyAvailable: onApiKeyAvailable };
 })();

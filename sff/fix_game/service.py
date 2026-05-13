@@ -522,6 +522,10 @@ Default Goldberg port: 47584 — make sure it is open in your firewall.
             run_dir = config_exe.parent
             run_exe = config_exe
         env = os.environ.copy()
+        # Empêche PYTHONHOME/PYTHONPATH du venv parent de casser le Python
+        # embarqué dans le PyInstaller bundle generate_emu_config.exe
+        for _k in ("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV", "VIRTUAL_ENV_PROMPT"):
+            env.pop(_k, None)
         if auth_mode == "login" and username and password:
             env["GSE_CFG_USERNAME"] = username
             env["GSE_CFG_PASSWORD"] = password

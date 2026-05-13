@@ -1,20 +1,20 @@
-# SteaMidra - Steam game setup and manifest tool (SFF)
+﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 #
-# This file is part of SteaMidra.
+# This file is part of SlimeDeals.
 #
-# SteaMidra is free software: you can redistribute it and/or modify
+# SlimeDeals is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# SteaMidra is distributed in the hope that it will be useful,
+# SlimeDeals is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
+# along with SlimeDeals.  If not, see <https://www.gnu.org/licenses/>.
 
 import functools
 import logging
@@ -1180,7 +1180,7 @@ class UI:
             tmp_update.mkdir(parents=True, exist_ok=True)
             with zipfile.ZipFile(update_zip) as zf:
                 zf.extractall(tmp_update)
-            # If zip had a single top-level folder (e.g. SteaMidra-v4.5.3/), flatten so copy source is the contents
+            # If zip had a single top-level folder (e.g. SlimeDeals-v4.5.3/), flatten so copy source is the contents
             entries = list(tmp_update.iterdir())
             if len(entries) == 1 and entries[0].is_dir():
                 inner = entries[0]
@@ -1268,7 +1268,7 @@ class UI:
                 "rmdir /s /q " + convert([internal_dir]) + " >nul 2>&1\n"
                 "robocopy " + convert([str(tmp_update), str(app_dir)]) + " /E /IS /IT >nul 2>&1\n"
                 "if %errorlevel% GEQ 8 (\n"
-                "  echo Robocopy error! Update may be incomplete. Check your SteaMidra folder.\n"
+                "  echo Robocopy error! Update may be incomplete. Check your SlimeDeals folder.\n"
                 "  pause\n"
                 "  goto :end\n"
                 ")\n"
@@ -1285,7 +1285,7 @@ class UI:
                 creationflags=subprocess.DETACHED_PROCESS | _BREAKAWAY,
                 cwd=str(app_dir),
             )
-            print(Fore.GREEN + "Update started. SteaMidra will restart automatically." + Style.RESET_ALL, flush=True)
+            print(Fore.GREEN + "Update started. SlimeDeals will restart automatically." + Style.RESET_ALL, flush=True)
             os._exit(0)
 
         def _do_linux_frozen_update():
@@ -1308,12 +1308,12 @@ class UI:
                     shutil.move(str(p), str(tmp_update / p.name))
                 inner.rmdir()
             update_zip.unlink(missing_ok=True)
-            install_sh = tmp_update / "steamidra_install.sh"
+            install_sh = tmp_update / "SlimeDeals_install.sh"
             if not install_sh.exists():
-                print(Fore.RED + "steamidra_install.sh not found in update package." + Style.RESET_ALL)
+                print(Fore.RED + "SlimeDeals_install.sh not found in update package." + Style.RESET_ALL)
                 return
             install_sh.chmod(0o755)
-            install_cmd = f"cd {shutil.quote(str(tmp_update))} && bash steamidra_install.sh; exec bash"
+            install_cmd = f"cd {shutil.quote(str(tmp_update))} && bash SlimeDeals_install.sh; exec bash"
             terminals = [
                 ["x-terminal-emulator", "-e", "bash", "-c", install_cmd],
                 ["gnome-terminal", "--", "bash", "-c", install_cmd],
@@ -1336,10 +1336,10 @@ class UI:
                 except Exception:
                     pass
             if launched:
-                print(Fore.GREEN + "Install script launched. SteaMidra will close now." + Style.RESET_ALL)
+                print(Fore.GREEN + "Install script launched. SlimeDeals will close now." + Style.RESET_ALL)
                 sys.exit(0)
             else:
-                print(Fore.RED + "Could not launch a terminal. Run steamidra_install.sh manually from:" + Style.RESET_ALL)
+                print(Fore.RED + "Could not launch a terminal. Run SlimeDeals_install.sh manually from:" + Style.RESET_ALL)
                 print(f"  {tmp_update}")
 
         if not is_frozen:

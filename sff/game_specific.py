@@ -238,6 +238,9 @@ class GameHandler:
             set_setting(Settings.STEAM_PASS, password)
             set_setting(Settings.STEAM32_ID, steam32_id)
         env = os.environ.copy()
+        # Empêche PYTHONHOME/PYTHONPATH du venv parent de casser le Python embarqué
+        for _k in ("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV", "VIRTUAL_ENV_PROMPT"):
+            env.pop(_k, None)
         env["GSE_CFG_USERNAME"] = user
         env["GSE_CFG_PASSWORD"] = password
         extra_args = []

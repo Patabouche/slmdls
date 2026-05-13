@@ -73,7 +73,7 @@ window.Library = (function() {
                         Components.showModal('library-delete-modal');
                     } else if (action === 'check_update') {
                         btn.disabled = true;
-                        btn.textContent = 'Checking...';
+                        btn.textContent = 'Vérification...';
                         btn.dataset.checking = appId;
                         Bridge.call('check_game_update', appId);
                     } else if (action === 'lure_fix') {
@@ -184,7 +184,7 @@ window.Library = (function() {
             try {
                 var d = JSON.parse(json || '{}');
                 if (d.error || !d.total) { el.textContent = ''; return; }
-                el.textContent = _fmtBytes(d.free) + ' free of ' + _fmtBytes(d.total);
+                el.textContent = _fmtBytes(d.free) + ' libre sur ' + _fmtBytes(d.total);
             } catch(e) {}
         });
     }
@@ -262,15 +262,15 @@ window.Library = (function() {
             btns.forEach(function(b) {
                 if (b.dataset.checking) {
                     b.disabled = false;
-                    b.textContent = 'Update';
+                    b.textContent = 'Mettre à jour';
                     delete b.dataset.checking;
                 }
             });
         }
         if (data.up_to_date) {
-            Components.showToast('success', 'Already up to date (build ' + (data.installed_buildid || '') + ')');
+            Components.showToast('success', 'Déjà à jour (build ' + (data.installed_buildid || '') + ')');
         } else if (data.updated) {
-            Components.showToast('success', 'Updated to build ' + (data.cm_buildid || ''));
+            Components.showToast('success', 'Mis à jour vers le build ' + (data.cm_buildid || ''));
         } else if (data.error) {
             Components.showToast('error', data.error);
         }
@@ -289,9 +289,9 @@ window.Library = (function() {
             });
         }
         if (data.success) {
-            Components.showToast('success', data.message || 'ACF patched. Restart Steam.');
+            Components.showToast('success', data.message || 'ACF patché. Redémarrez Steam.');
         } else {
-            Components.showToast('error', data.message || 'Lure fix failed');
+            Components.showToast('error', data.message || 'Lure fix échoué');
         }
     }
 

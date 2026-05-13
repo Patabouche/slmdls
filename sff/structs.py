@@ -125,6 +125,7 @@ class LuaEndpoint(Enum):
     OUREVERYDAY = "oureveryday (quick but could be limited)"
     HUBCAP = "Hubcap Manifest (more stuff, needs API key, has a daily limit)"
     RYUU = "Ryuu Generator (needs API key)"
+    TWENTYTWOCLOUD = "TwentyTwoCloud (lien Steam direct)"
 
 
 class MainReturnCode(Enum):

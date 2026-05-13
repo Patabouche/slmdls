@@ -56,7 +56,7 @@ window.CloudSaves = (function() {
             if (exe) Bridge.call('set_setting', 'cloud_rclone_exe', exe.value.trim());
             if (remote) Bridge.call('set_setting', 'cloud_rclone_remote', remote.value.trim());
         }
-        Components.showToast('success', 'Provider config saved');
+        Components.showToast('success', 'Configuration fournisseur enregistrée');
     }
 
     function _autofillBundledExe(provider) {
@@ -118,7 +118,7 @@ window.CloudSaves = (function() {
         if (gdriveDisconnectBtn) {
             gdriveDisconnectBtn.addEventListener('click', function() {
                 _setGdriveStatus(false, '');
-                Components.showToast('info', 'Google Drive disconnected');
+                Components.showToast('info', 'Google Drive déconnecté');
             });
         }
 
@@ -158,7 +158,7 @@ window.CloudSaves = (function() {
                 var rcloneExe = exeInp ? exeInp.value.trim() : '';
                 var remote = remoteInp ? remoteInp.value.trim() : '';
                 if (!remote) {
-                    Components.showToast('warning', 'Enter a remote destination first');
+                    Components.showToast('warning', 'Entrez d\'abord une destination distante');
                     return;
                 }
                 rcloneTestBtn.disabled = true;
@@ -220,7 +220,7 @@ window.CloudSaves = (function() {
                 var input = document.getElementById('cloud-steam32');
                 if (input && input.value.trim()) {
                     Bridge.call('set_setting', 'steam32_id', input.value.trim());
-                    Components.showToast('success', 'Steam32 ID saved');
+                    Components.showToast('success', 'Steam32 ID enregistré');
                 }
             });
         }
@@ -251,14 +251,14 @@ window.CloudSaves = (function() {
                 var tbody = document.getElementById('cloud-games-tbody');
                 var selectedRow = tbody ? tbody.querySelector('tr.selected') : null;
                 if (!selectedRow) {
-                    Components.showToast('warning', 'Select a game from the scan results first');
+                    Components.showToast('warning', 'Sélectionnez un jeu dans les résultats du scan d\'abord');
                     return;
                 }
                 var appId = selectedRow.dataset.appid;
                 var gameName = selectedRow.cells[1] ? selectedRow.cells[1].textContent : '';
 
                 if (!sp || !s32) {
-                    Components.showToast('warning', 'Set both Steam path and Steam32 ID first');
+                    Components.showToast('warning', 'Définissez le chemin Steam et le Steam32 ID d\'abord');
                     return;
                 }
 
@@ -268,7 +268,7 @@ window.CloudSaves = (function() {
                     var rExePath = rExe ? rExe.value.trim() : '';
                     var rRemotePath = rRemote ? rRemote.value.trim() : '';
                     if (!rExePath || !rRemotePath) {
-                        Components.showToast('warning', 'Set the rclone executable and remote destination first, then save the config');
+                        Components.showToast('warning', 'Définissez l\'exécutable rclone et la destination, puis enregistrez la config');
                         return;
                     }
                     Bridge.call('rclone_backup_save', JSON.stringify({
@@ -276,7 +276,7 @@ window.CloudSaves = (function() {
                         steam_path: sp, steam32_id: s32,
                         rclone_exe: rExePath, remote_dest: rRemotePath
                     }));
-                    Components.showToast('info', 'Uploading via rclone...');
+                    Components.showToast('info', 'Upload via rclone...');
                     return;
                 }
 
@@ -298,13 +298,13 @@ window.CloudSaves = (function() {
                         entries: [entry],
                         provider: 'gdrive_api'
                     }));
-                    Components.showToast('info', 'Uploading to Google Drive...');
+                    Components.showToast('info', 'Upload vers Google Drive...');
                     return;
                 } else {
                     var dest = document.getElementById('cloud-backup-dest');
                     destPath = dest ? dest.value.trim() : '';
                     if (!destPath) {
-                        Components.showToast('warning', 'Select a backup destination');
+                        Components.showToast('warning', 'Sélectionnez une destination de sauvegarde');
                         return;
                     }
                 }
@@ -313,7 +313,7 @@ window.CloudSaves = (function() {
                     app_id: appId, dest_path: destPath,
                     steam_path: sp, steam32_id: s32, game_name: gameName
                 }));
-                Components.showToast('info', 'Backing up saves for ' + (gameName || 'App ' + appId) + '...');
+                Components.showToast('info', 'Sauvegarde des données pour ' + (gameName || 'App ' + appId) + '...');
             });
         }
 
@@ -333,14 +333,14 @@ window.CloudSaves = (function() {
                 var tbody = document.getElementById('cloud-games-tbody');
                 var selectedRow = tbody ? tbody.querySelector('tr.selected') : null;
                 if (!selectedRow) {
-                    Components.showToast('warning', 'Select a game from the scan results first');
+                    Components.showToast('warning', 'Sélectionnez un jeu dans les résultats du scan d\'abord');
                     return;
                 }
                 var appId = selectedRow.dataset.appid;
                 var input = document.getElementById('cloud-import-path');
                 var importPath = input ? input.value.trim() : '';
                 if (!importPath) {
-                    Components.showToast('warning', 'Select a backup folder');
+                    Components.showToast('warning', 'Sélectionnez un dossier de sauvegarde');
                     return;
                 }
                 var steamPath = document.getElementById('cloud-steam-path');
@@ -348,7 +348,7 @@ window.CloudSaves = (function() {
                 var sp = steamPath ? steamPath.value.trim() : '';
                 var s32 = steam32 ? steam32.value.trim() : '';
                 if (!sp || !s32) {
-                    Components.showToast('warning', 'Set both Steam path and Steam32 ID first');
+                    Components.showToast('warning', 'Définissez le chemin Steam et le Steam32 ID d\'abord');
                     return;
                 }
                 if (confirm('Restore saves from this backup? A safety backup will be created automatically.')) {
@@ -356,7 +356,7 @@ window.CloudSaves = (function() {
                         backup_path: importPath, app_id: appId,
                         steam_path: sp, steam32_id: s32
                     }));
-                    Components.showToast('info', 'Restoring saves...');
+                    Components.showToast('info', 'Restauration des sauvegardes...');
                 }
             });
         }
@@ -460,9 +460,9 @@ window.CloudSaves = (function() {
                     if (btn) { btn.disabled = false; btn.textContent = 'Connect Google Drive'; }
                     if (data.success) {
                         _setGdriveStatus(true, data.email || '');
-                        Components.showToast('success', 'Google Drive connected');
+                        Components.showToast('success', 'Google Drive connecté');
                     } else {
-                        Components.showToast('error', data.message || 'Connection failed');
+                        Components.showToast('error', data.message || 'Connexion échouée');
                     }
                 }
 
@@ -491,9 +491,9 @@ window.CloudSaves = (function() {
                         setTimeout(function() { progressEl.classList.add('hidden'); }, 3000);
                     }
                     if (data.success) {
-                        Components.showToast('success', data.message || 'Backup complete');
+                        Components.showToast('success', data.message || 'Sauvegarde terminée');
                     } else {
-                        Components.showToast('error', data.message || 'Backup failed');
+                        Components.showToast('error', data.message || 'Sauvegarde échouée');
                     }
                 }
 
@@ -502,7 +502,7 @@ window.CloudSaves = (function() {
                         _restoreLocationsData = data.locations;
                         _renderRestoreLocations(data.locations);
                     } else {
-                        Components.showToast('error', data.message || 'Scan failed');
+                        Components.showToast('error', data.message || 'Scan échoué');
                     }
                 }
 
@@ -512,9 +512,9 @@ window.CloudSaves = (function() {
                     if (logEl2 && data.log) { logEl2.textContent = data.log; }
                     if (logDiv2) logDiv2.classList.remove('hidden');
                     if (data.success) {
-                        Components.showToast('success', 'Restore complete');
+                        Components.showToast('success', 'Restauration terminée');
                     } else {
-                        Components.showToast('error', data.message || 'Restore failed');
+                        Components.showToast('error', data.message || 'Restauration échouée');
                     }
                 }
 
@@ -523,15 +523,15 @@ window.CloudSaves = (function() {
                     if (testBtn) { testBtn.disabled = false; testBtn.textContent = 'Test'; }
                     var remoteVal = (document.getElementById('provider-rclone-remote') || {}).value || '';
                     if (data.success) {
-                        Components.showToast('success', 'Remote OK: ' + remoteVal);
+                        Components.showToast('success', 'Remote OK : ' + remoteVal);
                     } else {
-                        Components.showToast('error', 'Remote failed: ' + (data.error || 'unknown error'));
+                        Components.showToast('error', 'Remote échoué : ' + (data.error || 'erreur inconnue'));
                     }
                 }
 
                 if (data.task === 'rclone_list_remotes') {
                     var loadBtn = document.getElementById('provider-rclone-list');
-                    if (loadBtn) { loadBtn.disabled = false; loadBtn.textContent = 'Load Remotes'; }
+                    if (loadBtn) { loadBtn.disabled = false; loadBtn.textContent = 'Charger les remotes'; }
                     if (data.success) {
                         var dl = document.getElementById('rclone-remotes-list');
                         if (dl) {
@@ -543,12 +543,12 @@ window.CloudSaves = (function() {
                             });
                         }
                         if (!data.remotes || !data.remotes.length) {
-                            Components.showToast('warning', 'No remotes found. Click Setup in Terminal to add one.');
+                            Components.showToast('warning', 'Aucun remote trouvé. Cliquez sur Configurer dans le terminal pour en ajouter un.');
                         } else {
-                            Components.showToast('success', 'Found ' + data.remotes.length + ' remote(s): ' + data.remotes.join(', '));
+                            Components.showToast('success', 'Trouvé ' + data.remotes.length + ' remote(s) : ' + data.remotes.join(', '));
                         }
                     } else {
-                        Components.showToast('error', 'Could not list remotes: ' + (data.error || 'unknown error'));
+                        Components.showToast('error', 'Impossible de lister les remotes : ' + (data.error || 'erreur inconnue'));
                     }
                 }
 
@@ -556,9 +556,9 @@ window.CloudSaves = (function() {
                     var setupBtn = document.getElementById('provider-rclone-setup');
                     if (setupBtn) { setupBtn.disabled = false; setupBtn.textContent = 'Setup in Terminal'; }
                     if (data.success) {
-                        Components.showToast('info', 'rclone config opened. Add a remote, then click Load Remotes.');
+                        Components.showToast('info', 'Config rclone ouverte. Ajoutez un remote, puis cliquez sur Charger les remotes.');
                     } else {
-                        Components.showToast('error', 'Could not open terminal: ' + (data.error || 'unknown error'));
+                        Components.showToast('error', 'Impossible d\'ouvrir le terminal : ' + (data.error || 'erreur inconnue'));
                     }
                 }
 
@@ -571,9 +571,9 @@ window.CloudSaves = (function() {
                         if (logOutput) logOutput.classList.remove('hidden');
                     }
                     if (data.success) {
-                        Components.showToast('success', data.message || 'Done');
+                        Components.showToast('success', data.message || 'Terminé');
                     } else {
-                        Components.showToast('error', data.message || 'Operation failed');
+                        Components.showToast('error', data.message || 'Opération échouée');
                     }
                 }
             } catch(e) {}
@@ -626,11 +626,11 @@ window.CloudSaves = (function() {
         var s32 = steam32 ? steam32.value.trim() : '';
 
         if (!sp || !s32) {
-            Components.showToast('warning', 'Set both Steam path and Steam32 ID first');
+            Components.showToast('warning', 'Définissez le chemin Steam et le Steam32 ID d\'abord');
             return;
         }
 
-        Components.showToast('info', 'Scanning for cloud saves...');
+        Components.showToast('info', 'Scan des sauvegardes cloud...');
         Bridge.call('scan_cloud_games', sp, s32);
     }
 
@@ -657,7 +657,7 @@ window.CloudSaves = (function() {
         });
 
         if (tableDiv) tableDiv.classList.remove('hidden');
-        Components.showToast('success', 'Found ' + games.length + ' games with save data');
+        Components.showToast('success', 'Trouvé ' + games.length + ' jeu(x) avec des données de sauvegarde');
     }
 
     // ── Google Drive helpers ───────────────────────────────────────
@@ -694,7 +694,7 @@ window.CloudSaves = (function() {
         var steam32 = document.getElementById('cloud-steam32');
         var sp = steamPath ? steamPath.value.trim() : '';
         var s32 = steam32 ? steam32.value.trim() : '';
-        Components.showToast('info', 'Scanning all save locations...');
+        Components.showToast('info', 'Scan de tous les emplacements de sauvegarde...');
         Bridge.call('scan_all_save_locations', JSON.stringify({ steam_path: sp, steam32_id: s32 }));
     }
 
@@ -718,7 +718,7 @@ window.CloudSaves = (function() {
         if (backupBtn) backupBtn.style.display = '';
         // Show dest row only for non-gdrive providers
         if (destRow) destRow.style.display = (_provider === 'gdrive') ? 'none' : '';
-        Components.showToast('success', 'Found ' + entries.length + ' save folder(s)');
+        Components.showToast('success', 'Trouvé ' + entries.length + ' dossier(s) de sauvegarde');
     }
 
     function _backupAllSaves() {
@@ -731,7 +731,7 @@ window.CloudSaves = (function() {
             }
         });
         if (!selectedEntries.length) {
-            Components.showToast('warning', 'No save folders selected');
+            Components.showToast('warning', 'Aucun dossier de sauvegarde sélectionné');
             return;
         }
         var destInp = document.getElementById('all-saves-dest');
@@ -741,13 +741,13 @@ window.CloudSaves = (function() {
         var providerKey = _provider === 'gdrive' ? 'gdrive_api' : _provider;
         var needsDest = providerKey === 'local' || providerKey === 'gdrive_sync';
         if (needsDest && !destPath) {
-            Components.showToast('warning', 'Set the backup destination folder first');
+            Components.showToast('warning', 'Définissez d\'abord le dossier de destination');
             return;
         }
         if (providerKey === 'rclone') {
             var rcloneRemote = rcloneRemoteInp ? rcloneRemoteInp.value.trim() : '';
             if (!rcloneRemote) {
-                Components.showToast('warning', 'Set the rclone remote destination in the provider config first');
+                Components.showToast('warning', 'Définissez la destination rclone dans la config fournisseur d\'abord');
                 return;
             }
         }
@@ -772,7 +772,7 @@ window.CloudSaves = (function() {
             rclone_exe: rcloneExeInp ? rcloneExeInp.value.trim() : '',
             remote_dest: rcloneRemoteInp ? rcloneRemoteInp.value.trim() : ''
         }));
-        Components.showToast('info', 'Backing up ' + selectedEntries.length + ' folder(s)...');
+        Components.showToast('info', 'Sauvegarde de ' + selectedEntries.length + ' dossier(s)...');
     }
 
     function _scanBackupRoot() {
@@ -783,11 +783,11 @@ window.CloudSaves = (function() {
             var rcloneRemoteInp = document.getElementById('provider-rclone-remote');
             var rcloneRemote = rcloneRemoteInp ? rcloneRemoteInp.value.trim() : '';
             if (!rcloneRemote) {
-                Components.showToast('warning', 'Set the rclone remote destination in the provider config first');
+                Components.showToast('warning', 'Définissez la destination rclone dans la config fournisseur d\'abord');
                 return;
             }
             var rcloneExeInp = document.getElementById('provider-rclone-exe');
-            Components.showToast('info', 'Scanning backups on rclone remote...');
+            Components.showToast('info', 'Scan des sauvegardes sur le remote rclone...');
             Bridge.call('scan_backup_root', JSON.stringify({
                 provider: 'rclone',
                 backup_root: '',
@@ -797,10 +797,10 @@ window.CloudSaves = (function() {
             return;
         }
         if (providerKey === 'local' && !rootPath) {
-            Components.showToast('warning', 'Set the backup root folder first');
+            Components.showToast('warning', 'Définissez d\'abord le dossier racine de sauvegarde');
             return;
         }
-        Components.showToast('info', 'Scanning backups...');
+        Components.showToast('info', 'Scan des sauvegardes...');
         Bridge.call('scan_backup_root', JSON.stringify({ provider: providerKey, backup_root: rootPath }));
     }
 
@@ -820,7 +820,7 @@ window.CloudSaves = (function() {
         // Show/hide restore folder row based on provider
         var restoreFolderRow = document.getElementById('restore-folder-input-row');
         if (restoreFolderRow) restoreFolderRow.style.display = (_provider === 'gdrive') ? 'none' : '';
-        Components.showToast('success', 'Found ' + keys.length + ' backup location(s)');
+        Components.showToast('success', 'Trouvé ' + keys.length + ' emplacement(s) de sauvegarde');
     }
 
     function _renderRestoreGames(locationName) {
@@ -848,17 +848,17 @@ window.CloudSaves = (function() {
         var locName = locSel ? locSel.value : '';
         var gameIdx = gameSel ? parseInt(gameSel.value, 10) : -1;
         if (!locName || isNaN(gameIdx) || gameIdx < 0) {
-            Components.showToast('warning', 'Select both a location and a game first');
+            Components.showToast('warning', 'Sélectionnez un emplacement et un jeu d\'abord');
             return;
         }
         var loc = _restoreLocationsData[locName];
         if (!loc || !loc.games || !loc.games[gameIdx]) {
-            Components.showToast('warning', 'Game not found in backup data');
+            Components.showToast('warning', 'Jeu introuvable dans les données de sauvegarde');
             return;
         }
         var entry = loc.games[gameIdx];
         if (!entry.source_path) {
-            Components.showToast('warning', 'No source path in backup metadata — cannot restore');
+            Components.showToast('warning', 'Chemin source absent des métadonnées — restauration impossible');
             return;
         }
         if (!confirm('Restore "' + (entry.game_name || entry.folder_name) + '" to:\n' + entry.source_path + '\n\nA safety backup will be created automatically.')) {
@@ -870,7 +870,7 @@ window.CloudSaves = (function() {
             restoreEntry.rclone_exe = rcloneExeInp ? rcloneExeInp.value.trim() : '';
         }
         Bridge.call('restore_save_location', JSON.stringify(restoreEntry));
-        Components.showToast('info', 'Restoring...');
+        Components.showToast('info', 'Restauration...');
     }
 
     return {

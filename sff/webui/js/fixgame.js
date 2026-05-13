@@ -168,7 +168,7 @@ window.FixGame = (function() {
 
         var gamePath = gameSelect ? gameSelect.value : '';
         if (!gamePath) {
-            Components.showToast('warning', 'Please select a game first');
+            Components.showToast('warning', 'Veuillez sélectionner un jeu d\'abord');
             return;
         }
 
@@ -201,7 +201,7 @@ window.FixGame = (function() {
             gse_password: document.getElementById('gse-password') ? document.getElementById('gse-password').value : ''
         };
 
-        Components.showToast('info', 'Applying fix to ' + gamePath + '...');
+        Components.showToast('info', 'Application du patch sur ' + gamePath + '...');
         Bridge.call('fix_game', JSON.stringify(config));
     }
 
@@ -209,12 +209,12 @@ window.FixGame = (function() {
         var gameSelect = document.getElementById('fixgame-game-select');
         var gamePath = gameSelect ? gameSelect.value : '';
         if (!gamePath) {
-            Components.showToast('warning', 'Please select a game first');
+            Components.showToast('warning', 'Veuillez sélectionner un jeu d\'abord');
             return;
         }
-        if (confirm('Revert changes for this game? Original DLLs will be restored.')) {
+        if (confirm('Annuler les modifications pour ce jeu ? Les DLLs originales seront restaurées.')) {
             Bridge.call('revert_game', gamePath);
-            Components.showToast('info', 'Reverting changes...');
+            Components.showToast('info', 'Annulation des modifications...');
         }
     }
 

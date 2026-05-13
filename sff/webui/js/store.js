@@ -9,8 +9,23 @@ window.Store = (function () {
 
     var _currentAppId  = null;
     var _initialized   = false;
-    var _userRank      = null;   // 'free' | 'triple_monstre'
+    var _userRank      = null;   // valeur brute serveur (ex. free, triple_monstre, « TRIPLE MONSTRE »)
     var _freeClaimed   = null;   // null | app_id string
+
+    function _normalizeRank(rank) {
+        var s = String(rank == null || rank === '' ? 'free' : rank).trim().toLowerCase();
+        return s.replace(/\s+/g, '_');
+    }
+
+    function _isTripleMonstreRank(rank) {
+        var r = _normalizeRank(rank);
+        return (
+            r === 'triple_monstre' ||
+            r === 'triplemonstre' ||
+            r === 'unlimited' ||
+            r === 'role_unlimited'
+        );
+    }
 
     var FREE_CATALOG = [
         {
@@ -62,10 +77,13 @@ window.Store = (function () {
         var premiumSection = document.getElementById('store-premium-section');
         var subtitle       = document.getElementById('store-subtitle');
 
-        if (_userRank === 'triple_monstre') {
+        if (_isTripleMonstreRank(_userRank)) {
             if (freeSection)    freeSection.classList.add('hidden');
             if (premiumSection) premiumSection.classList.remove('hidden');
-            if (subtitle) subtitle.textContent = 'Colle un lien Steam — Triple Monstre, jeux illimités';
+            if (subtitle) {
+                subtitle.textContent =
+                    'Colle un lien Steam — TRIPLE MONSTRE : jeux illimités (abonnement 1 mois)';
+            }
             _initPremiumListeners();
         } else {
             if (premiumSection) premiumSection.classList.add('hidden');

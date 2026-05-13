@@ -1,23 +1,23 @@
-# SteaMidra - Steam game setup and manifest tool (SFF)
+﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 #
-# This file is part of SteaMidra.
+# This file is part of SlimeDeals.
 #
-# SteaMidra is free software: you can redistribute it and/or modify
+# SlimeDeals is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# SteaMidra is distributed in the hope that it will be useful,
+# SlimeDeals is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
+# along with SlimeDeals.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Single-instance guard for SteaMidra.
+Single-instance guard for SlimeDeals.
 
 Uses QLocalServer / QLocalSocket so only one process runs at a time.
 A second launch sends a SHOW message to the existing instance and exits.
@@ -30,7 +30,7 @@ from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
 logger = logging.getLogger(__name__)
 
-_SERVER_NAME = "SteaMidra-v1"
+_SERVER_NAME = "SlimeDeals-v1"
 _CONNECT_TIMEOUT_MS = 1000
 
 
@@ -45,7 +45,7 @@ class SingleInstanceGuard:
 
     def try_activate_existing(self) -> bool:
         """
-        Try to connect to an already-running SteaMidra instance.
+        Try to connect to an already-running SlimeDeals instance.
         Sends 'SHOW' and returns True if one was found.
         """
         sock = QLocalSocket()
@@ -55,7 +55,7 @@ class SingleInstanceGuard:
             sock.flush()
             sock.waitForBytesWritten(500)
             sock.disconnectFromServer()
-            logger.info("Existing SteaMidra instance found — forwarding show request")
+            logger.info("Existing SlimeDeals instance found — forwarding show request")
             return True
         return False
 

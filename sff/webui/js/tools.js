@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SteaMidra — Tools Page
  * GBE Token Generator, VDF Key Extractor, Workshop Browser
  */
@@ -34,11 +34,11 @@ window.Tools = (function() {
                 var outDir = document.getElementById('tool-gbe-outdir');
 
                 if (!apiKey || !apiKey.value.trim()) {
-                    Components.showToast('warning', 'Please enter a Steam Web API key');
+                    Components.showToast('warning', 'Veuillez entrer une clé API Web Steam');
                     return;
                 }
                 if (!appId || !appId.value.trim()) {
-                    Components.showToast('warning', 'Please enter an App ID');
+                    Components.showToast('warning', 'Veuillez entrer un App ID');
                     return;
                 }
 
@@ -48,7 +48,7 @@ window.Tools = (function() {
                     output_dir: outDir ? outDir.value.trim() : ''
                 };
 
-                Components.showToast('info', 'Generating GBE token...');
+                Components.showToast('info', 'Génération du token GBE...');
                 Bridge.call('generate_gbe_token', JSON.stringify(config));
             });
         }
@@ -73,13 +73,13 @@ window.Tools = (function() {
                 var pathInput = document.getElementById('tool-vdf-path');
                 var path = pathInput ? pathInput.value.trim() : '';
 
-                Components.showToast('info', 'Extracting VDF keys...');
+                Components.showToast('info', 'Extraction des clés VDF...');
                 Bridge.callWithCallback('extract_vdf_keys', path, function(json) {
                     try {
                         var keys = JSON.parse(json || '[]');
                         _renderVdfTable(keys);
                     } catch(e) {
-                        Components.showToast('error', 'Failed to parse VDF keys');
+                        Components.showToast('error', 'Impossible de lire les clés VDF');
                     }
                 });
             });
@@ -107,7 +107,7 @@ window.Tools = (function() {
                 var appIdInput = document.getElementById('tool-workshop-appid');
                 var appId = appIdInput ? appIdInput.value.trim() : '';
                 if (!appId) {
-                    Components.showToast('warning', 'Please enter an App ID');
+                    Components.showToast('warning', 'Veuillez entrer un App ID');
                     return;
                 }
                 Bridge.call('open_workshop', appId);
@@ -131,7 +131,7 @@ window.Tools = (function() {
         });
 
         if (tableDiv) tableDiv.classList.remove('hidden');
-        Components.showToast('success', 'Extracted ' + keys.length + ' keys');
+        Components.showToast('success', 'Extrait ' + keys.length + ' clé(s)');
     }
 
     function onPageEnter() {

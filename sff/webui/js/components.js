@@ -223,17 +223,17 @@ window.Components = (function() {
     function showDownloadModal(appId, gameName, platform) {
         var modal = document.getElementById('download-modal');
         var title = document.getElementById('download-modal-title');
-        if (title) title.textContent = 'Download: ' + gameName + ' (' + appId + ')';
+        if (title) title.textContent = 'Télécharger : ' + gameName + ' (' + appId + ')';
 
         // Update labels based on platform
         var fastestTitle = document.getElementById('dl-fastest-title');
         var fastestDesc = document.getElementById('dl-fastest-desc');
         if (platform === 'linux') {
-            if (fastestTitle) fastestTitle.textContent = 'Fastest download (Latest version)';
-            if (fastestDesc) fastestDesc.textContent = 'Downloads the latest version right away using DepotDownloaderMod.';
+            if (fastestTitle) fastestTitle.textContent = 'Téléchargement rapide (dernière version)';
+            if (fastestDesc) fastestDesc.textContent = 'Télécharge la dernière version directement via DepotDownloaderMod.';
         } else {
-            if (fastestTitle) fastestTitle.textContent = 'Download through Steam (Fastest)';
-            if (fastestDesc) fastestDesc.textContent = 'Downloads manifests + keys so Steam installs the game natively. Fastest method.';
+            if (fastestTitle) fastestTitle.textContent = 'Via Steam (Plus rapide)';
+            if (fastestDesc) fastestDesc.textContent = 'Télécharge les manifests + clés pour que Steam installe le jeu nativement.';
         }
 
         // Store the app ID for the download buttons
@@ -364,7 +364,7 @@ window.Components = (function() {
         if (idx >= 0 && this._select.options[idx] && this._select.options[idx].value) {
             this._display.textContent = this._select.options[idx].textContent;
         } else {
-            this._display.textContent = '-- Select a game --';
+            this._display.textContent = '-- Sélectionner un jeu --';
         }
     };
 

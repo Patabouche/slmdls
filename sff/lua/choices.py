@@ -33,7 +33,7 @@ from sff.fzf import run_fzf
 
 from sff.http_utils import download_to_tempfile
 
-from sff.lua.endpoints import get_hubcap, get_oureverday, get_ryuu
+from sff.lua.endpoints import get_hubcap, get_oureverday, get_ryuu, get_twentytwocloud
 
 from sff.prompts import prompt_confirm, prompt_file, prompt_select, prompt_text
 
@@ -261,4 +261,7 @@ def download_lua_direct(dest, app_id, source, steam_path=None, request_update=No
     elif source == LuaEndpoint.RYUU:
         depotcache = (Path(steam_path) / "depotcache") if steam_path else None
         return get_ryuu(dest, app_id, depotcache=depotcache, request_update=request_update)
+    elif source == LuaEndpoint.TWENTYTWOCLOUD:
+        depotcache = (Path(steam_path) / "depotcache") if steam_path else None
+        return get_twentytwocloud(dest, app_id, depotcache=depotcache)
     return None

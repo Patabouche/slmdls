@@ -1,20 +1,20 @@
-# SteaMidra - Steam game setup and manifest tool (SFF)
+﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 #
-# This file is part of SteaMidra.
+# This file is part of SlimeDeals.
 #
-# SteaMidra is free software: you can redistribute it and/or modify
+# SlimeDeals is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# SteaMidra is distributed in the hope that it will be useful,
+# SlimeDeals is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
+# along with SlimeDeals.  If not, see <https://www.gnu.org/licenses/>.
 
 """Global floating log window — captures all Python logging output."""
 
@@ -84,7 +84,7 @@ class GlobalLogWindow(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent, Qt.WindowType.Window)
-        self.setWindowTitle("SteaMidra — Log Viewer")
+        self.setWindowTitle("SlimeDeals — Log Viewer")
         self.setMinimumSize(700, 450)
         self.resize(820, 500)
         self._min_level = logging.DEBUG

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SteaMidra — Main App Router & Sidebar Navigation
  * Handles page switching, platform detection, and global initialization.
  */
@@ -193,7 +193,7 @@ window.App = (function() {
                 if (content) {
                     var text = content.innerText || content.textContent || '';
                     Bridge.call('copy_to_clipboard', text);
-                    Components.showToast('success', 'Log copied to clipboard');
+                    Components.showToast('success', 'Journal copié dans le presse-papiers');
                 }
             });
         }
@@ -303,7 +303,7 @@ window.App = (function() {
             restartBtn.addEventListener('click', function() {
                 if (confirm('Restart Steam?')) {
                     Bridge.call('restart_steam');
-                    Components.showToast('info', 'Restarting Steam...');
+                    Components.showToast('info', 'Redémarrage de Steam...');
                 }
             });
         }
@@ -398,7 +398,7 @@ window.App = (function() {
                 if (source === 'local') {
                     luaPath = (document.getElementById('dl-local-lua-path') || {}).value || '';
                     if (!luaPath) {
-                        Components.showToast('warning', 'Please select a local .lua or .zip file first.');
+                        Components.showToast('warning', 'Veuillez sélectionner un fichier .lua ou .zip local d\'abord.');
                         return;
                     }
                     manifestFolder = (document.getElementById('dl-manifest-folder-path') || {}).value || '';
@@ -477,7 +477,7 @@ window.App = (function() {
             ddmodHomeDownload.addEventListener('click', function() {
                 var appId = (document.getElementById('ddmod-home-appid') || {}).value || '';
                 if (!appId) {
-                    Components.showToast('warning', 'Please enter an App ID.');
+                    Components.showToast('warning', 'Veuillez entrer un App ID.');
                     return;
                 }
                 var sourceEl = document.querySelector('input[name="ddmod-home-source"]:checked');
@@ -487,14 +487,14 @@ window.App = (function() {
                 if (source === 'local') {
                     luaPath = (document.getElementById('ddmod-home-local-path') || {}).value || '';
                     if (!luaPath) {
-                        Components.showToast('warning', 'Please select a local .lua or .zip file first.');
+                        Components.showToast('warning', 'Veuillez sélectionner un fichier .lua ou .zip local d\'abord.');
                         return;
                     }
                     manifestFolder = (document.getElementById('ddmod-home-manifest-path') || {}).value || '';
                 } else if (source === 'recent') {
                     luaPath = (document.getElementById('ddmod-home-recent-select') || {}).value || '';
                     if (!luaPath) {
-                        Components.showToast('warning', 'Please select a recent file.');
+                        Components.showToast('warning', 'Veuillez sélectionner un fichier récent.');
                         return;
                     }
                     source = 'local';
@@ -530,7 +530,7 @@ window.App = (function() {
                 });
                 Bridge.call('set_setting', 'manifest_update_excludes', excludes.join(','));
                 Components.hideModal('update-manifests-modal');
-                Components.showToast('info', 'Updating manifests...');
+                Components.showToast('info', 'Mise à jour des manifests...');
                 Bridge.call('run_game_action', '', 'update_manifests');
             });
         }
@@ -541,7 +541,7 @@ window.App = (function() {
                 var checkboxes = document.querySelectorAll('#um-game-list input[type="checkbox"]');
                 var allChecked = Array.prototype.every.call(checkboxes, function(cb) { return cb.checked; });
                 checkboxes.forEach(function(cb) { cb.checked = !allChecked; });
-                umToggleBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
+                umToggleBtn.textContent = allChecked ? 'Tout sélectionner' : 'Tout désélectionner';
             });
         }
 
@@ -559,18 +559,18 @@ window.App = (function() {
             var libs;
             try { libs = JSON.parse(json || '[]'); } catch(e) { libs = []; }
             if (libs.length === 0) {
-                Components.showToast('error', 'No Steam libraries found. Check your Steam path in Settings.');
+                Components.showToast('error', 'Aucune bibliothèque Steam trouvée. Vérifiez le chemin Steam dans les Paramètres.');
                 return;
             }
             var mf = manifestFolder || '';
             if (libs.length === 1) {
                 Bridge.call('set_active_library', libs[0]);
-                Components.showToast('info', 'Starting DDMod download for App ' + appId + '...');
+                Components.showToast('info', 'Démarrage du téléchargement DDMod pour l\'App ' + appId + '...');
                 Bridge.call('download_game_ddmod', appId, source, luaPath || '', mf);
             } else {
                 Components.showLibraryModal(libs, function(selectedLib) {
                     Bridge.call('set_active_library', selectedLib);
-                    Components.showToast('info', 'Starting DDMod download for App ' + appId + '...');
+                    Components.showToast('info', 'Démarrage du téléchargement DDMod pour l\'App ' + appId + '...');
                     Bridge.call('download_game_ddmod', appId, source, luaPath || '', mf);
                 });
             }
@@ -618,7 +618,7 @@ window.App = (function() {
             try { libs = JSON.parse(json || '[]'); } catch(e) { libs = []; }
 
             if (libs.length === 0) {
-                Components.showToast('error', 'No Steam libraries found. Check your Steam path in Settings.');
+                Components.showToast('error', 'Aucune bibliothèque Steam trouvée. Vérifiez le chemin Steam dans les Paramètres.');
                 return;
             }
 
@@ -635,7 +635,7 @@ window.App = (function() {
     }
 
     function _executeDownload(appId, mode, source, requestUpdate) {
-        Components.showToast('info', 'Starting download for App ' + appId + '...');
+        Components.showToast('info', 'Démarrage du téléchargement pour l\'App ' + appId + '...');
         if (mode === 'fastest') {
             var src = source || 'hubcap';
             Bridge.call('download_game_with_source', appId, src, requestUpdate || '0');
@@ -744,7 +744,7 @@ window.App = (function() {
                 });
 
             } catch(e) {
-                Components.showToast('error', 'Failed to load version history');
+                Components.showToast('error', 'Impossible de charger l\'historique des versions');
             }
         };
         Bridge.on('depot_history_results', handler);
@@ -771,7 +771,7 @@ window.App = (function() {
 
             var doDownload = function() {
                 Bridge.call('download_game_version', appId, JSON.stringify(manifest_override));
-                Components.showToast('info', 'Downloading specific version of App ' + appId + '...');
+                Components.showToast('info', 'Téléchargement d\'une version spécifique de l\'App ' + appId + '...');
             };
 
             if (libs.length <= 1) {
@@ -958,14 +958,14 @@ window.App = (function() {
                 hvPath    = (document.getElementById('outside-path-display') || {}).value || '';
                 hvOAppId  = (document.getElementById('outside-appid') || {}).value || '0';
                 if (!hvPath) {
-                    Components.showToast('warning', 'Please select a game folder first.');
+                    Components.showToast('warning', 'Veuillez sélectionner un dossier de jeu d\'abord.');
                     return;
                 }
                 hvOutside = true;
             } else {
                 hvAppId = _getSelectedGameId();
                 if (!hvAppId) {
-                    Components.showToast('warning', 'Please select a game from the dropdown first.');
+                    Components.showToast('warning', 'Veuillez sélectionner un jeu dans la liste d\'abord.');
                     return;
                 }
             }
@@ -1018,7 +1018,7 @@ window.App = (function() {
             var gamePath     = (document.getElementById('outside-path-display') || {}).value || '';
             var outsideAppId = (document.getElementById('outside-appid') || {}).value || '0';
             if (!gamePath) {
-                Components.showToast('warning', 'Please select a game folder first.');
+                Components.showToast('warning', 'Veuillez sélectionner un dossier de jeu d\'abord.');
                 return;
             }
             Bridge.call('run_game_action_outside', gamePath, outsideAppId || '0', action);
@@ -1028,7 +1028,7 @@ window.App = (function() {
         // Steam game action
         var appId = _getSelectedGameId();
         if (nonGameActions.indexOf(action) === -1 && !appId) {
-            Components.showToast('warning', 'Please select a game from the dropdown first.');
+            Components.showToast('warning', 'Veuillez sélectionner un jeu dans la liste d\'abord.');
             return;
         }
         Bridge.call('run_game_action', appId || '', action);
@@ -1071,7 +1071,7 @@ window.App = (function() {
                 var methodEl = document.querySelector('input[name="gl-method"]:checked');
                 var method = methodEl ? methodEl.value : 'A';
                 if (!archivePath) {
-                    Components.showToast('warning', 'Please select the GreenLuma archive first');
+                    Components.showToast('warning', 'Veuillez sélectionner l\'archive GreenLuma d\'abord');
                     return;
                 }
                 runBtn.disabled = true;

@@ -38,7 +38,9 @@ window.Bridge = (function() {
             'depot_history_results',
             'download_progress',
             'task_finished',
-            'log_message'
+            'log_message',
+            'ttc_game_info',
+            'auth_done'
         ];
         signalNames.forEach(function(name) {
             if (_py[name] && typeof _py[name].connect === 'function') {
@@ -164,6 +166,9 @@ window.Bridge = (function() {
             browse_game_folder: function(cb) { if (cb) cb(''); },
             run_game_action_outside: function() {},
             open_url: function() {},
+            get_user_rank: function(cb) { if (cb) cb(JSON.stringify({rank:'free',free_claimed:null,username:''})); },
+            record_free_claim: function(app_id, cb) { if (cb) cb(JSON.stringify({ok:false,error:'simulation'})); },
+            discord_avis_url: function(cb) { if (cb) cb('https://discord.gg/slimedeals'); },
         };
         _ready = true;
         _readyCallbacks.forEach(function(cb) { cb(_py); });

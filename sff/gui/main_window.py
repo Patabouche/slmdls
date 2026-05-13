@@ -1,27 +1,27 @@
-# SteaMidra - Steam game setup and manifest tool (SFF)
+# SlimeDeals - Steam game setup and manifest tool (SFF)
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 #
-# This file is part of SteaMidra.
+# This file is part of SlimeDeals.
 #
-# SteaMidra is free software: you can redistribute it and/or modify
+# SlimeDeals is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# SteaMidra is distributed in the hope that it will be useful,
+# SlimeDeals is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
+# along with SlimeDeals.  If not, see <https://www.gnu.org/licenses/>.
 import logging
 import re
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QThread, QTimer, QUrl, pyqtSignal
-from PyQt6.QtGui import QTextCursor
+from PyQt6.QtCore import QObject, Qt, QThread, QTimer, QUrl, pyqtSignal
+from PyQt6.QtGui import QDesktopServices, QTextCursor
 from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtWebEngineCore import QWebEngineSettings
 from PyQt6.QtWebEngineWidgets import QWebEngineView
@@ -153,7 +153,7 @@ class SFFMainWindow(QMainWindow):
         self._stream_emitter.text_written.connect(self._log_window.append_text)
         self._worker = None
         self._worker_thread = None
-        self.setWindowTitle("SteaMidra")
+        self.setWindowTitle("SlimeDeals")
         self.setMinimumSize(960, 700)
         self.resize(1020, 780)
         from sff.gui.gui_prompts import update_parent
@@ -162,13 +162,84 @@ class SFFMainWindow(QMainWindow):
         self.setCentralWidget(central)
         root_layout = QVBoxLayout(central)
 
-        # ── Web UI toggle bar ──
+        # ── Top bar ──
         toggle_bar = QHBoxLayout()
-        self._web_ui_toggle = QPushButton(T("Switch to Classic UI"))
-        self._web_ui_toggle.setToolTip(T("Toggle between the classic tab UI and the new web-based UI"))
-        self._web_ui_toggle.clicked.connect(self._toggle_web_ui)
+        toggle_bar.setContentsMargins(6, 2, 6, 2)
+
+        site_btn = QPushButton("🌐  slimedeals.fr")
+        site_btn.setToolTip("Ouvrir le site SlimeDeals")
+        site_btn.setFlat(True)
+        site_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        site_btn.setStyleSheet("color: #7ec8e3; font-weight: 600; border: none; padding: 2px 8px;")
+        site_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://slimedeals.fr")))
+
+        discord_btn = QPushButton("💬  Discord")
+        discord_btn.setToolTip("Rejoindre le Discord SlimeDeals")
+        discord_btn.setFlat(True)
+        discord_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        discord_btn.setStyleSheet("color: #7289da; font-weight: 600; border: none; padding: 2px 8px;")
+        discord_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://discord.gg/slimedeals")))
+
+        # Logout button (hidden until authenticated)
+        self._logout_btn = QPushButton("⎋  Déconnexion")
+        self._logout_btn.setToolTip("Se déconnecter du compte SlimeDeals")
+        self._logout_btn.setFlat(True)
+        self._logout_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._logout_btn.setStyleSheet(
+            "color: #e05c7c; font-weight: 600; border: none; padding: 2px 8px;"
+        )
+        self._logout_btn.setVisible(False)
+        self._logout_btn.clicked.connect(self._do_logout)
+
+        # Pseudo + rang (widgets séparés : pseudo animé pour TRIPLE MONSTRE)
+        self._user_bar_widget = QWidget()
+        self._user_bar_widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._user_bar_widget.setStyleSheet("background: transparent; border: none;")
+        self._user_bar_layout = QHBoxLayout(self._user_bar_widget)
+        self._user_bar_layout.setContentsMargins(0, 0, 0, 0)
+        self._user_bar_layout.setSpacing(6)
+
+        self._user_emoji_lbl = QLabel("👤")
+        self._user_emoji_lbl.setStyleSheet(
+            "font-size: 13px; border: none; background: transparent; padding: 2px 0;"
+        )
+        self._user_name_lbl = QLabel()
+        self._user_name_lbl.setStyleSheet(
+            "font-size: 13px; font-weight: 700; border: none; background: transparent; "
+            "padding: 2px 2px; color: #e8e8f0;"
+        )
+        self._user_name_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        self._user_rank_lbl = QLabel()
+        self._user_rank_lbl.setStyleSheet(
+            "font-size: 11px; font-weight: 800; border: none; background: transparent; "
+            "padding: 2px 0; color: #94a3b8; letter-spacing: 0.06em;"
+        )
+        self._user_rank_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+
+        self._user_bar_layout.addWidget(self._user_emoji_lbl)
+        self._user_bar_layout.addWidget(self._user_name_lbl)
+        self._user_bar_layout.addWidget(self._user_rank_lbl)
+
+        self._user_triple_anim_timer = QTimer(self)
+        self._user_triple_anim_timer.timeout.connect(self._tick_user_triple_name_color)
+        self._user_triple_anim_phase = 0
+        self._user_triple_name_colors = (
+            "#fcd34d",
+            "#fbbf24",
+            "#fb7185",
+            "#f472b6",
+            "#c084fc",
+            "#818cf8",
+            "#38bdf8",
+            "#2dd4bf",
+        )
+        self._user_bar_widget.setVisible(False)
+
+        toggle_bar.addWidget(site_btn)
+        toggle_bar.addWidget(discord_btn)
         toggle_bar.addStretch()
-        toggle_bar.addWidget(self._web_ui_toggle)
+        toggle_bar.addWidget(self._user_bar_widget)
+        toggle_bar.addWidget(self._logout_btn)
         root_layout.addLayout(toggle_bar)
 
         # ── Classic tab UI (hidden by default — new UI is primary) ──
@@ -190,6 +261,9 @@ class SFFMainWindow(QMainWindow):
         )
         self._web_ui_active = True
         self._web_ui_loaded = False
+        self._authenticated = False       # set only after server-verified auth
+        self._current_username = ""
+        self._current_rank = "free"       # 'free' | 'triple_monstre' (from server)
         main_tab_widget = QWidget()
         main_tab_layout = QVBoxLayout(main_tab_widget)
         scroll = QScrollArea()
@@ -203,7 +277,7 @@ class SFFMainWindow(QMainWindow):
         add_help_button(
             layout,
             "Main Hub",
-            "SteaMidra Main Hub\n\n"
+            "SlimeDeals - Accueil\n\n"
             "Game / Path:\n"
             "  Select a Steam game from the dropdown or browse to a game\n"
             "  folder outside Steam. Used by all Game Actions below.\n\n"
@@ -238,7 +312,7 @@ class SFFMainWindow(QMainWindow):
             "    offline mode reliably.\n"
             "  - Mute: Toggle background music on/off.\n"
             "  - Remove game from library: Remove a game's ACF and AppList entry.\n"
-            "  - Context menu: Add/remove SteaMidra from Windows Explorer\n"
+            "  - Context menu: Ajouter/supprimer SlimeDeals dans l Explorateur Windows\n"
             "    right-click menu.",
             parent_widget=self,
         )
@@ -296,18 +370,18 @@ class SFFMainWindow(QMainWindow):
         refresh_btn.clicked.connect(self._refresh_game_list)
         game_row.addWidget(refresh_btn)
         quick_cc_btn = QPushButton("Quick ColdClient")
-        quick_cc_btn.setToolTip("Open Fix Game tab with ColdClient mode pre-filled for the selected game")
+        quick_cc_btn.setToolTip("Ouvre l'onglet Fix Game avec le mode ColdClient pré-rempli pour le jeu sélectionné")
         quick_cc_btn.clicked.connect(self._quick_coldclient)
         game_row.addWidget(quick_cc_btn)
         game_row.addStretch()
         path_layout.addLayout(game_row)
         outside_row = QHBoxLayout()
-        self._outside_name_label = QLabel("Game name:")
+        self._outside_name_label = QLabel("Nom du jeu :")
         outside_row.addWidget(self._outside_name_label)
         self.outside_name_edit = QLineEdit()
         self.outside_name_edit.setPlaceholderText("For search (e.g. online-fix.me)")
         outside_row.addWidget(self.outside_name_edit)
-        self._outside_appid_label = QLabel("App ID:")
+        self._outside_appid_label = QLabel("App ID :")
         outside_row.addWidget(self._outside_appid_label)
         self.outside_appid_edit = QLineEdit()
         self.outside_appid_edit.setPlaceholderText("Optional")
@@ -328,17 +402,17 @@ class SFFMainWindow(QMainWindow):
         ga_layout = QVBoxLayout(game_actions_group)
         ga_layout.setSpacing(6)
         _TOOLTIPS = {
-            T("Crack game (gbe_fork)"): "Replace steam_api DLLs with Goldberg Emulator",
-            T("Remove SteamStub (Steamless)"): "Strip Valve's SteamStub DRM from a game executable",
-            T("UserGameStats"): "Download achievement / stats data for this game",
-            T("DLC check"): "See which DLCs exist and which are unlocked",
-            T("Workshop item"): "Download a Steam Workshop mod by its ID",
-            T("Open Workshop"): "Browse the Steam Workshop for this game",
-            T("Check mod updates"): "Check if downloaded Workshop mods have newer versions",
-            T("Multiplayer fix"): "Apply online-fix.me multiplayer patches",
-            T("Fixes & Bypasses"): "Apply community-maintained fixes and bypasses",
-            T("DLC Unlockers"): "Manage CreamAPI / SmokeAPI / other DLC unlocker DLLs",
-            T("SteamAutoCrack"): "Run the SteamAutoCrack CLI tool on this game",
+            T("Crack game (gbe_fork)"): "Remplace les DLLs steam_api par l'émulateur Goldberg pour jouer sans posséder le jeu sur Steam",
+            T("Remove SteamStub (Steamless)"): "SteamStub est une protection Valve intégrée dans le .exe du jeu — elle vérifie que tu le possèdes sur Steam au lancement. Steamless la supprime directement de l'exécutable.",
+            T("UserGameStats"): "Télécharge les données de succès et statistiques pour ce jeu",
+            T("DLC check"): "Affiche les DLCs disponibles pour ce jeu et indique lesquels sont déjà déverrouillés",
+            T("Workshop item"): "Télécharge un mod Steam Workshop en entrant son identifiant",
+            T("Open Workshop"): "Ouvre le navigateur Steam Workshop pour ce jeu",
+            T("Check mod updates"): "Vérifie si les mods Workshop téléchargés ont des mises à jour disponibles",
+            T("Multiplayer fix"): "Applique les patches multijoueur online-fix.me pour jouer en ligne",
+            T("Fixes & Bypasses"): "Applique des correctifs et contournements maintenus par la communauté",
+            T("DLC Unlockers"): "Gère les DLLs de déverrouillage DLC : CreamAPI, SmokeAPI et autres",
+            T("SteamAutoCrack"): "Lance l'outil SteamAutoCrack en ligne de commande sur ce jeu",
         }
         row1 = QHBoxLayout()
         row1.setSpacing(4)
@@ -405,7 +479,7 @@ class SFFMainWindow(QMainWindow):
             btn = QPushButton(label)
             btn.clicked.connect(lambda checked=False, f=func: self._run_tool(f))
             tools_row1.addWidget(btn)
-        self._mute_btn = QPushButton("Mute")
+        self._mute_btn = QPushButton("Muet")
         self._mute_btn.clicked.connect(self._toggle_mute)
         tools_row1.addWidget(self._mute_btn)
         tools_row1.addStretch()
@@ -464,8 +538,9 @@ class SFFMainWindow(QMainWindow):
         self._refresh_game_list()
         # Start with new web UI by default — hide menu bar
         menubar.setVisible(False)
-        self._load_web_ui()
-        self._web_ui_loaded = True
+        self._web_ui_loaded = False
+        # ── Auth check ──
+        QTimer.singleShot(0, self._start_auth_check)
         self._tray = None
         self._save_watcher_timer = QTimer(self)
         self._save_watcher_timer.timeout.connect(self._run_background_save_watcher)
@@ -557,28 +632,138 @@ class SFFMainWindow(QMainWindow):
             self.tabs.setVisible(False)
             self._web_view.setVisible(True)
             self.menuBar().setVisible(False)
-            self._web_ui_toggle.setText(T("Switch to Classic UI"))
         else:
             self.tabs.setVisible(True)
             self._web_view.setVisible(False)
             self.menuBar().setVisible(True)
-            self._web_ui_toggle.setText(T("Switch to New UI"))
+
+    def _get_webui_dir(self):
+        if getattr(sys, 'frozen', False):
+            return Path(sys._MEIPASS) / "sff" / "webui"
+        return Path(__file__).resolve().parent.parent / "webui"
 
     def _load_web_ui(self):
         """Load index.html into the QWebEngineView."""
-        if getattr(sys, 'frozen', False):
-            webui_dir = Path(sys._MEIPASS) / "sff" / "webui"
-        else:
-            webui_dir = Path(__file__).resolve().parent.parent / "webui"
-
-        index_path = webui_dir / "index.html"
+        index_path = self._get_webui_dir() / "index.html"
         if index_path.exists():
             self._web_view.setUrl(QUrl.fromLocalFile(str(index_path)))
         else:
             import logging
-            logging.getLogger(__name__).error(
-                "Web UI not found at %s", index_path
+            logging.getLogger(__name__).error("Web UI not found at %s", index_path)
+
+    def _load_auth_page(self):
+        """Show the login/register page."""
+        auth_path = self._get_webui_dir() / "auth.html"
+        if auth_path.exists():
+            self._web_view.setUrl(QUrl.fromLocalFile(str(auth_path)))
+        else:
+            import logging
+            logging.getLogger(__name__).error("Auth page not found at %s", auth_path)
+
+    def _start_auth_check(self):
+        """Always show the auth page first; the page JS calls auth_check_saved()."""
+        self._load_auth_page()
+
+    def _stop_user_triple_anim(self) -> None:
+        self._user_triple_anim_timer.stop()
+
+    def _tick_user_triple_name_color(self) -> None:
+        colors = self._user_triple_name_colors
+        c = colors[self._user_triple_anim_phase % len(colors)]
+        self._user_triple_anim_phase += 1
+        self._user_name_lbl.setStyleSheet(
+            "font-size: 13px; font-weight: 800; border: none; background: transparent; "
+            f"padding: 2px 2px; color: {c};"
+        )
+
+    def _set_user_bar_display(self, username: str, rank: str) -> None:
+        """Barre du haut : pseudo + rang (pseudo animé si TRIPLE MONSTRE)."""
+        self._stop_user_triple_anim()
+        name = username or ""
+        r = (rank or "free").strip().lower().replace(" ", "_")
+        self._user_name_lbl.setText(name)
+
+        if r == "free":
+            self._user_bar_widget.setToolTip(
+                "Plan FREE — 1 jeu au choix parmi le catalogue (onglet Télécharger)"
             )
+            self._user_name_lbl.setStyleSheet(
+                "font-size: 13px; font-weight: 700; border: none; background: transparent; "
+                "padding: 2px 2px; color: #4ade80;"
+            )
+            self._user_rank_lbl.setText("FREE")
+            self._user_rank_lbl.setStyleSheet(
+                "font-size: 11px; font-weight: 600; border: none; background: transparent; "
+                "padding: 2px 0; color: #94a3b8; letter-spacing: 0.04em;"
+            )
+        elif r in ("triple_monstre", "triplemonstre", "unlimited", "role_unlimited"):
+            self._user_bar_widget.setToolTip(
+                "TRIPLE MONSTRE — abonnement 1 mois : jeux Steam illimités au choix "
+                "(recherche par lien dans Télécharger). Le plan gratuit (4 jeux catalogue) ne s'applique pas."
+            )
+            self._user_triple_anim_phase = 0
+            self._tick_user_triple_name_color()
+            self._user_triple_anim_timer.start(420)
+            self._user_rank_lbl.setText("TRIPLE MONSTRE")
+            self._user_rank_lbl.setStyleSheet(
+                "font-size: 10px; font-weight: 800; border: none; background: transparent; "
+                "padding: 2px 0; color: #e9d5ff; letter-spacing: 0.1em;"
+            )
+        else:
+            self._user_bar_widget.setToolTip("")
+            self._user_name_lbl.setStyleSheet(
+                "font-size: 13px; font-weight: 700; border: none; background: transparent; "
+                "padding: 2px 2px; color: #e8e8f0;"
+            )
+            self._user_rank_lbl.setText(rank.strip() if rank else "?")
+            self._user_rank_lbl.setStyleSheet(
+                "font-size: 11px; font-weight: 600; border: none; background: transparent; "
+                "padding: 2px 0; color: #94a3b8; letter-spacing: 0.04em;"
+            )
+
+    def _on_auth_success(self, username: str, rank: str = "free"):
+        """Called ONLY from WebBridge.auth_success after server verification.
+        Never call this directly — auth must go through the verified bridge path."""
+        import logging as _log
+        _log.getLogger(__name__).info(
+            "[Auth] Accès accordé pour : %s (rang=%s)", username, rank
+        )
+        self._authenticated = True
+        self._current_username = username
+        self._current_rank = rank or "free"
+        # Show user info + logout button in top bar (rang visible à droite, avant Déconnexion)
+        self._set_user_bar_display(username, self._current_rank)
+        self._user_bar_widget.setVisible(True)
+        self._logout_btn.setVisible(True)
+        self._load_web_ui()
+        self._web_ui_loaded = True
+
+    def _do_logout(self):
+        """Disconnect the user: wipe saved token and return to login page."""
+        from PyQt6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            self, "Déconnexion",
+            "Se déconnecter de SlimeDeals ?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        # Wipe saved auth
+        from sff.gui.web_bridge import _clear_auth
+        _clear_auth()
+        self._authenticated = False
+        self._current_username = ""
+        self._current_rank = "free"
+        # Hide user info
+        self._stop_user_triple_anim()
+        self._user_bar_widget.setVisible(False)
+        self._user_name_lbl.setText("")
+        self._user_rank_lbl.setText("")
+        self._user_bar_widget.setToolTip("")
+        self._logout_btn.setVisible(False)
+        # Return to auth page
+        self._web_ui_loaded = False
+        self._load_auth_page()
 
     # ── Worker management ────────────────────────────────────────
 
@@ -778,10 +963,10 @@ class SFFMainWindow(QMainWindow):
         )
         from sff.structs import SettingCustomTypes, Settings
         dlg = QDialog(self)
-        dlg.setWindowTitle("Settings")
+        dlg.setWindowTitle("Paramètres")
         dlg.setMinimumSize(620, 500)
         layout = QVBoxLayout(dlg)
-        layout.addWidget(QLabel("Double-click a setting to edit. Select and press Delete to clear."))
+        layout.addWidget(QLabel("Double-clic pour modifier. Sélectionne et appuie sur Suppr pour effacer."))
         win_only = {Settings.APPLIST_FOLDER, Settings.GL_VERSION}
         linux_only = {Settings.SLS_CONFIG_LOCATION}
         skip: set[Settings] = set()
@@ -809,14 +994,13 @@ class SFFMainWindow(QMainWindow):
                 item = QListWidgetItem(f"{s.clean_name}: {val_str}")
                 item.setData(Qt.ItemDataRole.UserRole, s)
                 lw.addItem(item)
-        from PyQt6.QtCore import Qt
         _refresh_list()
         layout.addWidget(lw)
         btn_row = QHBoxLayout()
-        edit_btn = QPushButton("Edit")
-        delete_btn = QPushButton("Delete")
-        export_btn = QPushButton("Export")
-        import_btn = QPushButton("Import")
+        edit_btn = QPushButton("Modifier")
+        delete_btn = QPushButton("Supprimer")
+        export_btn = QPushButton("Exporter")
+        import_btn = QPushButton("Importer")
         btn_row.addWidget(edit_btn)
         btn_row.addWidget(delete_btn)
         btn_row.addStretch()
@@ -946,7 +1130,7 @@ class SFFMainWindow(QMainWindow):
                 QMessageBox.information(
                     parent_widget,
                     "Restart Recommended",
-                    "Steam path changed. Please restart SteaMidra for all changes to take full effect.",
+                    "Steam path changed. Please redémarrer SlimeDeals pour appliquer les changements to take full effect.",
                 )
         elif s == Settings.LANGUAGE:
             from sff.i18n import set_language
@@ -1074,7 +1258,7 @@ class SFFMainWindow(QMainWindow):
             for loc in unique_locs:
                 subprocess.run(
                     [rclone_exe, 'mkdir',
-                     remote_dest.rstrip('/') + f'/SteaMidraAllSaves/{loc}'],
+                     remote_dest.rstrip('/') + f'/SlimeDealsAllSaves/{loc}'],
                     capture_output=True, stdin=subprocess.DEVNULL, timeout=30, **_no_window,
                 )
             with ThreadPoolExecutor(max_workers=10) as ex:
@@ -1119,7 +1303,7 @@ class SFFMainWindow(QMainWindow):
         from sff.strings import VERSION
         QMessageBox.about(
             self,
-            "About SteaMidra",
-            f"SteaMidra\nVersion {VERSION}\n\n"
+            "À propos de SlimeDeals",
+            f"SlimeDeals\nVersion {VERSION}\n\n"
             "https://github.com/Midrags/SFF/releases",
         )

@@ -1,14 +1,14 @@
-# SteaMidra - Steam game setup and manifest tool (SFF)
+﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
 
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 
 #
 
-# This file is part of SteaMidra.
+# This file is part of SlimeDeals.
 
 #
 
-# SteaMidra is free software: you can redistribute it and/or modify
+# SlimeDeals is free software: you can redistribute it and/or modify
 
 # it under the terms of the GNU General Public License as published by
 
@@ -18,7 +18,7 @@
 
 #
 
-# SteaMidra is distributed in the hope that it will be useful,
+# SlimeDeals is distributed in the hope that it will be useful,
 
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 
@@ -30,7 +30,7 @@
 
 # You should have received a copy of the GNU General Public License
 
-# along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
+# along with SlimeDeals.  If not, see <https://www.gnu.org/licenses/>.
 
 
 
@@ -378,9 +378,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
 
-                        prog='SteaMidra',
+                        prog='SlimeDeals',
 
-                        description='SteaMidra - set up games for Steam with Lua scripts, manifests, and GreenLuma',
+                        description='SlimeDeals - set up games for Steam with Lua scripts, manifests, and GreenLuma',
 
                         epilog='https://github.com/Midrags/SFF/releases')
 
@@ -434,7 +434,7 @@ if __name__ == "__main__":
 
     if args.version:
 
-        print(f"SteaMidra version {VERSION}")
+        print(f"SlimeDeals version {VERSION}")
 
         sys.exit(0)
 
@@ -474,7 +474,7 @@ if __name__ == "__main__":
 
 
 
-  SteaMidra
+  SlimeDeals
 
 
 

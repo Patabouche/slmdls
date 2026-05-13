@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SlimeDeals — Connexion</title>
+<style>
+  :root {
+    --bg: #0d0d14;
+    --bg2: #151520;
+    --bg3: #1c1c2e;
+    --accent: #7c5cbf;
+    --accent2: #a07de0;
+    --border: rgba(124,92,191,0.25);
+    --text: #e8e8f0;
+    --text-dim: rgba(232,232,240,0.55);
+    --error: #e05c7c;
+    --success: #4ec994;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .blob { position: fixed; border-radius: 50%; filter: blur(80px); opacity: 0.15; pointer-events: none; }
+  .blob-1 { width: 500px; height: 500px; background: #7c5cbf; top: -150px; left: -100px; }
+  .blob-2 { width: 400px; height: 400px; background: #3a5cbf; bottom: -100px; right: -80px; }
+
+  /* Loading overlay */
+  #loading-screen {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px; z-index: 100;
+  }
+  #loading-screen.hidden { display: none; }
+  .loading-logo { font-size: 22px; font-weight: 700; letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #a07de0, #7c5cbf);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .loading-spinner {
+    width: 36px; height: 36px;
+    border: 3px solid rgba(124,92,191,0.25);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .loading-text { font-size: 13px; color: var(--text-dim); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Card */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px 44px;
+    width: 400px;
+    max-width: 95vw;
+    position: relative;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(124,92,191,0.1);
+  }
+
+  .logo-wrap { text-align: center; margin-bottom: 28px; }
+  .logo-wrap svg { width: 48px; height: 48px; }
+  .logo-title {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.5px; margin-top: 10px;
+    background: linear-gradient(135deg, #a07de0, #7c5cbf);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .logo-sub { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+
+  .tabs {
+    display: flex; gap: 4px;
+    background: var(--bg3); border-radius: 10px; padding: 4px; margin-bottom: 28px;
+  }
+  .tab {
+    flex: 1; padding: 8px 0; border: none; border-radius: 8px;
+    background: transparent; color: var(--text-dim);
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  }
+  .tab.active { background: var(--accent); color: #fff; box-shadow: 0 2px 12px rgba(124,92,191,0.4); }
+
+  .form { display: none; flex-direction: column; gap: 14px; }
+  .form.active { display: flex; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.5px; text-transform: uppercase; }
+  .field input {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; color: var(--text); font-size: 14px; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s; width: 100%;
+  }
+  .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,92,191,0.2); }
+  .field input::placeholder { color: rgba(232,232,240,0.28); }
+
+  .btn-submit {
+    margin-top: 4px; padding: 11px 0; border: none; border-radius: 8px;
+    background: linear-gradient(135deg, #7c5cbf, #a07de0);
+    color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s; letter-spacing: 0.3px;
+  }
+  .btn-submit:hover { opacity: 0.9; }
+  .btn-submit:active { transform: scale(0.98); }
+  .btn-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .msg {
+    font-size: 13px; padding: 10px 14px; border-radius: 8px; display: none;
+  }
+  .msg.error   { background: rgba(224,92,124,0.12); border: 1px solid rgba(224,92,124,0.3); color: var(--error); }
+  .msg.success { background: rgba(78,201,148,0.12); border: 1px solid rgba(78,201,148,0.3); color: var(--success); }
+  .msg.show { display: block; }
+
+  .btn-spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff;
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  .hwid-note { font-size: 11px; color: var(--text-dim); text-align: center; margin-top: 6px; line-height: 1.5; }
+  .hwid-note span { color: var(--accent2); }
+</style>
+</head>
+<body>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<!-- Loading screen (shown while checking saved token) -->
+<div id="loading-screen">
+  <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+    <rect width="48" height="48" rx="12" fill="url(#lg2)"/>
+    <path d="M14 24c0-5.5 4.5-10 10-10s10 4.5 10 10-4.5 10-10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="24" cy="24" r="4" fill="#fff"/>
+    <defs><linearGradient id="lg2" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#7c5cbf"/><stop offset="1" stop-color="#3a5cbf"/></linearGradient></defs>
+  </svg>
+  <div class="loading-logo">SlimeDeals</div>
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">Vérification de la session…</div>
+</div>
+
+<!-- Auth card (hidden until check done) -->
+<div class="card" id="auth-card" style="display:none">
+  <div class="logo-wrap">
+    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="48" height="48" rx="12" fill="url(#lg)"/>
+      <path d="M14 24c0-5.5 4.5-10 10-10s10 4.5 10 10-4.5 10-10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="24" cy="24" r="4" fill="#fff"/>
+      <defs><linearGradient id="lg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#7c5cbf"/><stop offset="1" stop-color="#3a5cbf"/></linearGradient></defs>
+    </svg>
+    <div class="logo-title">SlimeDeals</div>
+    <div class="logo-sub">Connexion requise pour continuer</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="tab-login" onclick="switchTab('login')">Se connecter</button>
+    <button class="tab" id="tab-register" onclick="switchTab('register')">Créer un compte</button>
+  </div>
+
+  <!-- Login form -->
+  <div class="form active" id="form-login">
+    <div class="field">
+      <label>Pseudo</label>
+      <input type="text" id="login-username" placeholder="Ton pseudo" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label>Mot de passe</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <div class="msg" id="login-msg"></div>
+    <button class="btn-submit" id="login-btn" onclick="doLogin()">Se connecter</button>
+    <p class="hwid-note">Ton compte est lié à <span>ce PC uniquement</span>.</p>
+  </div>
+
+  <!-- Register form -->
+  <div class="form" id="form-register">
+    <div class="field">
+      <label>Pseudo</label>
+      <input type="text" id="reg-username" placeholder="Choisis un pseudo" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label>Mot de passe</label>
+      <input type="password" id="reg-password" placeholder="6 caractères minimum" autocomplete="new-password" />
+    </div>
+    <div class="field">
+      <label>Confirmer le mot de passe</label>
+      <input type="password" id="reg-password2" placeholder="Répète le mot de passe" autocomplete="new-password" />
+    </div>
+    <div class="msg" id="reg-msg"></div>
+    <button class="btn-submit" id="reg-btn" onclick="doRegister()">Créer le compte</button>
+    <p class="hwid-note">Ce compte sera lié à <span>ce PC</span> dès sa création.</p>
+  </div>
+</div>
+
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  var _bridge = null;
+
+  /* ── Bridge init ── */
+  function initBridge(cb) {
+    if (typeof QWebChannel === 'undefined') {
+      console.warn('[Auth] QWebChannel absent — dev mode');
+      cb(null);
+      return;
+    }
+    new QWebChannel(qt.webChannelTransport, function(ch) {
+      _bridge = ch.objects.bridge;
+      cb(_bridge);
+    });
+  }
+
+  /* ── Show login form (hide loading) ── */
+  function showAuthCard() {
+    document.getElementById('loading-screen').classList.add('hidden');
+    document.getElementById('auth-card').style.display = 'block';
+  }
+
+  /* ── Auto-check saved token on load ── */
+  window.addEventListener('load', function() {
+    initBridge(function(b) {
+      if (!b) { showAuthCard(); return; }
+
+      /* Listen for auth_done signal from Python — receives token or '' */
+      if (b.auth_done && typeof b.auth_done.connect === 'function') {
+        b.auth_done.connect(function(token) {
+          if (token && token.length >= 16) {
+            /* Valid saved session — Python will re-verify token + HWID */
+            document.getElementById('loading-text').textContent = 'Connexion en cours…';
+            b.auth_success(token);
+          } else {
+            /* No valid session — show login form */
+            showAuthCard();
+          }
+        });
+      }
+
+      /* Trigger the check */
+      b.auth_check_saved();
+    });
+  });
+
+  /* ── Helpers ── */
+  function showMsg(id, text, type) {
+    var el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'msg ' + type + ' show';
+  }
+  function hideMsg(id) { document.getElementById(id).className = 'msg'; }
+  function setLoading(btnId, loading, defaultText) {
+    var btn = document.getElementById(btnId);
+    if (loading) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="btn-spinner"></span>Chargement…';
+    } else {
+      btn.disabled = false;
+      btn.textContent = defaultText;
+    }
+  }
+
+  window.switchTab = function(tab) {
+    document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+    document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+    document.getElementById('form-login').classList.toggle('active', tab === 'login');
+    document.getElementById('form-register').classList.toggle('active', tab === 'register');
+    hideMsg('login-msg'); hideMsg('reg-msg');
+  };
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter') return;
+    if (document.getElementById('form-login').classList.contains('active')) doLogin();
+    else doRegister();
+  });
+
+  /* ── Login ── */
+  window.doLogin = function() {
+    var username = document.getElementById('login-username').value.trim();
+    var password = document.getElementById('login-password').value;
+    hideMsg('login-msg');
+    if (!username || !password) { showMsg('login-msg', 'Remplis tous les champs.', 'error'); return; }
+    if (!_bridge) { showMsg('login-msg', 'Bridge non disponible.', 'error'); return; }
+
+    setLoading('login-btn', true);
+    _bridge.auth_login(username, password, function(resultJson) {
+      var r; try { r = JSON.parse(resultJson); } catch(e) { r = {ok:false,error:'Erreur interne'}; }
+      setLoading('login-btn', false, 'Se connecter');
+      if (r.ok) {
+        showMsg('login-msg', '✓ Connexion réussie !', 'success');
+        /* Pass the token — Python will verify it server-side */
+        setTimeout(function() { _bridge.auth_success(r.token); }, 500);
+      } else {
+        showMsg('login-msg', r.error || 'Erreur de connexion.', 'error');
+      }
+    });
+  };
+
+  /* ── Register ── */
+  window.doRegister = function() {
+    var username = document.getElementById('reg-username').value.trim();
+    var password = document.getElementById('reg-password').value;
+    var password2 = document.getElementById('reg-password2').value;
+    hideMsg('reg-msg');
+    if (!username || !password || !password2) { showMsg('reg-msg', 'Remplis tous les champs.', 'error'); return; }
+    if (password !== password2) { showMsg('reg-msg', 'Les mots de passe ne correspondent pas.', 'error'); return; }
+    if (password.length < 6) { showMsg('reg-msg', 'Mot de passe trop court (6 min).', 'error'); return; }
+    if (username.length < 3) { showMsg('reg-msg', 'Pseudo trop court (3 min).', 'error'); return; }
+    if (!_bridge) { showMsg('reg-msg', 'Bridge non disponible.', 'error'); return; }
+
+    setLoading('reg-btn', true);
+    _bridge.auth_register(username, password, function(resultJson) {
+      var r; try { r = JSON.parse(resultJson); } catch(e) { r = {ok:false,error:'Erreur interne'}; }
+      setLoading('reg-btn', false, 'Créer le compte');
+      if (r.ok) {
+        showMsg('reg-msg', '✓ Compte créé !', 'success');
+        /* Pass the token — Python will verify it server-side */
+        setTimeout(function() { _bridge.auth_success(r.token); }, 600);
+      } else {
+        showMsg('reg-msg', r.error || 'Erreur lors de la création.', 'error');
+      }
+    });
+  };
+})();
+</script>
+</body>
+</html>

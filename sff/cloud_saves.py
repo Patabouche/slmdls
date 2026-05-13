@@ -1,25 +1,25 @@
-# SteaMidra - Steam game setup and manifest tool (SFF)
+﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 #
-# This file is part of SteaMidra.
+# This file is part of SlimeDeals.
 #
-# SteaMidra is free software: you can redistribute it and/or modify
+# SlimeDeals is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# SteaMidra is distributed in the hope that it will be useful,
+# SlimeDeals is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
+# along with SlimeDeals.  If not, see <https://www.gnu.org/licenses/>.
 
 """
 Cloud saves — local backup and restore for game save files.
 
-Scans common save locations, backs up to %APPDATA%/SteaMidra/save_backups/,
+Scans common save locations, backs up to %APPDATA%/SlimeDeals/save_backups/,
 and provides timestamped restore points.
 """
 
@@ -125,7 +125,7 @@ class BackupInfo:
 def _get_backup_dir():
     """get the save backup root directory"""
     base = Path(os.environ.get("APPDATA", os.path.expanduser("~")))
-    backup_dir = base / "SteaMidra" / "save_backups"
+    backup_dir = base / "SlimeDeals" / "save_backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
     return backup_dir
 
@@ -134,7 +134,7 @@ class CloudSaves:
     """
     Local save backup and restore system.
 
-    Backs up game saves to %APPDATA%/SteaMidra/save_backups/{appid}/
+    Backs up game saves to %APPDATA%/SlimeDeals/save_backups/{appid}/
     with timestamped snapshots.
 
     Structure:
@@ -362,7 +362,7 @@ class CloudSaves:
         Returns a list of (app_id, game_name) sorted by game name.
         Name resolution — three layers, in order:
           1. appmanifest_*.acf across all Steam library folders (installed games)
-          2. SteaMidra fix_game_cache CachedAppInfo (previously fixed games)
+          2. SlimeDeals fix_game_cache CachedAppInfo (previously fixed games)
           3. Batch Steam Store API call for anything still unresolved (uninstalled games)
         """
         userdata_dir = Path(steam_path) / "userdata" / str(steam32_id)
@@ -411,7 +411,7 @@ class CloudSaves:
                         pass
         except Exception:
             pass
-        # --- Layer 2: SteaMidra fix_game_cache (previously fixed games) ---
+        # --- Layer 2: SlimeDeals fix_game_cache (previously fixed games) ---
         unresolved = [a for a in app_ids if a not in name_map]
         if unresolved:
             try:
@@ -586,7 +586,7 @@ EMU_SAVE_LOCATIONS = {
     "Goldberg SocialClub Emu Saves": Path(os.environ.get("APPDATA", "")) / "Goldberg SocialClub Emu Saves",
 }
 
-_BACKUP_ROOT = Path(os.environ.get("APPDATA", "")) / "SteaMidra" / "save_backups"
+_BACKUP_ROOT = Path(os.environ.get("APPDATA", "")) / "SlimeDeals" / "save_backups"
 
 
 def _resolve_game_name(folder_name, name_map_cache=None):
@@ -717,7 +717,7 @@ def _make_meta(app_id, game_name, source_path, location):
 
 def backup_save_location_local(entry, dest_root, log_func=None):
     """
-    Copy one save entry to dest_root/SteaMidraAllSaves/{location}/{label}/.
+    Copy one save entry to dest_root/SlimeDealsAllSaves/{location}/{label}/.
     Skips files that are already up-to-date (same size and backup is not older).
     Returns dest folder path on success, None on failure.
     """
@@ -728,7 +728,7 @@ def backup_save_location_local(entry, dest_root, log_func=None):
         return None
     label = entry["label"]
     location = entry["location"]
-    dest = Path(dest_root) / "SteaMidraAllSaves" / location / label
+    dest = Path(dest_root) / "SlimeDealsAllSaves" / location / label
     try:
         dest.mkdir(parents=True, exist_ok=True)
         copied = 0
@@ -746,7 +746,7 @@ def backup_save_location_local(entry, dest_root, log_func=None):
                         continue
                 shutil.copy2(f, target)
                 copied += 1
-        meta_path = dest / "steamidra_meta.json"
+        meta_path = dest / "SlimeDeals_meta.json"
         meta_path.write_text(
             json.dumps(_make_meta(entry.get("app_id"), entry["game_name"], src, location), indent=2),
             encoding="utf-8"
@@ -762,7 +762,7 @@ def backup_save_location_local(entry, dest_root, log_func=None):
 
 
 def backup_save_location_rclone(entry, rclone_exe, remote_dest, log_func=None):
-    """Upload one save entry via rclone to remote_dest:SteaMidraAllSaves/{location}/{label}/."""
+    """Upload one save entry via rclone to remote_dest:SlimeDealsAllSaves/{location}/{label}/."""
     import subprocess
     import tempfile
     log = log_func or (lambda m: None)
@@ -772,7 +772,7 @@ def backup_save_location_rclone(entry, rclone_exe, remote_dest, log_func=None):
         return False
     label = entry["label"]
     location = entry["location"]
-    remote_path = remote_dest.rstrip("/") + f"/SteaMidraAllSaves/{location}/{label}"
+    remote_path = remote_dest.rstrip("/") + f"/SlimeDealsAllSaves/{location}/{label}"
     try:
         proc = subprocess.run(
             [
@@ -787,15 +787,15 @@ def backup_save_location_rclone(entry, rclone_exe, remote_dest, log_func=None):
         if proc.returncode != 0:
             log(f"  [FAIL] rclone exit {proc.returncode}: {proc.stderr[:200]}")
             return False
-        meta_tmp = Path(tempfile.mkdtemp(prefix="steamidra_meta_"))
+        meta_tmp = Path(tempfile.mkdtemp(prefix="SlimeDeals_meta_"))
         try:
-            meta_file = meta_tmp / "steamidra_meta.json"
+            meta_file = meta_tmp / "SlimeDeals_meta.json"
             meta_file.write_text(
                 json.dumps(_make_meta(entry.get("app_id"), entry["game_name"], src, location), indent=2),
                 encoding="utf-8",
             )
             subprocess.run(
-                [rclone_exe, "copyto", str(meta_file), remote_path + "/steamidra_meta.json",
+                [rclone_exe, "copyto", str(meta_file), remote_path + "/SlimeDeals_meta.json",
                  "--no-update-modtime"],
                 capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=30, **_CREATE_NO_WINDOW,
             )
@@ -835,9 +835,9 @@ def backup_save_location_gdrive(entry, service, backup_root_id, log_func=None, f
         if ok:
             game_folder_id = local_fc.get((label, loc_folder_id))
             if game_folder_id:
-                meta_tmp = Path(tempfile.mkdtemp(prefix="steamidra_meta_"))
+                meta_tmp = Path(tempfile.mkdtemp(prefix="SlimeDeals_meta_"))
                 try:
-                    meta_path = meta_tmp / "steamidra_meta.json"
+                    meta_path = meta_tmp / "SlimeDeals_meta.json"
                     meta_path.write_text(
                         json.dumps(_make_meta(entry.get("app_id"), entry["game_name"], src, location), indent=2),
                         encoding="utf-8",
@@ -855,19 +855,19 @@ def backup_save_location_gdrive(entry, service, backup_root_id, log_func=None, f
 
 
 def scan_backup_root_rclone(rclone_exe, remote_dest):
-    """Scan an rclone remote for SteaMidraAllSaves structure.
-    Downloads all steamidra_meta.json files at once, then parses them locally.
+    """Scan an rclone remote for SlimeDealsAllSaves structure.
+    Downloads all SlimeDeals_meta.json files at once, then parses them locally.
     Returns same structure as scan_backup_root_local.
     """
     import subprocess
     import tempfile
-    remote_root = remote_dest.rstrip("/") + "/SteaMidraAllSaves"
-    tmp = Path(tempfile.mkdtemp(prefix="steamidra_scan_"))
+    remote_root = remote_dest.rstrip("/") + "/SlimeDealsAllSaves"
+    tmp = Path(tempfile.mkdtemp(prefix="SlimeDeals_scan_"))
     try:
         subprocess.run(
             [
                 rclone_exe, "copy", remote_root, str(tmp),
-                "--include", "steamidra_meta.json",
+                "--include", "SlimeDeals_meta.json",
                 "--fast-list",
                 "--transfers", "10",
             ],
@@ -884,7 +884,7 @@ def scan_backup_root_rclone(rclone_exe, remote_dest):
                 if not game_dir.is_dir():
                     continue
                 meta = {}
-                meta_file = game_dir / "steamidra_meta.json"
+                meta_file = game_dir / "SlimeDeals_meta.json"
                 if meta_file.exists():
                     try:
                         meta = json.loads(meta_file.read_text(encoding="utf-8"))
@@ -914,10 +914,10 @@ def scan_backup_root_rclone(rclone_exe, remote_dest):
 
 def scan_backup_root_local(backup_root):
     """
-    Scan a local SteaMidraAllSaves root folder.
+    Scan a local SlimeDealsAllSaves root folder.
     Returns same structure as google_drive.list_backup_locations.
     """
-    root = Path(backup_root) / "SteaMidraAllSaves"
+    root = Path(backup_root) / "SlimeDealsAllSaves"
     if not root.exists():
         return {}
     result = {}
@@ -929,7 +929,7 @@ def scan_backup_root_local(backup_root):
             if not game_dir.is_dir():
                 continue
             meta = {}
-            meta_file = game_dir / "steamidra_meta.json"
+            meta_file = game_dir / "SlimeDeals_meta.json"
             if meta_file.exists():
                 try:
                     meta = json.loads(meta_file.read_text(encoding="utf-8"))
@@ -967,13 +967,13 @@ def restore_save_entry(game_entry, log_func=None):
     if rclone_path and rclone_exe:
         import subprocess
         import tempfile
-        tmp = Path(tempfile.mkdtemp(prefix="steamidra_restore_"))
+        tmp = Path(tempfile.mkdtemp(prefix="SlimeDeals_restore_"))
         try:
             log("Downloading from rclone remote...")
             proc = subprocess.run(
                 [
                     rclone_exe, "copy", rclone_path, str(tmp),
-                    "--exclude", "steamidra_meta.json",
+                    "--exclude", "SlimeDeals_meta.json",
                     "--transfers", "10", "--fast-list",
                 ],
                 capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=300, **_CREATE_NO_WINDOW,
@@ -995,7 +995,7 @@ def restore_save_entry(game_entry, log_func=None):
         if not service:
             log("[FAIL] Google Drive not connected.")
             return False
-        tmp = Path(tempfile.mkdtemp(prefix="steamidra_restore_"))
+        tmp = Path(tempfile.mkdtemp(prefix="SlimeDeals_restore_"))
         try:
             log("Downloading from Google Drive...")
             if not download_folder(service, folder_id, tmp, log_func=log):
@@ -1030,7 +1030,7 @@ def _do_restore_copy(src, dest, log):
         dest.mkdir(parents=True, exist_ok=True)
         restored = 0
         for f in src.rglob("*"):
-            if f.is_file() and f.name != "steamidra_meta.json":
+            if f.is_file() and f.name != "SlimeDeals_meta.json":
                 rel = f.relative_to(src)
                 target = dest / rel
                 target.parent.mkdir(parents=True, exist_ok=True)

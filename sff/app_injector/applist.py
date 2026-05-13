@@ -1,20 +1,20 @@
-# SteaMidra - Steam game setup and manifest tool (SFF)
+﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 #
-# This file is part of SteaMidra.
+# This file is part of SlimeDeals.
 #
-# SteaMidra is free software: you can redistribute it and/or modify
+# SlimeDeals is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# SteaMidra is distributed in the hope that it will be useful,
+# SlimeDeals is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
+# along with SlimeDeals.  If not, see <https://www.gnu.org/licenses/>.
 
 """For managing Greenluma's AppList folder"""
 
@@ -80,24 +80,28 @@ class AppListManager(AppInjectionManager):
         self.provider = provider
         # App ID / Depot IDs mapped to their name and type
         self.id_map: dict[int, DepotOrAppID] = {}
+        default_steam_applist = Path(r"C:\Program Files (x86)\Steam\AppList")
+        # Auto-create and force the Steam AppList folder
+        if not default_steam_applist.exists():
+            try:
+                default_steam_applist.mkdir(parents=True, exist_ok=True)
+                print(f"AppList folder created automatically: {default_steam_applist}")
+            except Exception:
+                pass
+        if default_steam_applist.exists():
+            self.applist_folder = default_steam_applist
+            set_setting(Settings.APPLIST_FOLDER, str(self.applist_folder.absolute()))
+        else:
+            saved_applist = get_setting(Settings.APPLIST_FOLDER)
+            self.applist_folder = (
+                steam_path / "AppList" if saved_applist is None else Path(saved_applist)
+            )
+            if not self.applist_folder.exists():
+                self.applist_folder = prompt_dir(
+                    "Could not find AppList folder. " "Please specify the full path here:"
+                )
+                set_setting(Settings.APPLIST_FOLDER, str(self.applist_folder.absolute()))
         saved_applist = get_setting(Settings.APPLIST_FOLDER)
-        self.applist_folder = (
-            steam_path / "AppList" if saved_applist is None else Path(saved_applist)
-        )
-        if not self.applist_folder.exists():
-            self.applist_folder = prompt_dir(
-                "Could not find AppList folder. " "Please specify the full path here:"
-            )
-            set_setting(Settings.APPLIST_FOLDER, str(self.applist_folder.absolute()))
-        elif saved_applist is None:
-            colorized = (
-                Fore.YELLOW + str(self.applist_folder.resolve()) + Style.RESET_ALL
-            )
-            print(
-                f"AppsList folder automatically selected: {colorized}\n"
-                "Change this in settings if it's the wrong folder."
-            )
-            set_setting(Settings.APPLIST_FOLDER, str(self.applist_folder.absolute()))
         if saved_applist:
             colorized = (
                 Fore.YELLOW + str(self.applist_folder.resolve()) + Style.RESET_ALL
@@ -139,7 +143,7 @@ class AppListManager(AppInjectionManager):
                 raise Exception(
                     f"{file.name} does not contain a "
                     "number. Text files in AppList should only contain the number "
-                    "of their App ID. Please fix this and launch SteaMidra again."
+                    "of their App ID. Please fix this and launch SlimeDeals again."
                 )
             ids.append(AppListPathAndID(file, appid))
         if sort:

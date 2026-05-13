@@ -1,20 +1,20 @@
-# SteaMidra - Steam game setup and manifest tool (SFF)
+﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 #
-# This file is part of SteaMidra.
+# This file is part of SlimeDeals.
 #
-# SteaMidra is free software: you can redistribute it and/or modify
+# SlimeDeals is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# SteaMidra is distributed in the hope that it will be useful,
+# SlimeDeals is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
+# along with SlimeDeals.  If not, see <https://www.gnu.org/licenses/>.
 
 import logging
 import os
@@ -59,7 +59,7 @@ except Exception as e:
         pass
     from PyQt6.QtWidgets import QApplication, QMessageBox
     app = QApplication.instance() or QApplication(sys.argv)
-    QMessageBox.critical(None, "SteaMidra startup error", msg[:2000])
+    QMessageBox.critical(None, "SlimeDeals startup error", msg[:2000])
     sys.exit(1)
 
 logger = logging.getLogger("sff")
@@ -102,8 +102,8 @@ def main():
         set_language(str(lang))
 
     app = QApplication(sys.argv)
-    app.setApplicationName("SteaMidra")
-    app.setApplicationDisplayName("SteaMidra")
+    app.setApplicationName("SlimeDeals")
+    app.setApplicationDisplayName("SlimeDeals")
 
     from sff.single_instance import SingleInstanceGuard
     _guard = SingleInstanceGuard()
@@ -130,7 +130,7 @@ def main():
     while steam_path is None:
         QMessageBox.warning(
             None,
-            "Steam path required — SteaMidra",
+            "Steam path required — SlimeDeals",
             f"Steam installation path could not be found. Please select the folder that contains {_steam_exe}.",
         )
         path = QFileDialog.getExistingDirectory(None, f"Select Steam folder (contains {_steam_exe})")
@@ -200,7 +200,7 @@ def _show_error_and_exit(msg, log_path = "crash.log"):
         app = QApplication(sys.argv)
     QMessageBox.critical(
         None,
-        "SteaMidra failed to start",
+        "SlimeDeals failed to start",
         "An error occurred. See crash.log for details.\n\n" + msg[:1500],
     )
     sys.exit(1)

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SteaMidra — Settings Page
  * Theme picker, paths, API keys, AppList profiles, preferences.
  */
@@ -157,7 +157,7 @@ window.Settings = (function() {
                     var cfg = apiSaveMap[btnId];
                     var input = document.getElementById(cfg.input);
                     var val = input ? input.value.trim() : '';
-                    if (!val) { Components.showToast('warning', 'Please enter a value'); return; }
+                    if (!val) { Components.showToast('warning', 'Veuillez entrer une valeur'); return; }
                     if (cfg.useConnect) {
                         Bridge.call('connect_store', val);
                     } else {
@@ -174,7 +174,7 @@ window.Settings = (function() {
             manifestExcludesSave.addEventListener('click', function() {
                 var val = (document.getElementById('setting-manifest-excludes') || {}).value || '';
                 Bridge.call('set_setting', 'manifest_update_excludes', val.trim());
-                Components.showToast('success', 'Manifest excludes saved');
+                Components.showToast('success', 'Exclusions manifest enregistrées');
             });
         }
 
@@ -186,14 +186,14 @@ window.Settings = (function() {
             applistClear.addEventListener('click', function() {
                 if (!confirm('Clear ALL IDs from the GreenLuma AppList folder? Game files and Steam library are untouched.')) return;
                 Bridge.call('clear_applist');
-                Components.showToast('info', 'Clearing AppList...');
+                Components.showToast('info', 'Nettoyage de l\'AppList...');
             });
         }
 
         if (applistRebuild) {
             applistRebuild.addEventListener('click', function() {
                 Bridge.call('rebuild_applist_from_installed');
-                Components.showToast('info', 'Rebuilding AppList from installed games...');
+                Components.showToast('info', 'Reconstruction de l\'AppList depuis les jeux installés...');
             });
         }
 
@@ -205,9 +205,9 @@ window.Settings = (function() {
                 var input = document.getElementById(inputId);
                 if (!input) return;
                 var val = input.value.trim();
-                if (!val) { Components.showToast('warning', 'Please enter a value'); return; }
+                if (!val) { Components.showToast('warning', 'Veuillez entrer une valeur'); return; }
                 Bridge.call('set_setting', key, val);
-                Components.showToast('success', 'Setting saved');
+                Components.showToast('success', 'Paramètre enregistré');
             });
         });
     }
@@ -223,9 +223,9 @@ window.Settings = (function() {
             switchBtn.addEventListener('click', function() {
                 var select = document.getElementById('profile-select');
                 var name = select ? select.value : '';
-                if (!name) { Components.showToast('warning', 'Select a profile first'); return; }
+                if (!name) { Components.showToast('warning', 'Sélectionnez un profil d\'abord'); return; }
                 Bridge.call('switch_profile', name);
-                Components.showToast('info', 'Switching to profile: ' + name);
+                Components.showToast('info', 'Basculement vers le profil : ' + name);
             });
         }
 
@@ -234,7 +234,7 @@ window.Settings = (function() {
                 var name = prompt('Save current AppList as profile:');
                 if (name) {
                     Bridge.call('save_profile', name);
-                    Components.showToast('info', 'Saving profile: ' + name);
+                    Components.showToast('info', 'Enregistrement du profil : ' + name);
                     setTimeout(_loadProfiles, 500);
                 }
             });
@@ -245,7 +245,7 @@ window.Settings = (function() {
                 var name = prompt('New profile name:');
                 if (name) {
                     Bridge.call('save_profile', name);
-                    Components.showToast('success', 'Created profile: ' + name);
+                    Components.showToast('success', 'Profil créé : ' + name);
                     setTimeout(_loadProfiles, 500);
                 }
             });
@@ -255,11 +255,11 @@ window.Settings = (function() {
             renameBtn.addEventListener('click', function() {
                 var select = document.getElementById('profile-select');
                 var oldName = select ? select.value : '';
-                if (!oldName) { Components.showToast('warning', 'Select a profile first'); return; }
+                if (!oldName) { Components.showToast('warning', 'Sélectionnez un profil d\'abord'); return; }
                 var newName = prompt('New name for "' + oldName + '":');
                 if (newName && newName !== oldName) {
                     Bridge.call('rename_profile', oldName, newName);
-                    Components.showToast('success', 'Renamed profile');
+                    Components.showToast('success', 'Profil renommé');
                     setTimeout(_loadProfiles, 500);
                 }
             });
@@ -269,10 +269,10 @@ window.Settings = (function() {
             deleteBtn.addEventListener('click', function() {
                 var select = document.getElementById('profile-select');
                 var name = select ? select.value : '';
-                if (!name) { Components.showToast('warning', 'Select a profile first'); return; }
+                if (!name) { Components.showToast('warning', 'Sélectionnez un profil d\'abord'); return; }
                 if (confirm('Delete profile "' + name + '"? This cannot be undone.')) {
                     Bridge.call('delete_profile', name);
-                    Components.showToast('info', 'Deleted profile: ' + name);
+                    Components.showToast('info', 'Profil supprimé : ' + name);
                     setTimeout(_loadProfiles, 500);
                 }
             });
@@ -331,16 +331,16 @@ window.Settings = (function() {
                 var cfg = { provider: provider };
                 if (provider === 'local') {
                     var dest = (document.getElementById('setting-autobackup-local-dest') || {}).value || '';
-                    if (!dest) { Components.showToast('warning', 'Select a destination folder first'); return; }
+                    if (!dest) { Components.showToast('warning', 'Sélectionnez d\'abord un dossier de destination'); return; }
                     cfg.dest_path = dest;
                 } else if (provider === 'rclone') {
                     var remote = (document.getElementById('setting-autobackup-rclone-dest') || {}).value || '';
-                    if (!remote) { Components.showToast('warning', 'Enter a remote destination first'); return; }
+                    if (!remote) { Components.showToast('warning', 'Entrez d\'abord une destination distante'); return; }
                     cfg.rclone_exe = '';
                     cfg.remote_dest = remote;
                 }
                 Bridge.call('set_setting', 'last_backup_provider_config', JSON.stringify(cfg));
-                Components.showToast('success', 'Auto backup settings saved');
+                Components.showToast('success', 'Paramètres de sauvegarde auto enregistrés');
             });
         }
 
@@ -401,15 +401,15 @@ window.Settings = (function() {
                 var data = JSON.parse(json);
                 if (data.task === 'applist_cleared') {
                     if (data.success) {
-                        Components.showToast('success', 'AppList cleared — ' + data.count + ' IDs removed');
+                        Components.showToast('success', 'AppList vidée — ' + data.count + ' IDs supprimés');
                     } else {
-                        Components.showToast('error', 'AppList clear failed: ' + data.message);
+                        Components.showToast('error', 'Échec du nettoyage AppList : ' + data.message);
                     }
                 } else if (data.task === 'applist_rebuilt') {
                     if (data.success) {
-                        Components.showToast('success', 'AppList rebuilt — ' + data.count + ' installed games added');
+                        Components.showToast('success', 'AppList reconstruite — ' + data.count + ' jeux installés ajoutés');
                     } else {
-                        Components.showToast('error', 'AppList rebuild failed: ' + data.message);
+                        Components.showToast('error', 'Échec de la reconstruction AppList : ' + data.message);
                     }
                 }
             } catch(e) {}
@@ -429,9 +429,9 @@ window.Settings = (function() {
                     Bridge.call('set_setting', dropdowns[id], this.value);
                     if (id === 'setting-language') {
                         if (window.I18n) I18n.applyLanguage(this.value);
-                        Components.showToast('success', 'Language updated');
+                        Components.showToast('success', 'Langue mise à jour');
                     } else {
-                        Components.showToast('success', 'Setting updated');
+                        Components.showToast('success', 'Paramètre mis à jour');
                     }
                 });
             }
@@ -520,13 +520,13 @@ window.Settings = (function() {
         if (applyBtn) {
             applyBtn.addEventListener('click', function() {
                 var path = pathInput ? pathInput.value.trim() : '';
-                if (!path) { Components.showToast('warning', 'Browse for an avatar first'); return; }
+                if (!path) { Components.showToast('warning', 'Parcourez pour choisir un avatar d\'abord'); return; }
                 Bridge.callWithCallback('set_global_avatar', path, function(result) {
                     if (result === 'ok') {
-                        Components.showToast('success', 'Avatar applied globally');
+                        Components.showToast('success', 'Avatar appliqué globalement');
                         _loadCurrentAvatar();
                     } else {
-                        Components.showToast('error', result || 'Failed to apply avatar');
+                        Components.showToast('error', result || 'Impossible d\'appliquer l\'avatar');
                     }
                 });
             });

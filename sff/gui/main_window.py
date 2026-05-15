@@ -20,7 +20,7 @@ import re
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, Qt, QThread, QTimer, QUrl, pyqtSignal
+from PyQt6.QtCore import QObject, QPoint, QThread, QTimer, QUrl, pyqtSignal, Qt
 from PyQt6.QtGui import QDesktopServices, QTextCursor, QColor, QFont, QFontMetrics, QPainter
 from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtWebEngineCore import QWebEngineSettings
@@ -140,12 +140,14 @@ class LauncherNewsTicker(QWidget):
         self._timer = QTimer(self)
         self._timer.setInterval(32)
         self._timer.timeout.connect(self._tick)
+        self.setAutoFillBackground(False)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setFixedHeight(22)
-        self.setMinimumWidth(64)
+        self.setMinimumWidth(80)
         self.setStyleSheet(
-            "LauncherNewsTicker{background:rgba(21,23,34,0.92);border-radius:5px;"
-            "border:1px solid rgba(114,137,218,0.38);}"
+            "LauncherNewsTicker{ border-radius:5px;"
+            "border:1px solid rgba(114,137,218,0.38); }"
         )
 
     def set_message(self, text: str):
@@ -163,6 +165,7 @@ class LauncherNewsTicker(QWidget):
         fm = QFontMetrics(f)
         gap = 56
         self._cycle = max(160, fm.horizontalAdvance(t) + gap)
+        self.setMinimumWidth(min(420, 120 + fm.horizontalAdvance(t) // 4))
         self.setVisible(True)
         if not self._timer.isActive():
             self._timer.start()
@@ -178,6 +181,7 @@ class LauncherNewsTicker(QWidget):
             return
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+        p.fillRect(self.rect(), QColor(21, 23, 34, 235))
         f = QFont()
         f.setPointSize(9)
         f.setWeight(600)
@@ -188,9 +192,9 @@ class LauncherNewsTicker(QWidget):
         p.setPen(QColor("#c5cee0"))
         cy = max(1, self._cycle)
         off = self._scroll % cy
-        x = -off
+        x = float(-off)
         while x < w + cy:
-            p.drawText(int(x), baseline, self._msg)
+            p.drawText(QPoint(int(x), baseline), self._msg)
             x += cy
 
 
@@ -329,7 +333,7 @@ class SFFMainWindow(QMainWindow):
         self._user_bar_widget.setVisible(False)
 
         self._news_ticker = LauncherNewsTicker()
-        self._last_banner_rev = -10**9
+        self._last_banner_key = None
         toggle_bar.addWidget(site_btn)
         toggle_bar.addWidget(discord_btn)
         toggle_bar.addWidget(self._news_ticker, 1)
@@ -1037,10 +1041,12 @@ class SFFMainWindow(QMainWindow):
             return
         if rev < 0:
             return
-        if rev == self._last_banner_rev:
+        text = str(d.get("text") or "")
+        key = (rev, text)
+        if key == self._last_banner_key:
             return
-        self._last_banner_rev = rev
-        self._news_ticker.set_message(str(d.get("text") or ""))
+        self._last_banner_key = key
+        self._news_ticker.set_message(text)
 
     def _do_logout(self):
         """Disconnect the user: wipe saved token and return to login page."""

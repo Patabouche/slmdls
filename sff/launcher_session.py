@@ -31,16 +31,40 @@ def fetch_launcher_banner() -> dict:
     """GET /api/launcher/banner — public. Retourne {text, rev} ou {text:'', rev:-1} en erreur."""
     req = urllib.request.Request(
         f"{_API_BASE}/api/launcher/banner",
-        headers={"Accept": "application/json"},
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "SlimeDealsLauncher/1.0 (banner-poll)",
+        },
         method="GET",
     )
     try:
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            if resp.getcode() != 200:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            code = resp.getcode()
+            body = resp.read().decode("utf-8", errors="replace")
+            if code != 200:
+                logger.warning("fetch_launcher_banner: HTTP %s", code)
                 return {"text": "", "rev": -1}
-            return json.loads(resp.read().decode())
+            data = json.loads(body)
+            if not isinstance(data, dict):
+                return {"text": "", "rev": -1}
+            return {
+                "text": str(data.get("text") or ""),
+                "rev": int(data.get("rev") or 0),
+            }
+    except urllib.error.HTTPError as e:
+        try:
+            err_body = e.read().decode("utf-8", errors="replace")[:500]
+        except Exception:
+            err_body = ""
+        logger.warning(
+            "fetch_launcher_banner: HTTPError %s %s — %s",
+            e.code,
+            e.reason,
+            err_body or "—",
+        )
+        return {"text": "", "rev": -1}
     except Exception as exc:
-        logger.debug("fetch_launcher_banner: %s", exc.__class__.__name__)
+        logger.warning("fetch_launcher_banner: %s: %s", exc.__class__.__name__, exc)
         return {"text": "", "rev": -1}
 
 

@@ -22,6 +22,7 @@ import asyncio
 import io
 import json
 import logging
+import os
 import re
 from pathlib import Path
 
@@ -365,11 +366,15 @@ def get_ryuu(dest, app_id, depotcache=None, request_update=None):
         return lua_path
 
 
-# ── TwentyTwoCloud ─────────────────────────────────────────────────────────────
+# ── Téléchargement Lua catalogue (API interne, lien Steam) ───────────────────
 
-_TTC_AUTH_TOKEN = "ttc_WMPOWDWDJPWYDWWIJPODWWPODDOWPDI9WDJPOWDWD89W7D489WD7"
-_TTC_DOWNLOAD_URL = "https://api.twentytwocloud.com/download?appid={}&auth_token=" + _TTC_AUTH_TOKEN
-_TTC_INFO_URL = "https://api.twentytwocloud.com/info?appid={}"
+# Catalogue Lua (URL de base et jeton configurables en prod via variables d'environnement).
+_CATALOG_API_BASE = (os.getenv("SLIMEDEALS_CATALOG_API_BASE") or "https://api.twentytwocloud.com").rstrip("/")
+_CATALOG_TOKEN = (os.getenv("SLIMEDEALS_CATALOG_TOKEN") or "").strip() or (
+    "ttc_WMPOWDWDJPWYDWWIJPODWWPODDOWPDI9WDJPOWDWD89W7D489WD7"
+)
+_TTC_DOWNLOAD_URL = _CATALOG_API_BASE + "/download?appid={}&auth_token=" + _CATALOG_TOKEN
+_TTC_INFO_URL = _CATALOG_API_BASE + "/info?appid={}"
 
 
 def _ttc_body_is_not_found(body: bytes) -> bool:
@@ -385,33 +390,60 @@ def _ttc_body_is_not_found(body: bytes) -> bool:
 
 
 def ttc_get_game_info(app_id: str) -> dict | None:
-    """Appelle l'endpoint /info de TwentyTwoCloud et retourne le dict JSON, ou None."""
+    """Récupère les métadonnées jeu pour l’onglet Télécharger (API catalogue), ou None."""
     try:
         resp = httpx.get(_TTC_INFO_URL.format(app_id), timeout=15)
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:
-        logger.warning(f"[TTC] info error app_id={app_id}: {e}")
+        logger.warning("[catalogue] meta indisponible app_id=%s (%s)", app_id, type(e).__name__)
     return None
 
 
+def steam_store_dlc_count(app_id: str) -> int | None:
+    """Nombre de DLC listés sur la fiche Steam Store (API publique). None si indisponible."""
+    aid = str(app_id).strip()
+    if not aid.isdigit():
+        return None
+    try:
+        resp = httpx.get(
+            "https://store.steampowered.com/api/appdetails",
+            params={"appids": aid, "l": "french"},
+            timeout=12,
+        )
+        if resp.status_code != 200:
+            return None
+        root = resp.json()
+        entry = root.get(aid) or root.get(str(int(aid)))
+        if not isinstance(entry, dict) or not entry.get("success"):
+            return None
+        data = entry.get("data") or {}
+        dlc = data.get("dlc")
+        if isinstance(dlc, list):
+            return len(dlc)
+        return 0
+    except Exception as e:
+        logger.debug("[Steam] appdetails DLC count app_id=%s: %s", app_id, e)
+        return None
+
+
 def get_twentytwocloud(dest, app_id, depotcache=None):
-    """Télécharge le fichier Lua/ZIP depuis TwentyTwoCloud et retourne le chemin du .lua."""
+    """Télécharge le fichier Lua/ZIP depuis le catalogue intégré et retourne le chemin du .lua."""
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
     app_id = str(app_id)
 
-    print(Fore.CYAN + f"[TwentyTwoCloud] Téléchargement du fichier pour app {app_id}..." + Style.RESET_ALL)
+    print(Fore.CYAN + f"[Téléchargement] Téléchargement du fichier Lua pour l’app {app_id}…" + Style.RESET_ALL)
     try:
         resp = httpx.get(_TTC_DOWNLOAD_URL.format(app_id), timeout=60, follow_redirects=True)
         body = resp.content
 
         if _ttc_body_is_not_found(body):
-            print(Fore.RED + f"[TwentyTwoCloud] Jeu introuvable (app_id={app_id})" + Style.RESET_ALL)
+            print(Fore.RED + f"[Téléchargement] Jeu introuvable (app_id={app_id})" + Style.RESET_ALL)
             return None
 
         if resp.status_code != 200:
-            print(Fore.RED + f"[TwentyTwoCloud] HTTP {resp.status_code}" + Style.RESET_ALL)
+            print(Fore.RED + f"[Téléchargement] HTTP {resp.status_code}" + Style.RESET_ALL)
             return None
 
         # Récupère le nom de fichier depuis Content-Disposition
@@ -423,7 +455,7 @@ def get_twentytwocloud(dest, app_id, depotcache=None):
         if filename.lower().endswith(".zip") or body[:2] == b"PK":
             lua_bytes = read_lua_from_zip(io.BytesIO(body), decode=False, depotcache=depotcache)
             if lua_bytes is None:
-                print(Fore.RED + "[TwentyTwoCloud] ZIP reçu mais aucun .lua trouvé dedans." + Style.RESET_ALL)
+                print(Fore.RED + "[Téléchargement] Archive reçue mais aucun .lua trouvé dedans." + Style.RESET_ALL)
                 return None
         else:
             lua_bytes = body
@@ -432,10 +464,10 @@ def get_twentytwocloud(dest, app_id, depotcache=None):
         with lua_path.open("wb") as f:
             f.write(lua_bytes)
         _update_fallback_depotkeys(lua_bytes)
-        print(Fore.GREEN + f"\u2705 TwentyTwoCloud: Lua sauvegardé → {lua_path}" + Style.RESET_ALL)
+        print(Fore.GREEN + f"\u2705 Téléchargement : fichier Lua enregistré → {lua_path}" + Style.RESET_ALL)
         return lua_path
 
     except Exception as e:
-        print(Fore.RED + f"[TwentyTwoCloud] Erreur: {e}" + Style.RESET_ALL)
-        logger.exception(f"[TTC] download error app_id={app_id}")
+        print(Fore.RED + "[Téléchargement] Erreur réseau ou catalogue." + Style.RESET_ALL)
+        logger.error("[catalogue] lua app_id=%s (%s)", app_id, type(e).__name__)
         return None

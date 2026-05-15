@@ -80,6 +80,11 @@ c_dir = os.path.join(spec_root, 'c')
 if os.path.exists(c_dir):
     datas.append((c_dir, 'c'))
 
+# Google Drive — JSON OAuth (inclus si présent à la racine SFF au build)
+for _gcs in sorted(_glob.glob(os.path.join(spec_root, 'client_secret*.json'))):
+    datas.append((_gcs, '.'))
+    print(f"Including Google OAuth client JSON (datas): {os.path.basename(_gcs)}")
+
 # ── Bundle system libs required by Qt6WebEngine ──────────────────────────────
 # pyqt6-webengine-qt6 (PyPI) links against these system libs at compile time
 # but does NOT ship them. Bundle them here so the AppImage is self-contained

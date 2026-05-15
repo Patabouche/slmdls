@@ -18,8 +18,10 @@
 
 """Cloud Saves tab — Steam userdata remote/ backup and restore."""
 
+import json
 import logging
 from pathlib import Path
+from typing import Optional
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject
 from PyQt6.QtWidgets import (
@@ -29,6 +31,7 @@ from PyQt6.QtWidgets import (
 )
 
 from sff.cloud_saves import CloudSaves
+from sff.launcher_ranks import cloud_saves_launcher_allowed_for_rank
 from sff.storage.settings import get_setting, set_setting
 from sff.structs import Settings
 
@@ -92,6 +95,24 @@ class CloudSavesTab(QWidget):
         self._thread: Optional[QThread] = None
         self._games: list[tuple[int, str]] = []
         self._setup_ui()
+
+    @staticmethod
+    def _auth_rank_raw() -> str:
+        try:
+            p = Path.home() / ".slimedeals" / "auth.json"
+            d = json.loads(p.read_text(encoding="utf-8"))
+            return str(d.get("rank") or "free")
+        except Exception:
+            return "free"
+
+    def _cloud_saves_allowed_for_account(self) -> bool:
+        return cloud_saves_launcher_allowed_for_rank(self._auth_rank_raw())
+
+    def _cloud_saves_blocked_message(self) -> str:
+        return (
+            "Les sauvegardes cloud sont reservees au plan Triple Monstre "
+            "(plans FREE et Monstre exclus). Voir slimedeals.fr/#tarifs."
+        )
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -248,6 +269,9 @@ class CloudSavesTab(QWidget):
         return steam_path, steam32_id
 
     def _scan_games(self):
+        if not self._cloud_saves_allowed_for_account():
+            QMessageBox.information(self, "Sauvegardes cloud", self._cloud_saves_blocked_message())
+            return
         result = self._validate_setup()
         if not result:
             return
@@ -273,6 +297,9 @@ class CloudSavesTab(QWidget):
         self._restore_btn.setEnabled(enabled)
 
     def _do_backup(self):
+        if not self._cloud_saves_allowed_for_account():
+            QMessageBox.information(self, "Sauvegardes cloud", self._cloud_saves_blocked_message())
+            return
         result = self._validate_setup()
         if not result:
             return
@@ -288,6 +315,9 @@ class CloudSavesTab(QWidget):
         self._run_worker("backup", steam_path, steam32_id, app_id, game_name, dest)
 
     def _do_restore(self):
+        if not self._cloud_saves_allowed_for_account():
+            QMessageBox.information(self, "Sauvegardes cloud", self._cloud_saves_blocked_message())
+            return
         result = self._validate_setup()
         if not result:
             return

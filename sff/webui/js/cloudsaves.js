@@ -1,880 +1,1489 @@
 /**
- * SteaMidra — Cloud Saves Page
- * Steam userdata backup and restore with provider support.
+
+ * SteaMidra — Sauvegardes cloud (Google Drive uniquement sur cette page).
+
  */
 
+
+
 window.CloudSaves = (function() {
+
     'use strict';
 
+
+
     var _initialized = false;
-    var _provider = 'local';
+
     var _allSavesEntries = [];
+
     var _restoreLocationsData = {};
 
-    // ── Provider helpers ──────────────────────────────────────────
 
-    function _showProviderConfig(provider) {
-        var folderCfg = document.getElementById('provider-config-folder');
-        var rcloneCfg = document.getElementById('provider-config-rclone');
-        var saveBtn = document.getElementById('provider-save-config');
-        var backupDestRow = document.getElementById('cloud-backup-dest-row');
-        var backupBtn = document.getElementById('cloud-backup-btn');
 
-        if (folderCfg) folderCfg.style.display = 'none';
-        if (rcloneCfg) rcloneCfg.style.display = 'none';
-        if (saveBtn) saveBtn.style.display = 'none';
-        if (backupDestRow) backupDestRow.style.display = '';
+    function _gdriveProviderConfig() {
 
-        var gdriveCfg = document.getElementById('provider-config-gdrive');
-        if (gdriveCfg) gdriveCfg.style.display = 'none';
+        return JSON.stringify({ provider: 'gdrive_api' });
 
-        if (provider === 'gdrive') {
-            if (gdriveCfg) gdriveCfg.style.display = '';
-            if (backupDestRow) backupDestRow.style.display = 'none';
-            if (backupBtn) backupBtn.textContent = 'Backup via Google Drive';
-        } else if (provider === 'rclone') {
-            if (rcloneCfg) rcloneCfg.style.display = '';
-            if (saveBtn) saveBtn.style.display = '';
-            if (backupDestRow) backupDestRow.style.display = 'none';
-            if (backupBtn) backupBtn.textContent = 'Upload via rclone';
-        } else {
-            if (backupBtn) backupBtn.textContent = 'Backup Selected Game';
+    }
+
+
+
+    function _persistSteamPathFromField(showToast) {
+
+        var input = document.getElementById('cloud-steam-path');
+
+        var v = input ? input.value.trim() : '';
+
+        if (!v) return;
+
+        Bridge.call('set_setting', 'steam_path', v);
+
+        if (showToast) Components.showToast('success', 'Chemin Steam enregistré');
+
+    }
+
+
+
+    function _persistSteam32FromField(showToast) {
+
+        var input = document.getElementById('cloud-steam32');
+
+        var v = input ? input.value.trim() : '';
+
+        if (!v) {
+
+            if (showToast) Components.showToast('warning', 'Entre d’abord le numéro du dossier userdata');
+
+            return;
+
         }
+
+        Bridge.call('set_setting', 'steam32_id', v);
+
+        if (showToast) Components.showToast('success', 'ID userdata enregistré');
+
     }
 
-    function _setActiveCard(provider) {
-        document.querySelectorAll('.provider-card').forEach(function(card) {
-            card.classList.toggle('active', card.dataset.provider === provider);
-        });
-    }
 
-    function _saveProviderConfig() {
-        Bridge.call('set_setting', 'cloud_provider', _provider);
-        if (_provider === 'rclone') {
-            var exe = document.getElementById('provider-rclone-exe');
-            var remote = document.getElementById('provider-rclone-remote');
-            if (exe) Bridge.call('set_setting', 'cloud_rclone_exe', exe.value.trim());
-            if (remote) Bridge.call('set_setting', 'cloud_rclone_remote', remote.value.trim());
-        }
-        Components.showToast('success', 'Configuration fournisseur enregistrée');
-    }
-
-    function _autofillBundledExe(provider) {
-        if (provider === 'rclone') {
-            var inp = document.getElementById('provider-rclone-exe');
-            if (inp && !inp.value.trim()) {
-                Bridge.callWithCallback('get_bundled_tool_path', 'rclone', function(p) {
-                    if (p && !inp.value.trim()) inp.value = p;
-                });
-            }
-        }
-    }
-
-    function _loadRcloneRemotes() {
-        var exeInp = document.getElementById('provider-rclone-exe');
-        var rcloneExe = exeInp ? exeInp.value.trim() : '';
-        var listBtn = document.getElementById('provider-rclone-list');
-        if (listBtn) { listBtn.disabled = true; listBtn.textContent = 'Loading...'; }
-        Bridge.call('rclone_list_remotes', JSON.stringify({ rclone_exe: rcloneExe }));
-    }
-
-    // ── Init ──────────────────────────────────────────────────────
 
     function init() {
+
         if (_initialized) return;
+
         _initialized = true;
 
-        var steamBrowse = document.getElementById('cloud-steam-browse');
-        var saveIdBtn = document.getElementById('cloud-save-id');
-        var scanBtn = document.getElementById('cloud-scan');
-        var backupBrowse = document.getElementById('cloud-backup-browse');
-        var backupBtn = document.getElementById('cloud-backup-btn');
-        var importBrowse = document.getElementById('cloud-import-browse');
-        var importBtn = document.getElementById('cloud-import-btn');
-        var saveConfigBtn = document.getElementById('provider-save-config');
 
-        // Provider card clicks
-        document.querySelectorAll('.provider-card').forEach(function(card) {
-            card.addEventListener('click', function() {
-                _provider = this.dataset.provider;
-                _setActiveCard(_provider);
-                _showProviderConfig(_provider);
-                Bridge.call('set_setting', 'cloud_provider', _provider);
-                _autofillBundledExe(_provider);
-                if (_provider === 'gdrive') _checkGdriveStatus();
+
+        var steamBrowse = document.getElementById('cloud-steam-browse');
+
+        var saveIdBtn = document.getElementById('cloud-save-id');
+
+        var scanBtn = document.getElementById('cloud-scan');
+
+        var backupBtn = document.getElementById('cloud-backup-btn');
+
+        var importBrowse = document.getElementById('cloud-import-browse');
+
+        var importBtn = document.getElementById('cloud-import-btn');
+
+
+
+        var autoInterval = document.getElementById('cloud-auto-interval');
+
+        var autoEnable = document.getElementById('cloud-auto-enable-btn');
+
+        var autoDisable = document.getElementById('cloud-auto-disable-btn');
+
+
+
+        if (autoEnable) {
+
+            autoEnable.addEventListener('click', function() {
+
+                var min = autoInterval ? parseInt(autoInterval.value, 10) : 0;
+
+                if (isNaN(min) || min < 1) {
+
+                    Components.showToast('warning', 'Mets au moins 1 minute entre chaque envoi automatique');
+
+                    return;
+
+                }
+
+                var steamPathEl = document.getElementById('cloud-steam-path');
+
+                var steam32El = document.getElementById('cloud-steam32');
+
+                var sp = steamPathEl ? steamPathEl.value.trim() : '';
+
+                var s32 = steam32El ? steam32El.value.trim() : '';
+
+                if (!sp || !s32) {
+
+                    Components.showToast('warning', 'Renseigne d’abord le dossier Steam et l’ID userdata (étape 3) — l’auto a besoin des deux pour trouver les fichiers.');
+
+                    return;
+
+                }
+
+                Bridge.call('set_setting', 'steam_path', sp);
+
+                Bridge.call('set_setting', 'steam32_id', s32);
+
+                Bridge.call('set_setting', 'save_watcher_interval', String(min));
+
+                Bridge.call('set_setting', 'last_backup_provider_config', _gdriveProviderConfig());
+
+                Components.showToast('success', 'Sauvegarde auto sur Google Drive activée (' + min + ' min)');
+
             });
-        });
+
+        }
+
+        if (autoDisable) {
+
+            autoDisable.addEventListener('click', function() {
+
+                Bridge.call('set_setting', 'save_watcher_interval', '0');
+
+                if (autoInterval) autoInterval.value = '0';
+
+                Components.showToast('info', 'Sauvegarde automatique désactivée');
+
+            });
+
+        }
+
+
+
+        if (autoInterval) {
+
+            autoInterval.addEventListener('change', function() {
+
+                var v = String(this.value == null ? '' : this.value).trim();
+
+                Bridge.call('set_setting', 'save_watcher_interval', v === '' ? '0' : v);
+
+            });
+
+        }
+
+
 
         // Google Drive connect / disconnect
+
         var gdriveConnectBtn = document.getElementById('gdrive-connect-btn');
+
         var gdriveDisconnectBtn = document.getElementById('gdrive-disconnect-btn');
+
         if (gdriveConnectBtn) {
+
             gdriveConnectBtn.addEventListener('click', function() {
+
                 gdriveConnectBtn.disabled = true;
-                gdriveConnectBtn.textContent = 'Connecting...';
+
+                gdriveConnectBtn.textContent = 'Connexion…';
+
                 Bridge.call('gdrive_authorize');
+
             });
+
         }
+
         if (gdriveDisconnectBtn) {
+
             gdriveDisconnectBtn.addEventListener('click', function() {
-                _setGdriveStatus(false, '');
-                Components.showToast('info', 'Google Drive déconnecté');
+
+                Bridge.call('gdrive_disconnect');
+
             });
+
         }
 
-        // rclone provider chips, Load Remotes, Test, Setup in Terminal
-        // Provider chip strip — pre-fill remote destination on click
-        document.querySelectorAll('.rclone-chip').forEach(function(chip) {
-            chip.addEventListener('click', function() {
-                var prefix = this.dataset.prefix || '';
-                var remoteInp = document.getElementById('provider-rclone-remote');
-                if (remoteInp && prefix) remoteInp.value = prefix;
-                document.querySelectorAll('.rclone-chip').forEach(function(c) { c.classList.remove('active'); });
-                this.classList.add('active');
-            });
-        });
 
-        // Setup in Terminal
-        var rcloneSetupBtn = document.getElementById('provider-rclone-setup');
-        if (rcloneSetupBtn) {
-            rcloneSetupBtn.addEventListener('click', function() {
-                var exeInp = document.getElementById('provider-rclone-exe');
-                var rcloneExe = exeInp ? exeInp.value.trim() : '';
-                rcloneSetupBtn.disabled = true;
-                rcloneSetupBtn.textContent = 'Opening...';
-                Bridge.call('rclone_open_config', JSON.stringify({ rclone_exe: rcloneExe }));
-            });
-        }
 
-        var rcloneListBtn = document.getElementById('provider-rclone-list');
-        if (rcloneListBtn) {
-            rcloneListBtn.addEventListener('click', _loadRcloneRemotes);
-        }
-        var rcloneTestBtn = document.getElementById('provider-rclone-test');
-        if (rcloneTestBtn) {
-            rcloneTestBtn.addEventListener('click', function() {
-                var exeInp = document.getElementById('provider-rclone-exe');
-                var remoteInp = document.getElementById('provider-rclone-remote');
-                var rcloneExe = exeInp ? exeInp.value.trim() : '';
-                var remote = remoteInp ? remoteInp.value.trim() : '';
-                if (!remote) {
-                    Components.showToast('warning', 'Entrez d\'abord une destination distante');
-                    return;
-                }
-                rcloneTestBtn.disabled = true;
-                rcloneTestBtn.textContent = 'Testing...';
-                Bridge.call('rclone_test_remote', JSON.stringify({ rclone_exe: rcloneExe, remote: remote }));
-            });
-        }
-        var rcloneDocsLink = document.getElementById('rclone-docs-link');
-        if (rcloneDocsLink) {
-            rcloneDocsLink.addEventListener('click', function(e) {
-                e.preventDefault();
-                Bridge.call('open_url', 'https://rclone.org/docs/');
-            });
-        }
-
-        // Provider config browse buttons
-        var folderBrowse = document.getElementById('provider-folder-browse');
-        if (folderBrowse) {
-            folderBrowse.addEventListener('click', function() {
-                Bridge.callSync('open_file_dialog', function(path) {
-                    if (path) {
-                        var inp = document.getElementById('provider-folder-path');
-                        if (inp) inp.value = path;
-                    }
-                });
-            });
-        }
-
-        var rcloneBrowse = document.getElementById('provider-rclone-browse');
-        if (rcloneBrowse) {
-            rcloneBrowse.addEventListener('click', function() {
-                Bridge.callSync('open_file_dialog', function(path) {
-                    if (path) {
-                        var inp = document.getElementById('provider-rclone-exe');
-                        if (inp) inp.value = path;
-                    }
-                });
-            });
-        }
-
-        if (saveConfigBtn) {
-            saveConfigBtn.addEventListener('click', _saveProviderConfig);
-        }
-
-        // Steam path / Steam32 ID
         if (steamBrowse) {
+
             steamBrowse.addEventListener('click', function() {
+
                 Bridge.callSync('open_file_dialog', function(path) {
+
                     if (path) {
+
                         var input = document.getElementById('cloud-steam-path');
+
                         if (input) input.value = path;
+
+                        _persistSteamPathFromField(true);
+
                     }
+
                 });
+
             });
+
         }
+
+
+
+        var steamPathInput = document.getElementById('cloud-steam-path');
+
+        if (steamPathInput) {
+
+            steamPathInput.addEventListener('blur', function() {
+
+                _persistSteamPathFromField(false);
+
+            });
+
+            steamPathInput.addEventListener('change', function() {
+
+                _persistSteamPathFromField(false);
+
+            });
+
+        }
+
+
+
+        var steam32Input = document.getElementById('cloud-steam32');
+
+        if (steam32Input) {
+
+            steam32Input.addEventListener('blur', function() {
+
+                _persistSteam32FromField(false);
+
+            });
+
+            steam32Input.addEventListener('change', function() {
+
+                _persistSteam32FromField(false);
+
+            });
+
+        }
+
+
 
         if (saveIdBtn) {
+
             saveIdBtn.addEventListener('click', function() {
-                var input = document.getElementById('cloud-steam32');
-                if (input && input.value.trim()) {
-                    Bridge.call('set_setting', 'steam32_id', input.value.trim());
-                    Components.showToast('success', 'Steam32 ID enregistré');
-                }
+
+                _persistSteam32FromField(true);
+
             });
+
         }
+
+
+
+        var selfTestBtn = document.getElementById('cloud-self-test-btn');
+
+        if (selfTestBtn) {
+
+            selfTestBtn.addEventListener('click', _runCloudSelfTest);
+
+        }
+
+
 
         if (scanBtn) {
+
             scanBtn.addEventListener('click', _scanGames);
+
         }
 
-        if (backupBrowse) {
-            backupBrowse.addEventListener('click', function() {
-                Bridge.callSync('open_file_dialog', function(path) {
-                    if (path) {
-                        var input = document.getElementById('cloud-backup-dest');
-                        if (input) input.value = path;
-                    }
-                });
-            });
-        }
 
-        // Backup button — routes by provider
+
         if (backupBtn) {
+
             backupBtn.addEventListener('click', function() {
+
+                _persistSteamPathFromField(false);
+
+                _persistSteam32FromField(false);
+
                 var steamPath = document.getElementById('cloud-steam-path');
+
                 var steam32 = document.getElementById('cloud-steam32');
+
                 var sp = steamPath ? steamPath.value.trim() : '';
+
                 var s32 = steam32 ? steam32.value.trim() : '';
 
+
+
                 var tbody = document.getElementById('cloud-games-tbody');
+
                 var selectedRow = tbody ? tbody.querySelector('tr.selected') : null;
+
                 if (!selectedRow) {
-                    Components.showToast('warning', 'Sélectionnez un jeu dans les résultats du scan d\'abord');
+
+                    Components.showToast('warning', 'Scanne les jeux puis clique une ligne du tableau pour choisir le jeu');
+
                     return;
+
                 }
+
                 var appId = selectedRow.dataset.appid;
+
                 var gameName = selectedRow.cells[1] ? selectedRow.cells[1].textContent : '';
 
+
+
                 if (!sp || !s32) {
-                    Components.showToast('warning', 'Définissez le chemin Steam et le Steam32 ID d\'abord');
+
+                    Components.showToast('warning', 'Renseigne le dossier Steam et l’ID userdata');
+
                     return;
+
                 }
 
-                if (_provider === 'rclone') {
-                    var rExe = document.getElementById('provider-rclone-exe');
-                    var rRemote = document.getElementById('provider-rclone-remote');
-                    var rExePath = rExe ? rExe.value.trim() : '';
-                    var rRemotePath = rRemote ? rRemote.value.trim() : '';
-                    if (!rExePath || !rRemotePath) {
-                        Components.showToast('warning', 'Définissez l\'exécutable rclone et la destination, puis enregistrez la config');
-                        return;
-                    }
-                    Bridge.call('rclone_backup_save', JSON.stringify({
-                        app_id: appId, game_name: gameName,
-                        steam_path: sp, steam32_id: s32,
-                        rclone_exe: rExePath, remote_dest: rRemotePath
-                    }));
-                    Components.showToast('info', 'Upload via rclone...');
-                    return;
-                }
 
-                var destPath = '';
-                if (_provider === 'gdrive') {
-                    // Single-game backup via GDrive API — construct entry from selected game
-                    var sp2 = sp;
-                    var s32a = s32;
-                    var entry = {
-                        location: 'Steam Userdata',
-                        folder_name: String(appId),
-                        app_id: parseInt(appId, 10),
-                        game_name: gameName || ('App ' + appId),
-                        label: appId + (gameName ? ' - ' + gameName : ''),
-                        source_path: sp2 + '/userdata/' + s32a + '/' + appId,
-                        file_count: 0
-                    };
-                    Bridge.call('backup_all_save_locations', JSON.stringify({
-                        entries: [entry],
-                        provider: 'gdrive_api'
-                    }));
-                    Components.showToast('info', 'Upload vers Google Drive...');
-                    return;
-                } else {
-                    var dest = document.getElementById('cloud-backup-dest');
-                    destPath = dest ? dest.value.trim() : '';
-                    if (!destPath) {
-                        Components.showToast('warning', 'Sélectionnez une destination de sauvegarde');
-                        return;
-                    }
-                }
 
-                Bridge.call('backup_cloud_save', JSON.stringify({
-                    app_id: appId, dest_path: destPath,
-                    steam_path: sp, steam32_id: s32, game_name: gameName
+                var entry = {
+
+                    location: 'Steam Userdata',
+
+                    folder_name: String(appId),
+
+                    app_id: parseInt(appId, 10),
+
+                    game_name: gameName || ('App ' + appId),
+
+                    label: appId + (gameName ? ' - ' + gameName : ''),
+
+                    source_path: sp + '/userdata/' + s32 + '/' + appId,
+
+                    file_count: 0
+
+                };
+
+                Bridge.call('backup_all_save_locations', JSON.stringify({
+
+                    entries: [entry],
+
+                    provider: 'gdrive_api'
+
                 }));
-                Components.showToast('info', 'Sauvegarde des données pour ' + (gameName || 'App ' + appId) + '...');
+
+                Components.showToast('info', 'Envoi vers Google Drive…');
+
             });
+
         }
+
+
 
         if (importBrowse) {
+
             importBrowse.addEventListener('click', function() {
+
                 Bridge.callSync('open_file_dialog', function(path) {
+
                     if (path) {
+
                         var input = document.getElementById('cloud-import-path');
+
                         if (input) input.value = path;
+
                     }
+
                 });
+
             });
+
         }
+
+
 
         if (importBtn) {
+
             importBtn.addEventListener('click', function() {
+
+                _persistSteamPathFromField(false);
+
+                _persistSteam32FromField(false);
+
                 var tbody = document.getElementById('cloud-games-tbody');
+
                 var selectedRow = tbody ? tbody.querySelector('tr.selected') : null;
+
                 if (!selectedRow) {
-                    Components.showToast('warning', 'Sélectionnez un jeu dans les résultats du scan d\'abord');
+
+                    Components.showToast('warning', 'Choisis d’abord un jeu dans le tableau (après scan)');
+
                     return;
+
                 }
+
                 var appId = selectedRow.dataset.appid;
+
                 var input = document.getElementById('cloud-import-path');
+
                 var importPath = input ? input.value.trim() : '';
+
                 if (!importPath) {
-                    Components.showToast('warning', 'Sélectionnez un dossier de sauvegarde');
+
+                    Components.showToast('warning', 'Choisis le dossier de la sauvegarde à restaurer');
+
                     return;
+
                 }
+
                 var steamPath = document.getElementById('cloud-steam-path');
+
                 var steam32 = document.getElementById('cloud-steam32');
+
                 var sp = steamPath ? steamPath.value.trim() : '';
+
                 var s32 = steam32 ? steam32.value.trim() : '';
+
                 if (!sp || !s32) {
-                    Components.showToast('warning', 'Définissez le chemin Steam et le Steam32 ID d\'abord');
+
+                    Components.showToast('warning', 'Renseigne le dossier Steam et l’ID userdata');
+
                     return;
+
                 }
-                if (confirm('Restore saves from this backup? A safety backup will be created automatically.')) {
+
+                if (confirm('Restaurer cette sauvegarde dans Steam ? Une copie de sécurité sera créée si possible.')) {
+
                     Bridge.call('restore_cloud_save', JSON.stringify({
+
                         backup_path: importPath, app_id: appId,
+
                         steam_path: sp, steam32_id: s32
+
                     }));
-                    Components.showToast('info', 'Restauration des sauvegardes...');
+
+                    Components.showToast('info', 'Restauration…');
+
                 }
+
             });
+
         }
 
-        // All Save Locations — scan
+
+
         var allSavesScanBtn = document.getElementById('all-saves-scan-btn');
+
         if (allSavesScanBtn) {
+
             allSavesScanBtn.addEventListener('click', _scanAllSaveLocations);
+
         }
 
-        // All Save Locations — backup destination browse
-        var allSavesDestBrowse = document.getElementById('all-saves-dest-browse');
-        if (allSavesDestBrowse) {
-            allSavesDestBrowse.addEventListener('click', function() {
-                Bridge.callSync('open_file_dialog', function(path) {
-                    if (path) {
-                        var inp = document.getElementById('all-saves-dest');
-                        if (inp) inp.value = path;
-                    }
-                });
-            });
-        }
 
-        // All Save Locations — backup all now
+
         var allSavesBackupBtn = document.getElementById('all-saves-backup-btn');
+
         if (allSavesBackupBtn) {
+
             allSavesBackupBtn.addEventListener('click', _backupAllSaves);
+
         }
 
-        // Select all checkbox
+
+
         var selectAll = document.getElementById('all-saves-select-all');
+
         if (selectAll) {
+
             selectAll.addEventListener('change', function() {
+
                 document.querySelectorAll('.all-saves-row-check').forEach(function(cb) {
+
                     cb.checked = selectAll.checked;
+
                 });
+
             });
+
         }
 
-        // Restore — backup root browse
+
+
         var restoreBackupBrowse = document.getElementById('restore-backup-browse');
+
         if (restoreBackupBrowse) {
+
             restoreBackupBrowse.addEventListener('click', function() {
+
                 Bridge.callSync('open_file_dialog', function(path) {
+
                     if (path) {
+
                         var inp = document.getElementById('restore-backup-root');
+
                         if (inp) inp.value = path;
+
                     }
+
                 });
+
             });
+
         }
 
-        // Restore — scan backups
+
+
         var restoreScanBtn = document.getElementById('restore-scan-btn');
+
         if (restoreScanBtn) {
+
             restoreScanBtn.addEventListener('click', _scanBackupRoot);
+
         }
 
-        // Restore — location select
+
+
         var restoreLocSel = document.getElementById('restore-location-select');
+
         if (restoreLocSel) {
+
             restoreLocSel.addEventListener('change', function() {
+
                 _renderRestoreGames(this.value);
+
             });
+
         }
 
-        // Restore — restore selected
+
+
         var restoreSelectedBtn = document.getElementById('restore-selected-btn');
+
         if (restoreSelectedBtn) {
+
             restoreSelectedBtn.addEventListener('click', _doRestoreSelected);
+
         }
 
-        // Backup progress updates
+
+
         Bridge.on('download_progress', function(json) {
+
             try {
+
                 var d = JSON.parse(json);
+
                 if (d.task !== 'backup_progress') return;
+
                 var progressEl = document.getElementById('all-saves-progress');
+
                 var progressFill = document.getElementById('all-saves-progress-fill');
+
                 var progressLabel = document.getElementById('all-saves-progress-label');
+
                 var progressCount = document.getElementById('all-saves-progress-count');
+
                 var progressOk = document.getElementById('all-saves-progress-ok');
+
                 var progressFail = document.getElementById('all-saves-progress-fail');
+
                 if (!progressEl) return;
+
                 progressEl.classList.remove('hidden');
+
                 if (progressFill) progressFill.style.width = (d.percent || 0) + '%';
-                if (progressLabel) progressLabel.textContent = d.current_label || 'Backing up...';
+
+                if (progressLabel) progressLabel.textContent = d.current_label || 'Sauvegarde…';
+
                 if (progressCount) progressCount.textContent = (d.done || 0) + ' / ' + (d.total || 0);
-                if (progressOk) progressOk.textContent = '\u2713 ' + (d.succeeded || 0) + ' done';
-                if (progressFail) progressFail.textContent = '\u2717 ' + (d.failed || 0) + ' failed';
+
+                if (progressOk) progressOk.textContent = '\u2713 ' + (d.succeeded || 0) + ' OK';
+
+                if (progressFail) progressFail.textContent = '\u2717 ' + (d.failed || 0) + ' échec(s)';
+
             } catch(e) {}
+
         });
 
-        // Task results
+
+
         Bridge.on('task_finished', function(json) {
+
             try {
+
                 var data = JSON.parse(json);
 
+
+
                 if (data.task === 'gdrive_authorize') {
+
                     var btn = document.getElementById('gdrive-connect-btn');
-                    if (btn) { btn.disabled = false; btn.textContent = 'Connect Google Drive'; }
-                    if (data.success) {
-                        _setGdriveStatus(true, data.email || '');
-                        Components.showToast('success', 'Google Drive connecté');
-                    } else {
-                        Components.showToast('error', data.message || 'Connexion échouée');
+
+                    if (btn) {
+
+                        btn.disabled = false;
+
+                        btn.textContent = 'Se connecter à Google Drive';
+
                     }
+
+                    if (data.success) {
+
+                        _setGdriveStatus(true, data.email || '');
+
+                        Components.showToast('success', 'Google Drive connecté');
+
+                    } else {
+
+                        Components.showToast('error', data.message || 'Connexion échouée');
+
+                    }
+
                 }
 
-                if (data.task === 'scan_cloud_games' && data.games) {
-                    _renderGames(data.games);
+
+
+                if (data.task === 'gdrive_disconnect') {
+
+                    if (data.success) {
+
+                        _checkGdriveStatus();
+
+                        Components.showToast('info', data.message || 'Google Drive déconnecté');
+
+                    } else {
+
+                        Components.showToast('error', data.message || 'Déconnexion échouée');
+
+                    }
+
                 }
+
+
+
+                if (data.task === 'scan_cloud_games') {
+
+                    if (data.success && Array.isArray(data.games)) {
+
+                        _renderGames(data.games, data.scan_hint || '');
+
+                    } else if (!data.success && data.message) {
+
+                        Components.showToast('warning', data.message);
+
+                    }
+
+                }
+
+
 
                 if (data.task === 'scan_all_save_locations') {
-                    _allSavesEntries = data.entries || [];
-                    _renderAllSavesResults(_allSavesEntries);
+
+                    if (data.success) {
+
+                        _allSavesEntries = data.entries || [];
+
+                        _renderAllSavesResults(_allSavesEntries);
+
+                    } else {
+
+                        Components.showToast('warning', data.message || 'Scan impossible');
+
+                    }
+
                 }
+
+
 
                 if (data.task === 'backup_all_save_locations') {
+
                     var logEl = document.getElementById('all-saves-log-content');
+
                     var logDiv = document.getElementById('all-saves-log');
+
                     if (logEl && data.log) { logEl.textContent = data.log; }
+
                     if (logDiv) logDiv.classList.remove('hidden');
+
                     var progressEl = document.getElementById('all-saves-progress');
+
                     if (progressEl) {
+
                         if (data.success) {
+
                             var fill = document.getElementById('all-saves-progress-fill');
+
                             if (fill) fill.style.width = '100%';
+
                             var lbl = document.getElementById('all-saves-progress-label');
-                            if (lbl) lbl.textContent = 'Backup complete';
+
+                            if (lbl) lbl.textContent = 'Terminé';
+
                         }
+
                         setTimeout(function() { progressEl.classList.add('hidden'); }, 3000);
+
                     }
+
                     if (data.success) {
+
                         Components.showToast('success', data.message || 'Sauvegarde terminée');
+
                     } else {
+
                         Components.showToast('error', data.message || 'Sauvegarde échouée');
+
                     }
+
                 }
+
+
 
                 if (data.task === 'scan_backup_root') {
+
                     if (data.success && data.locations) {
+
                         _restoreLocationsData = data.locations;
+
                         _renderRestoreLocations(data.locations);
+
                     } else {
+
                         Components.showToast('error', data.message || 'Scan échoué');
+
                     }
+
                 }
+
+
 
                 if (data.task === 'restore_save_location') {
+
                     var logEl2 = document.getElementById('all-saves-log-content');
+
                     var logDiv2 = document.getElementById('all-saves-log');
+
                     if (logEl2 && data.log) { logEl2.textContent = data.log; }
+
                     if (logDiv2) logDiv2.classList.remove('hidden');
+
                     if (data.success) {
+
                         Components.showToast('success', 'Restauration terminée');
+
                     } else {
+
                         Components.showToast('error', data.message || 'Restauration échouée');
+
                     }
+
                 }
 
-                if (data.task === 'rclone_test_remote') {
-                    var testBtn = document.getElementById('provider-rclone-test');
-                    if (testBtn) { testBtn.disabled = false; testBtn.textContent = 'Test'; }
-                    var remoteVal = (document.getElementById('provider-rclone-remote') || {}).value || '';
-                    if (data.success) {
-                        Components.showToast('success', 'Remote OK : ' + remoteVal);
-                    } else {
-                        Components.showToast('error', 'Remote échoué : ' + (data.error || 'erreur inconnue'));
-                    }
-                }
 
-                if (data.task === 'rclone_list_remotes') {
-                    var loadBtn = document.getElementById('provider-rclone-list');
-                    if (loadBtn) { loadBtn.disabled = false; loadBtn.textContent = 'Charger les remotes'; }
-                    if (data.success) {
-                        var dl = document.getElementById('rclone-remotes-list');
-                        if (dl) {
-                            dl.innerHTML = '';
-                            (data.remotes || []).forEach(function(r) {
-                                var opt = document.createElement('option');
-                                opt.value = r;
-                                dl.appendChild(opt);
-                            });
-                        }
-                        if (!data.remotes || !data.remotes.length) {
-                            Components.showToast('warning', 'Aucun remote trouvé. Cliquez sur Configurer dans le terminal pour en ajouter un.');
-                        } else {
-                            Components.showToast('success', 'Trouvé ' + data.remotes.length + ' remote(s) : ' + data.remotes.join(', '));
-                        }
-                    } else {
-                        Components.showToast('error', 'Impossible de lister les remotes : ' + (data.error || 'erreur inconnue'));
-                    }
-                }
-
-                if (data.task === 'rclone_open_config') {
-                    var setupBtn = document.getElementById('provider-rclone-setup');
-                    if (setupBtn) { setupBtn.disabled = false; setupBtn.textContent = 'Setup in Terminal'; }
-                    if (data.success) {
-                        Components.showToast('info', 'Config rclone ouverte. Ajoutez un remote, puis cliquez sur Charger les remotes.');
-                    } else {
-                        Components.showToast('error', 'Impossible d\'ouvrir le terminal : ' + (data.error || 'erreur inconnue'));
-                    }
-                }
 
                 var cloudTasks = ['backup_cloud_save', 'restore_cloud_save', 'rclone_backup_save'];
+
                 if (cloudTasks.indexOf(data.task) !== -1) {
+
                     var logContent = document.getElementById('cloud-log-content');
+
                     var logOutput = document.getElementById('cloud-log');
+
                     if (logContent && data.log) {
+
                         logContent.textContent = data.log;
+
                         if (logOutput) logOutput.classList.remove('hidden');
+
                     }
+
                     if (data.success) {
+
                         Components.showToast('success', data.message || 'Terminé');
+
                     } else {
+
                         Components.showToast('error', data.message || 'Opération échouée');
+
                     }
+
                 }
+
             } catch(e) {}
+
         });
+
     }
+
+
 
     function onPageEnter() {
+
         init();
+
         Bridge.callWithCallback('get_setting', 'steam_path', function(val) {
-            if (val) {
+
+            var s = val ? String(val).trim() : '';
+
+            if (s) {
+
                 var input = document.getElementById('cloud-steam-path');
-                if (input && !input.value) input.value = val;
+
+                if (input) input.value = s;
+
             }
+
         });
+
         Bridge.callWithCallback('get_setting', 'steam32_id', function(val) {
-            if (val) {
+
+            var s = val ? String(val).trim() : '';
+
+            if (s) {
+
                 var input = document.getElementById('cloud-steam32');
-                if (input && !input.value) input.value = val;
+
+                if (input) input.value = s;
+
             }
+
         });
-        // Restore saved provider
-        Bridge.callWithCallback('get_setting', 'cloud_provider', function(val) {
-            if (val) {
-                _provider = val;
-                _setActiveCard(_provider);
-                _showProviderConfig(_provider);
-                // Load provider-specific config fields
-                if (_provider === 'gdrive') {
-                    _checkGdriveStatus();
-                } else if (_provider === 'rclone') {
-                    Bridge.callWithCallback('get_setting', 'cloud_rclone_exe', function(v) {
-                        var inp = document.getElementById('provider-rclone-exe');
-                        if (inp) {
-                            if (v) { inp.value = v; } else { _autofillBundledExe('rclone'); }
-                        }
-                    });
-                    Bridge.callWithCallback('get_setting', 'cloud_rclone_remote', function(v) {
-                        var inp = document.getElementById('provider-rclone-remote');
-                        if (inp && v) inp.value = v;
-                    });
-                }
+
+        Bridge.callWithCallback('get_setting', 'save_watcher_interval', function(val) {
+
+            var inp = document.getElementById('cloud-auto-interval');
+
+            if (inp && (val !== undefined && val !== null && val !== '')) {
+
+                inp.value = String(val);
+
             }
+
         });
+
+        Bridge.call('set_setting', 'cloud_provider', 'gdrive');
+
+        _checkGdriveStatus();
+
     }
 
-    function _scanGames() {
+
+
+    function _runCloudSelfTest() {
+
+        _persistSteamPathFromField(false);
+
+        _persistSteam32FromField(false);
+
         var steamPath = document.getElementById('cloud-steam-path');
+
         var steam32 = document.getElementById('cloud-steam32');
+
         var sp = steamPath ? steamPath.value.trim() : '';
+
         var s32 = steam32 ? steam32.value.trim() : '';
 
         if (!sp || !s32) {
-            Components.showToast('warning', 'Définissez le chemin Steam et le Steam32 ID d\'abord');
+
+            Components.showToast('warning', 'Renseigne d’abord le dossier Steam et l’ID userdata');
+
             return;
+
         }
 
-        Components.showToast('info', 'Scan des sauvegardes cloud...');
-        Bridge.call('scan_cloud_games', sp, s32);
-    }
+        var btn = document.getElementById('cloud-self-test-btn');
 
-    function _renderGames(games) {
-        var tableDiv = document.getElementById('cloud-games');
-        var tbody = document.getElementById('cloud-games-tbody');
-        if (!tbody) return;
+        var oldLabel = btn ? btn.textContent : '';
 
-        tbody.innerHTML = '';
-        games.forEach(function(game) {
-            var tr = document.createElement('tr');
-            tr.dataset.appid = game.app_id;
-            tr.style.cursor = 'pointer';
-            tr.innerHTML =
-                '<td>' + game.app_id + '</td>' +
-                '<td>' + Components.escapeHtml(game.name || 'Unknown') + '</td>' +
-                '<td>' + (game.size || 'N/A') + '</td>';
-            tr.addEventListener('click', function() {
-                tbody.querySelectorAll('tr.selected').forEach(function(r) { r.classList.remove('selected'); r.style.background = ''; });
-                this.classList.add('selected');
-                this.style.background = 'var(--btn-bg)';
-            });
-            tbody.appendChild(tr);
+        if (btn) {
+
+            btn.disabled = true;
+
+            btn.textContent = 'Test…';
+
+        }
+
+        Bridge.callWithCallback('cloud_saves_self_test', sp, s32, function(jsonRaw) {
+
+            if (btn) {
+
+                btn.disabled = false;
+
+                btn.textContent = oldLabel || 'Tester la configuration';
+
+            }
+
+            try {
+
+                var r = JSON.parse(jsonRaw || '{}');
+
+                var lines = [];
+
+                lines.push('— Résultat du test —');
+
+                lines.push('Dossier Steam au bon endroit : ' + (r.steam_install_ok ? 'oui' : 'non'));
+
+                lines.push('Binaire Steam présent : ' + (r.steam_exe_found ? 'oui' : 'non'));
+
+                lines.push('ID userdata renseigné : ' + (r.userdata_id_set ? 'oui' : 'non'));
+
+                if (r.account_id) {
+
+                    lines.push('Dossier userdata utilisé (après normalisation) : ' + r.account_id);
+
+                }
+
+                lines.push('Dossier …/userdata/… existe : ' + (r.userdata_folder_ok ? 'oui' : 'non'));
+
+                lines.push('OAuth Google configuré : ' + (r.gdrive_oauth_available ? 'oui' : 'non'));
+
+                lines.push('Google Drive connecté : ' + (r.gdrive_connected ? 'oui' : 'non'));
+
+                lines.push('Racine des sauvegardes sur Drive : ' + (r.gdrive_backup_root_ok ? 'OK' : 'non'));
+
+                lines.push('');
+
+                (r.messages || []).forEach(function(m) { lines.push('- ' + m); });
+
+                var logContent = document.getElementById('cloud-log-content');
+
+                var logOutput = document.getElementById('cloud-log');
+
+                if (logContent) logContent.textContent = lines.join('\n');
+
+                if (logOutput) {
+
+                    logOutput.classList.remove('hidden');
+
+                    logOutput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                }
+
+                if (r.ok) {
+
+                    Components.showToast('success', 'Test réussi — tout est prêt.');
+
+                } else {
+
+                    Components.showToast('warning', 'Problème détecté — lis le log « Log » sous la page.');
+
+                }
+
+            } catch (e) {
+
+                Components.showToast('error', 'Réponse de test illisible');
+
+            }
+
         });
 
-        if (tableDiv) tableDiv.classList.remove('hidden');
-        Components.showToast('success', 'Trouvé ' + games.length + ' jeu(x) avec des données de sauvegarde');
     }
 
-    // ── Google Drive helpers ───────────────────────────────────────
+
+
+    function _scanGames() {
+
+        _persistSteamPathFromField(false);
+
+        _persistSteam32FromField(false);
+
+        var steamPath = document.getElementById('cloud-steam-path');
+
+        var steam32 = document.getElementById('cloud-steam32');
+
+        var sp = steamPath ? steamPath.value.trim() : '';
+
+        var s32 = steam32 ? steam32.value.trim() : '';
+
+
+
+        if (!sp || !s32) {
+
+            Components.showToast('warning', 'Renseigne le dossier Steam et l’ID userdata');
+
+            return;
+
+        }
+
+
+
+        Components.showToast('info', 'Scan des jeux…');
+
+        Bridge.call('scan_cloud_games', sp, s32);
+
+    }
+
+
+
+    function _renderGames(games, scanHint) {
+
+        var tableDiv = document.getElementById('cloud-games');
+
+        var tbody = document.getElementById('cloud-games-tbody');
+
+        var hintEl = document.getElementById('cloud-scan-hint');
+
+        if (hintEl) {
+
+            if ((!games || games.length === 0) && scanHint) {
+
+                hintEl.textContent = scanHint;
+
+                hintEl.classList.remove('hidden');
+
+            } else {
+
+                hintEl.textContent = '';
+
+                hintEl.classList.add('hidden');
+
+            }
+
+        }
+
+        if (!tbody) return;
+
+
+
+        tbody.innerHTML = '';
+
+        (games || []).forEach(function(game) {
+
+            var tr = document.createElement('tr');
+
+            tr.dataset.appid = game.app_id;
+
+            tr.style.cursor = 'pointer';
+
+            tr.innerHTML =
+
+                '<td>' + game.app_id + '</td>' +
+
+                '<td>' + Components.escapeHtml(game.name || 'Inconnu') + '</td>' +
+
+                '<td>' + (game.size || 'N/A') + '</td>';
+
+            tr.addEventListener('click', function() {
+
+                tbody.querySelectorAll('tr.selected').forEach(function(r) { r.classList.remove('selected'); r.style.background = ''; });
+
+                this.classList.add('selected');
+
+                this.style.background = 'var(--btn-bg)';
+
+            });
+
+            tbody.appendChild(tr);
+
+        });
+
+
+
+        if (tableDiv) {
+
+            if (games && games.length > 0) {
+
+                tableDiv.classList.remove('hidden');
+
+            } else {
+
+                tableDiv.classList.add('hidden');
+
+            }
+
+        }
+
+        if (games && games.length > 0) {
+
+            Components.showToast('success', games.length + ' jeu(x) trouvé(s)');
+
+        } else {
+
+            Components.showToast('warning', 'Aucun jeu — lis le message sous « Scanner les jeux »');
+
+        }
+
+    }
+
+
 
     function _checkGdriveStatus() {
-        try {
-            var result = Bridge.callSync('gdrive_status');
-            if (result) {
+
+        Bridge.callSync('gdrive_status', function(result) {
+
+            try {
+
+                if (!result) return;
+
                 var status = JSON.parse(result);
-                _setGdriveStatus(status.connected, status.email || '');
-            }
-        } catch(e) {}
+
+                if (status.available === false) {
+
+                    _setGdriveUnavailable();
+
+                    return;
+
+                }
+
+                _setGdriveStatus(!!status.connected, status.email || '');
+
+            } catch (e) {}
+
+        });
+
     }
+
+
+
+    function _setGdriveUnavailable() {
+
+        var statusText = document.getElementById('gdrive-status-text');
+
+        var connectBtn = document.getElementById('gdrive-connect-btn');
+
+        var disconnectBtn = document.getElementById('gdrive-disconnect-btn');
+
+        if (statusText) {
+
+            statusText.textContent =
+
+                'OAuth non configuré — ajoute gdrive_oauth_client.json dans le dossier SlimeDeals ou les variables STEAMIDRA_GDRIVE_CLIENT_*';
+
+        }
+
+        if (connectBtn) {
+
+            connectBtn.style.display = '';
+
+            connectBtn.disabled = true;
+
+            connectBtn.textContent = 'Configurer OAuth';
+
+        }
+
+        if (disconnectBtn) disconnectBtn.style.display = 'none';
+
+    }
+
+
 
     function _setGdriveStatus(connected, email) {
+
         var statusText = document.getElementById('gdrive-status-text');
+
         var connectBtn = document.getElementById('gdrive-connect-btn');
+
         var disconnectBtn = document.getElementById('gdrive-disconnect-btn');
+
         if (connected) {
-            if (statusText) statusText.textContent = 'Connected' + (email ? ': ' + email : '');
+
+            if (statusText) statusText.textContent = 'Connecté' + (email ? ' : ' + email : '');
+
             if (connectBtn) connectBtn.style.display = 'none';
+
             if (disconnectBtn) disconnectBtn.style.display = '';
+
         } else {
-            if (statusText) statusText.textContent = 'Not connected';
-            if (connectBtn) { connectBtn.style.display = ''; connectBtn.disabled = false; connectBtn.textContent = 'Connect Google Drive'; }
+
+            if (statusText) statusText.textContent = 'Non connecté';
+
+            if (connectBtn) {
+
+                connectBtn.style.display = '';
+
+                connectBtn.disabled = false;
+
+                connectBtn.textContent = 'Se connecter à Google Drive';
+
+            }
+
             if (disconnectBtn) disconnectBtn.style.display = 'none';
+
         }
+
     }
 
-    // ── All Save Locations helpers ────────────────────────────────
+
 
     function _scanAllSaveLocations() {
+
+        _persistSteamPathFromField(false);
+
+        _persistSteam32FromField(false);
+
         var steamPath = document.getElementById('cloud-steam-path');
+
         var steam32 = document.getElementById('cloud-steam32');
+
         var sp = steamPath ? steamPath.value.trim() : '';
+
         var s32 = steam32 ? steam32.value.trim() : '';
-        Components.showToast('info', 'Scan de tous les emplacements de sauvegarde...');
+
+        Components.showToast('info', 'Scan de tous les emplacements…');
+
         Bridge.call('scan_all_save_locations', JSON.stringify({ steam_path: sp, steam32_id: s32 }));
+
     }
+
+
 
     function _renderAllSavesResults(entries) {
+
         var tbody = document.getElementById('all-saves-tbody');
+
         var resultsDiv = document.getElementById('all-saves-results');
+
         var backupBtn = document.getElementById('all-saves-backup-btn');
-        var destRow = document.getElementById('all-saves-dest-row');
+
         if (!tbody) return;
+
         tbody.innerHTML = '';
+
         entries.forEach(function(entry, idx) {
+
             var tr = document.createElement('tr');
+
             tr.innerHTML =
+
                 '<td><input type="checkbox" class="all-saves-row-check" data-idx="' + idx + '" checked></td>' +
+
                 '<td>' + Components.escapeHtml(entry.location) + '</td>' +
+
                 '<td>' + Components.escapeHtml(entry.label) + '</td>' +
+
                 '<td>' + (entry.file_count || 0) + '</td>';
+
             tbody.appendChild(tr);
+
         });
+
         if (resultsDiv) resultsDiv.classList.remove('hidden');
+
         if (backupBtn) backupBtn.style.display = '';
-        // Show dest row only for non-gdrive providers
-        if (destRow) destRow.style.display = (_provider === 'gdrive') ? 'none' : '';
-        Components.showToast('success', 'Trouvé ' + entries.length + ' dossier(s) de sauvegarde');
+
+        Components.showToast('success', entries.length + ' dossier(s) trouvé(s)');
+
     }
+
+
 
     function _backupAllSaves() {
+
         var checked = document.querySelectorAll('.all-saves-row-check:checked');
+
         var selectedEntries = [];
+
         checked.forEach(function(cb) {
+
             var idx = parseInt(cb.dataset.idx, 10);
+
             if (!isNaN(idx) && _allSavesEntries[idx]) {
+
                 selectedEntries.push(_allSavesEntries[idx]);
+
             }
+
         });
+
         if (!selectedEntries.length) {
-            Components.showToast('warning', 'Aucun dossier de sauvegarde sélectionné');
+
+            Components.showToast('warning', 'Coche au moins un dossier dans le tableau');
+
             return;
+
         }
-        var destInp = document.getElementById('all-saves-dest');
-        var destPath = destInp ? destInp.value.trim() : '';
-        var rcloneExeInp = document.getElementById('provider-rclone-exe');
-        var rcloneRemoteInp = document.getElementById('provider-rclone-remote');
-        var providerKey = _provider === 'gdrive' ? 'gdrive_api' : _provider;
-        var needsDest = providerKey === 'local' || providerKey === 'gdrive_sync';
-        if (needsDest && !destPath) {
-            Components.showToast('warning', 'Définissez d\'abord le dossier de destination');
-            return;
-        }
-        if (providerKey === 'rclone') {
-            var rcloneRemote = rcloneRemoteInp ? rcloneRemoteInp.value.trim() : '';
-            if (!rcloneRemote) {
-                Components.showToast('warning', 'Définissez la destination rclone dans la config fournisseur d\'abord');
-                return;
-            }
-        }
+
         var progressEl = document.getElementById('all-saves-progress');
+
         var progressFill = document.getElementById('all-saves-progress-fill');
+
         var progressLabel = document.getElementById('all-saves-progress-label');
+
         var progressCount = document.getElementById('all-saves-progress-count');
+
         var progressOk = document.getElementById('all-saves-progress-ok');
+
         var progressFail = document.getElementById('all-saves-progress-fail');
+
         if (progressEl) {
+
             progressEl.classList.remove('hidden');
+
             if (progressFill) progressFill.style.width = '0%';
-            if (progressLabel) progressLabel.textContent = 'Starting backup...';
+
+            if (progressLabel) progressLabel.textContent = 'Démarrage…';
+
             if (progressCount) progressCount.textContent = '0 / ' + selectedEntries.length;
-            if (progressOk) progressOk.textContent = '\u2713 0 done';
-            if (progressFail) progressFail.textContent = '\u2717 0 failed';
+
+            if (progressOk) progressOk.textContent = '\u2713 0 OK';
+
+            if (progressFail) progressFail.textContent = '\u2717 0 échec(s)';
+
         }
+
         Bridge.call('backup_all_save_locations', JSON.stringify({
+
             entries: selectedEntries,
-            provider: providerKey,
-            dest_path: destPath,
-            rclone_exe: rcloneExeInp ? rcloneExeInp.value.trim() : '',
-            remote_dest: rcloneRemoteInp ? rcloneRemoteInp.value.trim() : ''
+
+            provider: 'gdrive_api'
+
         }));
-        Components.showToast('info', 'Sauvegarde de ' + selectedEntries.length + ' dossier(s)...');
+
+        Components.showToast('info', 'Envoi de ' + selectedEntries.length + ' dossier(s) vers Google Drive…');
+
     }
+
+
 
     function _scanBackupRoot() {
-        var rootInp = document.getElementById('restore-backup-root');
-        var rootPath = rootInp ? rootInp.value.trim() : '';
-        var providerKey = _provider === 'gdrive' ? 'gdrive_api' : _provider;
-        if (providerKey === 'rclone') {
-            var rcloneRemoteInp = document.getElementById('provider-rclone-remote');
-            var rcloneRemote = rcloneRemoteInp ? rcloneRemoteInp.value.trim() : '';
-            if (!rcloneRemote) {
-                Components.showToast('warning', 'Définissez la destination rclone dans la config fournisseur d\'abord');
-                return;
-            }
-            var rcloneExeInp = document.getElementById('provider-rclone-exe');
-            Components.showToast('info', 'Scan des sauvegardes sur le remote rclone...');
-            Bridge.call('scan_backup_root', JSON.stringify({
-                provider: 'rclone',
-                backup_root: '',
-                rclone_exe: rcloneExeInp ? rcloneExeInp.value.trim() : '',
-                remote_dest: rcloneRemote
-            }));
-            return;
-        }
-        if (providerKey === 'local' && !rootPath) {
-            Components.showToast('warning', 'Définissez d\'abord le dossier racine de sauvegarde');
-            return;
-        }
-        Components.showToast('info', 'Scan des sauvegardes...');
-        Bridge.call('scan_backup_root', JSON.stringify({ provider: providerKey, backup_root: rootPath }));
+
+        Components.showToast('info', 'Lecture des sauvegardes sur Google Drive…');
+
+        Bridge.call('scan_backup_root', JSON.stringify({ provider: 'gdrive_api', backup_root: '' }));
+
     }
+
+
 
     function _renderRestoreLocations(locations) {
+
         var sel = document.getElementById('restore-location-select');
+
         var resultsDiv = document.getElementById('restore-results');
+
         if (!sel) return;
-        sel.innerHTML = '<option value="">Select a location...</option>';
+
+        sel.innerHTML = '<option value="">Choisir un emplacement…</option>';
+
         var keys = Object.keys(locations);
+
         keys.forEach(function(loc) {
+
             var opt = document.createElement('option');
+
             opt.value = loc;
-            opt.textContent = loc + ' (' + (locations[loc].games || []).length + ' games)';
+
+            opt.textContent = loc + ' (' + (locations[loc].games || []).length + ' jeu(x))';
+
             sel.appendChild(opt);
+
         });
+
         if (resultsDiv) resultsDiv.classList.remove('hidden');
-        // Show/hide restore folder row based on provider
+
         var restoreFolderRow = document.getElementById('restore-folder-input-row');
-        if (restoreFolderRow) restoreFolderRow.style.display = (_provider === 'gdrive') ? 'none' : '';
-        Components.showToast('success', 'Trouvé ' + keys.length + ' emplacement(s) de sauvegarde');
+
+        var restoreSourceRow = document.getElementById('restore-source-row');
+
+        if (restoreFolderRow) restoreFolderRow.style.display = 'none';
+
+        var restoreLabel = document.getElementById('restore-source-label');
+
+        if (restoreLabel) restoreLabel.textContent = 'Source : Google Drive (déjà connecté)';
+
+        if (restoreSourceRow) restoreSourceRow.style.display = '';
+
+        Components.showToast('success', keys.length + ' emplacement(s) sur Drive');
+
     }
+
+
 
     function _renderRestoreGames(locationName) {
+
         var gamesSel = document.getElementById('restore-game-select');
+
         var gamesList = document.getElementById('restore-games-list');
+
         if (!gamesSel || !locationName) return;
+
         var loc = _restoreLocationsData[locationName];
-        gamesSel.innerHTML = '<option value="">Select a game...</option>';
+
+        gamesSel.innerHTML = '<option value="">Choisir un jeu…</option>';
+
         if (loc && loc.games) {
+
             loc.games.forEach(function(game, idx) {
+
                 var opt = document.createElement('option');
+
                 opt.value = idx;
+
                 opt.textContent = game.game_name || game.folder_name;
-                if (game.app_id) opt.textContent = game.app_id + ' - ' + opt.textContent;
+
+                if (game.app_id) opt.textContent = game.app_id + ' — ' + opt.textContent;
+
                 if (game.backed_up_at) opt.textContent += '  [' + game.backed_up_at.split('T')[0] + ']';
+
                 gamesSel.appendChild(opt);
+
             });
+
         }
+
         if (gamesList) gamesList.classList.remove('hidden');
+
     }
+
+
 
     function _doRestoreSelected() {
+
         var locSel = document.getElementById('restore-location-select');
+
         var gameSel = document.getElementById('restore-game-select');
+
         var locName = locSel ? locSel.value : '';
+
         var gameIdx = gameSel ? parseInt(gameSel.value, 10) : -1;
+
         if (!locName || isNaN(gameIdx) || gameIdx < 0) {
-            Components.showToast('warning', 'Sélectionnez un emplacement et un jeu d\'abord');
+
+            Components.showToast('warning', 'Choisis un emplacement puis un jeu');
+
             return;
+
         }
+
         var loc = _restoreLocationsData[locName];
+
         if (!loc || !loc.games || !loc.games[gameIdx]) {
-            Components.showToast('warning', 'Jeu introuvable dans les données de sauvegarde');
+
+            Components.showToast('warning', 'Jeu introuvable');
+
             return;
+
         }
+
         var entry = loc.games[gameIdx];
+
         if (!entry.source_path) {
-            Components.showToast('warning', 'Chemin source absent des métadonnées — restauration impossible');
+
+            Components.showToast('warning', 'Chemin de destination manquant dans les métadonnées');
+
             return;
+
         }
-        if (!confirm('Restore "' + (entry.game_name || entry.folder_name) + '" to:\n' + entry.source_path + '\n\nA safety backup will be created automatically.')) {
+
+        if (!confirm('Restaurer « ' + (entry.game_name || entry.folder_name) + ' » vers :\n' + entry.source_path + ' ?')) {
+
             return;
+
         }
-        var restoreEntry = Object.assign({}, entry);
-        if (_provider === 'rclone') {
-            var rcloneExeInp = document.getElementById('provider-rclone-exe');
-            restoreEntry.rclone_exe = rcloneExeInp ? rcloneExeInp.value.trim() : '';
-        }
-        Bridge.call('restore_save_location', JSON.stringify(restoreEntry));
-        Components.showToast('info', 'Restauration...');
+
+        Bridge.call('restore_save_location', JSON.stringify(Object.assign({}, entry)));
+
+        Components.showToast('info', 'Restauration…');
+
     }
 
+
+
     return {
+
         init: init,
+
         onPageEnter: onPageEnter
+
     };
+
 })();
+
+

@@ -20,30 +20,158 @@ import io
 import json
 import logging
 import os
+import sys
 from pathlib import Path
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 _SCOPES = ["https://www.googleapis.com/auth/drive.file"]
-_TOKEN_PATH = Path(os.environ.get("APPDATA", "~")) / "SteaMidra" / "gdrive_token.json"
 _AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
 _TOKEN_URI = "https://oauth2.googleapis.com/token"
 
 
-def _client_config():
+def _steamidra_config_dir() -> Path:
+    """Dossier de configuration persistant (jeton OAuth, fichier client JSON)."""
+    if sys.platform == "win32":
+        ap = (os.environ.get("APPDATA") or "").strip()
+        if ap:
+            return Path(ap) / "SteaMidra"
+    xdg = (os.environ.get("XDG_CONFIG_HOME") or "").strip()
+    if xdg:
+        return Path(xdg) / "SteaMidra"
+    return Path.home() / ".config" / "SteaMidra"
+
+
+_TOKEN_PATH = _steamidra_config_dir() / "gdrive_token.json"
+_OAUTH_CLIENT_JSON = _steamidra_config_dir() / "gdrive_oauth_client.json"
+
+
+def _sff_install_root() -> Path:
+    """Répertoire du bundle launcher (parent du package ``sff``).
+
+    En dev : ``.../launcher/SFF``. Sous PyInstaller : ``sys._MEIPASS`` (racine du bundle extrait).
+    """
+    return Path(__file__).resolve().parent.parent
+
+
+def _frozen_exe_parent() -> Optional[Path]:
+    """Répertoire contenant l'exécutable (portable / install) — utile si le JSON n'est pas dans _MEIPASS."""
+    if not getattr(sys, "frozen", False):
+        return None
+    appimage = (os.environ.get("APPIMAGE") or "").strip()
+    if appimage:
+        return Path(appimage).resolve().parent
+    return Path(sys.executable).resolve().parent
+
+
+def _cid_secret_from_parsed_json(raw: object) -> Tuple[str, str]:
+    """Extrait client_id / client_secret depuis le dict racine ou la clé ``installed``."""
+    if not isinstance(raw, dict):
+        return "", ""
+    ins = raw.get("installed") if isinstance(raw.get("installed"), dict) else raw
+    if not isinstance(ins, dict):
+        return "", ""
+    cid = (ins.get("client_id") or ins.get("clientId") or "").strip()
+    csec = (ins.get("client_secret") or ins.get("clientSecret") or "").strip()
+    return cid, csec
+
+
+def _try_load_oauth_json_file(path: Path) -> Tuple[str, str]:
+    if not path.is_file():
+        return "", ""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        return _cid_secret_from_parsed_json(raw)
+    except Exception as e:
+        logger.warning("Lecture OAuth JSON %s impossible: %s", path, e)
+        return "", ""
+
+
+def _load_client_id_secret() -> Tuple[str, str]:
+    """Identifiants OAuth type « application de bureau » (non versionnés dans le dépôt).
+
+    Ordre :
+
+    1. Module optionnel ``sff._gc`` (get_ci / get_cs).
+    2. Variables d'environnement ``STEAMIDRA_GDRIVE_CLIENT_*`` / ``GOOGLE_OAUTH_*``.
+    3. ``%APPDATA%/SteaMidra/gdrive_oauth_client.json`` (ou équivalent Linux).
+    4. Racine bundle / dossier SFF : ``gdrive_oauth_client.json``, puis ``client_secret*.json``
+       (dev : ``launcher/SFF`` ; exe PyInstaller : fichiers ajoutés au ``datas`` à la racine ``_MEIPASS``).
+    5. **À côté de l'exe** (build figé) : mêmes noms de fichiers — pratique pour un zip portable sans
+       embarquer le secret dans l'exe.
+
+    Formats acceptés : JSON minimal ou clé ``installed`` comme celui fourni par Google.
+    """
+    cid, csec = "", ""
     try:
         from sff._gc import get_ci, get_cs
-        return {
-            "installed": {
-                "client_id": get_ci(),
-                "client_secret": get_cs(),
-                "auth_uri": _AUTH_URI,
-                "token_uri": _TOKEN_URI,
-                "redirect_uris": ["http://localhost"],
-            }
-        }
+
+        cid = (get_ci() or "").strip()
+        csec = (get_cs() or "").strip()
     except ImportError:
+        pass
+    except Exception as e:
+        logger.debug("sff._gc credentials: %s", e)
+    if not cid or not csec:
+        cid = (
+            os.environ.get("STEAMIDRA_GDRIVE_CLIENT_ID", "")
+            or os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+        ).strip()
+        csec = (
+            os.environ.get("STEAMIDRA_GDRIVE_CLIENT_SECRET", "")
+            or os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
+        ).strip()
+    if not cid or not csec:
+        cid, csec = _try_load_oauth_json_file(_OAUTH_CLIENT_JSON)
+    if not cid or not csec:
+        root = _sff_install_root()
+        cid, csec = _try_load_oauth_json_file(root / "gdrive_oauth_client.json")
+    if not cid or not csec:
+        root = _sff_install_root()
+        for p in sorted(root.glob("client_secret*.json")):
+            cid, csec = _try_load_oauth_json_file(p)
+            if cid and csec:
+                logger.info("OAuth Google Drive : identifiants chargés depuis %s", p.name)
+                break
+    if not cid or not csec:
+        portable = _frozen_exe_parent()
+        if portable is not None:
+            cid, csec = _try_load_oauth_json_file(portable / "gdrive_oauth_client.json")
+            if not cid or not csec:
+                for p in sorted(portable.glob("client_secret*.json")):
+                    cid, csec = _try_load_oauth_json_file(p)
+                    if cid and csec:
+                        logger.info(
+                            "OAuth Google Drive : identifiants depuis %s (dossier de l'exécutable)",
+                            p.name,
+                        )
+                        break
+    return cid, csec
+
+
+def _client_config():
+    cid, csec = _load_client_id_secret()
+    if not cid or not csec:
         return None
+    return {
+        "installed": {
+            "client_id": cid,
+            "client_secret": csec,
+            "auth_uri": _AUTH_URI,
+            "token_uri": _TOKEN_URI,
+            "redirect_uris": ["http://localhost"],
+        }
+    }
+
+
+def clear_saved_token() -> None:
+    """Supprime le jeton OAuth local (déconnexion Google Drive)."""
+    try:
+        if _TOKEN_PATH.exists():
+            _TOKEN_PATH.unlink()
+    except OSError as e:
+        logger.warning("clear_saved_token: %s", e)
 
 
 def is_available():
@@ -83,7 +211,12 @@ def authorize(log_func=None):
     cfg = _client_config()
     if cfg is None:
         if log_func:
-            log_func("[!] Google Drive not available in this build.")
+            log_func(
+                "[!] Client OAuth Google Drive introuvable. Installe les paquets "
+                "google-auth, google-auth-oauthlib, google-api-python-client, puis "
+                f"crée le fichier « {_OAUTH_CLIENT_JSON} » (client_id + client_secret) "
+                "ou définis STEAMIDRA_GDRIVE_CLIENT_ID / STEAMIDRA_GDRIVE_CLIENT_SECRET."
+            )
         return False
     try:
         from google_auth_oauthlib.flow import InstalledAppFlow
@@ -354,15 +487,55 @@ def download_folder(service, folder_id, local_dest, log_func=None):
     return ok
 
 
-_BACKUP_ROOT_NAME = "SteaMidra Backups"
+# Dossier racine à la racine « Mon Drive » (nom visible dans Google Drive).
+BACKUP_ROOT_FOLDER_NAME = "SLIMEDEALS BACKUP"
+_LEGACY_BACKUP_ROOT_NAMES = ("SteaMidra Backups",)
+
+
+def _find_legacy_backup_root(service):
+    """Retourne (nom_affiché, id) du premier dossier legacy trouvé, sinon (None, None)."""
+    for legacy in _LEGACY_BACKUP_ROOT_NAMES:
+        fid = find_folder(service, legacy, "root")
+        if fid:
+            return legacy, fid
+    return None, None
+
+
+def _backup_root_folder_id_for_read(service):
+    """ID du dossier racine des sauvegardes (nouveau nom ou ancien), sans créer ni renommer."""
+    fid = find_folder(service, BACKUP_ROOT_FOLDER_NAME, "root")
+    if fid:
+        return fid
+    _name, old_id = _find_legacy_backup_root(service)
+    return old_id
 
 
 def get_backup_root(service):
-    return get_or_create_folder(service, _BACKUP_ROOT_NAME, "root")
+    """Crée ou renvoie le dossier racine « SLIMEDEALS BACKUP » ; renomme l’ancien « SteaMidra Backups » si présent."""
+    fid = find_folder(service, BACKUP_ROOT_FOLDER_NAME, "root")
+    if fid:
+        return fid
+    legacy_name, old_id = _find_legacy_backup_root(service)
+    if old_id:
+        try:
+            service.files().update(
+                fileId=old_id, body={"name": BACKUP_ROOT_FOLDER_NAME}, fields="id"
+            ).execute()
+            logger.info(
+                "Google Drive: dossier renomme de %r vers %r", legacy_name, BACKUP_ROOT_FOLDER_NAME
+            )
+        except Exception as e:
+            logger.warning(
+                "GDrive: impossible de renommer %r (%s) - utilisation du dossier existant.",
+                legacy_name,
+                e,
+            )
+        return old_id
+    return get_or_create_folder(service, BACKUP_ROOT_FOLDER_NAME, "root")
 
 
 def list_backup_locations(service):
-    root_id = find_folder(service, _BACKUP_ROOT_NAME, "root")
+    root_id = _backup_root_folder_id_for_read(service)
     if not root_id:
         return {}
     result = {}
@@ -389,11 +562,12 @@ def list_backup_locations(service):
 
 def _fetch_meta_from_folder(service, folder_id):
     items = list_folder(service, folder_id)
-    for item in items:
-        if item["name"] == "steamidra_meta.json":
-            try:
-                content = service.files().get_media(fileId=item["id"]).execute()
-                return json.loads(content)
-            except Exception:
-                pass
+    for meta_name in ("SlimeDeals_meta.json", "steamidra_meta.json"):
+        for item in items:
+            if item["name"] == meta_name:
+                try:
+                    content = service.files().get_media(fileId=item["id"]).execute()
+                    return json.loads(content)
+                except Exception:
+                    pass
     return {}

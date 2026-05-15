@@ -9,6 +9,79 @@ window.Library = (function() {
     var _initialized = false;
     var _pendingDelete = null; // { appId, gamePath }
 
+    /** Aligné sur App._normLauncherRank / plan FREE */
+    function _normLauncherRank(r) {
+        var s = String(r == null || r === '' ? 'free' : r).trim().toLowerCase().replace(/\s+/g, '_');
+        if (!s || s === 'none' || s === 'null') return 'free';
+        return s;
+    }
+
+    function _isStrictlyFreePlan(rank) {
+        return _normLauncherRank(rank) === 'free';
+    }
+
+    var _TR_LIB = {
+        triple_monstre: 1, triplemonstre: 1, triple_monster: 1, triplemonster: 1,
+        triple: 1, tm: 1, unlimited: 1, role_unlimited: 1, vip: 1, premium: 1
+    };
+    var _P24_LIB = {
+        '24hpass': 1, '24h_pass': 1, pass_24h: 1, pass24h: 1, hpass24: 1,
+        day_pass_24h: 1, pass_24hpass: 1
+    };
+    var _MR_LIB = {
+        monstre: 1, monster: 1, plan_monstre: 1, role_monstre: 1,
+        double_monstre: 1, deux_monstres: 1, pass_monstre: 1
+    };
+
+    function _launcherRankBucketLib(rank) {
+        var r = _normLauncherRank(rank);
+        if (r === 'free') return 'free';
+        if (_TR_LIB[r]) return 'triple';
+        if (_P24_LIB[r]) return 'pass24h';
+        if (_MR_LIB[r]) return 'monstre';
+        return 'monstre';
+    }
+
+    function _onlineFixAllowedLib(rank) {
+        return _launcherRankBucketLib(rank) === 'triple';
+    }
+    var _onlineFixFreeModalBound = false;
+    function ensureOnlineFixFreeModalBindings() {
+        if (_onlineFixFreeModalBound) return;
+        var btnT = document.getElementById('library-onlinefix-tarifs');
+        var btnA = document.getElementById('library-onlinefix-avis');
+        if (!btnT || !btnA) return;
+        _onlineFixFreeModalBound = true;
+        var msgEl = document.getElementById('library-onlinefix-free-msg');
+        if (msgEl && !msgEl.getAttribute('data-default-inner')) {
+            msgEl.setAttribute('data-default-inner', msgEl.innerHTML);
+        }
+        btnT.addEventListener('click', function() {
+            Bridge.call('open_url', 'https://slimedeals.fr/#tarifs');
+        });
+        btnA.addEventListener('click', function() {
+            Bridge.onReady(function(py) {
+                if (typeof py.discord_avis_url !== 'function') {
+                    Bridge.call('open_url', 'https://discord.gg/c2pRJKjvgE');
+                    return;
+                }
+                py.discord_avis_url(function(url) {
+                    Bridge.call('open_url', url && url.indexOf('http') === 0 ? url : 'https://discord.gg/c2pRJKjvgE');
+                });
+            });
+        });
+    }
+
+    function _showOnlineFixFreeUpsell() {
+        ensureOnlineFixFreeModalBindings();
+        var msgEl = document.getElementById('library-onlinefix-free-msg');
+        var def = msgEl && msgEl.getAttribute('data-default-inner');
+        if (msgEl && def) {
+            msgEl.innerHTML = def;
+        }
+        Components.showModal('library-onlinefix-free-modal');
+    }
+
     function init() {
         if (_initialized) return;
         _initialized = true;
@@ -32,6 +105,7 @@ window.Library = (function() {
             });
         }
         new Components.CustomSelect('library-drive-select', 'library-drive-select-ui');
+        ensureOnlineFixFreeModalBindings();
 
         Bridge.on('task_finished', function(json) {
             try {
@@ -81,6 +155,23 @@ window.Library = (function() {
                         btn.textContent = 'Patching...';
                         btn.dataset.lurefixing = appId;
                         Bridge.call('lure_fix_acf', appId);
+                    } else if (action === 'multiplayer') {
+                        Bridge.onReady(function(py) {
+                            py.get_user_rank(function(jsonStr) {
+                                var d, rnk;
+                                try {
+                                    d = JSON.parse(jsonStr);
+                                    rnk = d.rank || 'free';
+                                } catch (e) {
+                                    rnk = 'free';
+                                }
+                                if (!_onlineFixAllowedLib(rnk)) {
+                                    _showOnlineFixFreeUpsell();
+                                } else {
+                                    Bridge.call('run_game_action', appId, action);
+                                }
+                            });
+                        });
                     } else {
                         Bridge.call('run_game_action', appId, action);
                     }
@@ -242,6 +333,7 @@ window.Library = (function() {
             if (actions) {
                 actions.innerHTML =
                     '<button class="btn btn-sm" data-action="fix" data-appid="' + game.app_id + '" data-tooltip="Fix this game">Fix</button>' +
+                    '<button class="btn btn-sm" data-action="multiplayer" data-appid="' + game.app_id + '" data-tooltip="Applique les patches multijoueur en ligne — compte préconfiguré dans le launcher, aucune saisie">ONLINE FIX</button>' +
                     '<button class="btn btn-sm" data-action="dlc_check" data-appid="' + game.app_id + '" data-tooltip="Check DLCs">DLC</button>' +
                     '<button class="btn btn-sm" data-action="workshop" data-appid="' + game.app_id + '" data-tooltip="Open Workshop">Workshop</button>' +
                     '<button class="btn btn-sm" data-action="lure_fix" data-appid="' + game.app_id + '" data-tooltip="Patch ACF to match Steam CM latest — no download, stops update prompt">Lure Fix</button>' +
@@ -297,6 +389,7 @@ window.Library = (function() {
 
     return {
         init: init,
-        onPageEnter: onPageEnter
+        onPageEnter: onPageEnter,
+        ensureOnlineFixFreeModalBindings: ensureOnlineFixFreeModalBindings
     };
 })();

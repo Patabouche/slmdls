@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import glob
 import os
 import sys
 from pathlib import Path
@@ -71,6 +72,23 @@ if os.path.exists(webui_dir):
 c_dir = os.path.join(spec_root, 'c')
 if os.path.exists(c_dir):
     datas.append((c_dir, 'c'))
+
+# Google Drive — JSON OAuth téléchargé depuis Google Cloud (non versionné ; inclus si présent au build)
+for _gcs in sorted(glob.glob(os.path.join(spec_root, 'client_secret*.json'))):
+    datas.append((_gcs, '.'))
+    print(f"Including Google OAuth client JSON (datas): {os.path.basename(_gcs)}")
+
+# ROCKSTAR BYPASS — tout le dossier SlimeDealsBPRG (exe + Assets) si présent avant PyInstaller
+_sdb_dir = os.path.join(spec_root, 'SlimeDealsBPRG')
+_sdb_exe = os.path.join(_sdb_dir, 'SlimeDealsBPRG.exe')
+if os.path.isfile(_sdb_exe):
+    datas.append((_sdb_dir, 'SlimeDealsBPRG'))
+    print(f"Including SlimeDealsBPRG (datas): {_sdb_dir}")
+else:
+    print(
+        "Note: SlimeDealsBPRG/SlimeDealsBPRG.exe absent — compilez l'outil (voir SlimeDealsBPRG/README.txt) "
+        "ou lancez build_simple_gui.bat qui tente un build automatique depuis le dépôt test."
+    )
 
 win10toast_data = get_win10toast_data()
 if win10toast_data:

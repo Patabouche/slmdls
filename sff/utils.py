@@ -68,6 +68,40 @@ def root_folder(outside_internal = False):
         return root
 
 
+def iter_application_icon_files():
+    """
+    Chemins vers une icône applicative (barre de titre / barre des tâches / zone de notification).
+
+    Ordre : d'abord le bundle PyInstaller (_MEIPASS), puis le dossier à côté de l'exe
+    (permet de surcharger). Noms alignés sur build_sff_gui.spec (sff.png, sff.ico).
+    """
+    names = ("sff.ico", "SFF.ico", "sff.png", "SFF.png", "SFF.PNG")
+    roots: list[Path] = []
+    try:
+        roots.append(root_folder(outside_internal=False))
+    except Exception:
+        pass
+    try:
+        outside = root_folder(outside_internal=True)
+        if outside not in roots:
+            roots.append(outside)
+    except Exception:
+        pass
+    seen: set[str] = set()
+    for base in roots:
+        for n in names:
+            p = Path(base) / n
+            try:
+                key = str(p.resolve())
+            except OSError:
+                key = str(p)
+            if key in seen:
+                continue
+            seen.add(key)
+            if p.is_file():
+                yield p
+
+
 def enter_path(
 
     obj,

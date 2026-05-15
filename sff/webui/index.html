@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SlimeDeals</title>
+    <link rel="icon" type="image/png" href="assets/blob.png">
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/themes.css">
     <link rel="stylesheet" href="css/cards.css">
@@ -15,7 +16,7 @@
     <!-- Sidebar Navigation -->
     <nav id="sidebar" class="sidebar">
         <div class="sidebar-logo">
-            <img src="assets/SFF.png" alt="SlimeDeals" class="sidebar-icon" onerror="this.style.display='none'">
+            <img src="assets/blob.png" alt="SlimeDeals" class="sidebar-icon" onerror="this.style.display='none'">
             <span class="sidebar-title">SlimeDeals</span>
         </div>
         <div class="sidebar-nav">
@@ -135,10 +136,15 @@
                         <span class="action-title">Déverrouillage DLC</span>
                         <span class="action-desc">CreamAPI, SmokeAPI</span>
                     </button>
+                    <button class="action-card" data-action="update_manifests" data-tooltip="Met à jour les manifests des jeux de ton AppList pour qu’ils correspondent aux versions Steam — utile après une mise à jour des jeux">
+                        <svg class="action-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                        <span class="action-title">Mettre à jour les jeux</span>
+                        <span class="action-desc">Rafraîchit les manifests de l’AppList</span>
+                    </button>
                 </div>
             </div>
 
-            <div class="section-group">
+            <div class="section-group" id="section-lua-manifest">
                 <h2 class="section-title">Traitement Lua / Manifest</h2>
                 <div class="action-grid">
                     <button class="action-card" data-action="download_games" data-tooltip="Télécharge un jeu via les fichiers Lua — récupère les manifests et les clés pour que Steam installe le jeu">
@@ -156,11 +162,6 @@
                         <span class="action-title">Fichiers .lua récents</span>
                         <span class="action-desc">Ouvre les fichiers récents</span>
                     </button>
-                    <button class="action-card" data-action="update_manifests" data-tooltip="Re-télécharge tous les manifests des jeux dans ton AppList pour obtenir les versions les plus récentes">
-                        <svg class="action-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-                        <span class="action-title">Mettre à jour les manifests</span>
-                        <span class="action-desc">Rafraîchit tous les manifests</span>
-                    </button>
                 </div>
             </div>
 
@@ -170,10 +171,6 @@
                     <button class="action-card compact" data-action="workshop" data-tooltip="Télécharge un mod Steam Workshop en entrant son ID — récupère le fichier directement">
                         <svg class="action-icon" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
                         <span class="action-title">Élément Workshop</span>
-                    </button>
-                    <button class="action-card compact" data-action="multiplayer" data-tooltip="Applique les patches multijoueur online-fix.me pour jouer en ligne sans posséder le jeu">
-                        <svg class="action-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
-                        <span class="action-title">Fix multijoueur</span>
                     </button>
                     <button class="action-card compact" data-action="community_fixes" data-tooltip="Applique des correctifs et contournements créés par la communauté pour des jeux spécifiques">
                         <svg class="action-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -215,6 +212,10 @@
                         <svg class="action-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
                         <span class="action-title">Config. GreenLuma auto</span>
                     </button>
+                    <button class="action-card compact platform-win" data-action="slimedeals_bprg" data-tooltip="ROCKSTAR BYPASS — réservé au plan Triple Monstre uniquement. Voir slimedeals.fr/#tarifs">
+                        <svg class="action-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        <span class="action-title">ROCKSTAR BYPASS</span>
+                    </button>
                 </div>
             </div>
             </div><!-- /.home-actions -->
@@ -234,11 +235,74 @@
             </div><!-- /.home-layout -->
         </section>
 
-        <!-- Page: Store (TwentyTwoCloud) -->
+        <!-- Page: Store (recherche Steam) -->
         <section id="page-store" class="page">
             <div class="page-header">
                 <h1>Télécharger</h1>
                 <p class="page-subtitle" id="store-subtitle">Colle un lien Steam — le fichier est récupéré automatiquement</p>
+            </div>
+
+            <!-- Recherche par lien Steam — visible plan FREE et TRIPLE MONSTRE -->
+            <div id="store-ttc-section" class="hidden">
+                <div class="ttc-search-wrap">
+                    <div class="ttc-search-bar">
+                        <svg class="ttc-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="ttc-url-input"
+                               placeholder="https://store.steampowered.com/app/1971870/Mortal_Kombat_1/"
+                               data-tooltip="Colle le lien Steam du jeu ou entres directement un App ID"
+                               autocomplete="off" spellcheck="false">
+                        <button id="ttc-search-btn" class="btn btn-primary" data-tooltip="Rechercher le jeu">
+                            Rechercher
+                        </button>
+                    </div>
+                    <p class="ttc-hint">Fonctionne avec les liens Steam complets ou juste un App ID numérique</p>
+                </div>
+
+                <div id="ttc-loading" class="ttc-loading hidden">
+                    <div class="ttc-spinner"></div>
+                    <span>Recherche en cours…</span>
+                </div>
+
+                <div id="ttc-result" class="ttc-result hidden">
+                    <div class="ttc-card">
+                        <div class="ttc-card-img-wrap">
+                            <img id="ttc-header-img" src="" alt="header" class="ttc-header-img" onerror="this.style.display='none'">
+                        </div>
+                        <div class="ttc-card-body">
+                            <div class="ttc-card-top">
+                                <div>
+                                    <h2 id="ttc-game-name" class="ttc-game-name">—</h2>
+                                    <span id="ttc-app-id-badge" class="ttc-badge">App ID: —</span>
+                                    <span id="ttc-dlc-badge" class="ttc-badge ttc-dlc-badge hidden">DLC —</span>
+                                </div>
+                                <div id="ttc-status-badge" class="ttc-status"></div>
+                            </div>
+                            <div class="ttc-actions">
+                                <button id="ttc-download-btn" class="btn btn-primary ttc-dl-btn"
+                                        data-tooltip="Télécharge le fichier .lua et installe le jeu dans Steam automatiquement">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    Télécharger &amp; installer
+                                </button>
+                                <button id="ttc-depot-btn" class="btn ttc-depot-btn"
+                                        data-tooltip="Ouvre le sélecteur de version pour choisir une version spécifique du jeu (dépôts / manifests)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                                    Choisir une version
+                                </button>
+                            </div>
+                            <div id="ttc-progress-wrap" class="ttc-progress-wrap hidden">
+                                <div id="ttc-progress-bar" class="ttc-progress-bar">
+                                    <div id="ttc-progress-fill" class="ttc-progress-fill" style="width:0%"></div>
+                                </div>
+                                <span id="ttc-progress-label" class="ttc-progress-label">Démarrage…</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="ttc-error" class="ttc-error hidden">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <p id="ttc-error-msg">Erreur inconnue.</p>
+                </div>
             </div>
 
             <!-- ══ FREE rank section ══════════════════════════════════════════ -->
@@ -295,77 +359,30 @@
                 </aside>
             </div>
 
-            <!-- ══ Premium rank section ═══════════════════════════════════════ -->
-            <div id="store-premium-section" class="hidden">
-                <!-- URL input -->
-                <div class="ttc-search-wrap">
-                    <div class="ttc-search-bar">
-                        <svg class="ttc-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        <input type="text" id="ttc-url-input"
-                               placeholder="https://store.steampowered.com/app/1971870/Mortal_Kombat_1/"
-                               data-tooltip="Colle le lien Steam du jeu ou entres directement un App ID"
-                               autocomplete="off" spellcheck="false">
-                        <button id="ttc-search-btn" class="btn btn-primary" data-tooltip="Rechercher le jeu">
-                            Rechercher
-                        </button>
-                    </div>
-                    <p class="ttc-hint">Fonctionne avec les liens Steam complets ou juste un App ID numérique</p>
-                </div>
-
-                <!-- Loading state -->
-                <div id="ttc-loading" class="ttc-loading hidden">
-                    <div class="ttc-spinner"></div>
-                    <span>Recherche en cours…</span>
-                </div>
-
-                <!-- Result card -->
-                <div id="ttc-result" class="ttc-result hidden">
-                    <div class="ttc-card">
-                        <div class="ttc-card-img-wrap">
-                            <img id="ttc-header-img" src="" alt="header" class="ttc-header-img" onerror="this.style.display='none'">
-                        </div>
-                        <div class="ttc-card-body">
-                            <div class="ttc-card-top">
-                                <div>
-                                    <h2 id="ttc-game-name" class="ttc-game-name">—</h2>
-                                    <span id="ttc-app-id-badge" class="ttc-badge">App ID: —</span>
-                                </div>
-                                <div id="ttc-status-badge" class="ttc-status"></div>
-                            </div>
-                            <div class="ttc-actions">
-                                <button id="ttc-download-btn" class="btn btn-primary ttc-dl-btn"
-                                        data-tooltip="Télécharge le fichier .lua via TwentyTwoCloud et installe le jeu dans Steam automatiquement">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                    Télécharger &amp; installer
-                                </button>
-                                <button id="ttc-depot-btn" class="btn ttc-depot-btn"
-                                        data-tooltip="Ouvre le sélecteur de version pour choisir une version spécifique du jeu (dépôts / manifests)">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-                                    Choisir une version
-                                </button>
-                            </div>
-                            <!-- Download progress -->
-                            <div id="ttc-progress-wrap" class="ttc-progress-wrap hidden">
-                                <div id="ttc-progress-bar" class="ttc-progress-bar">
-                                    <div id="ttc-progress-fill" class="ttc-progress-fill" style="width:0%"></div>
-                                </div>
-                                <span id="ttc-progress-label" class="ttc-progress-label">Démarrage…</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Error state -->
-                <div id="ttc-error" class="ttc-error hidden">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                    <p id="ttc-error-msg">Erreur inconnue.</p>
-                </div>
-            </div>
-
             <!-- Loading rank -->
             <div id="store-rank-loading" class="ttc-loading">
                 <div class="ttc-spinner"></div>
                 <span>Chargement…</span>
+            </div>
+
+            <div id="free-plan-upsell-modal" class="modal hidden">
+                <div class="modal-overlay"></div>
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Abonnement requis</h2>
+                        <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Pour <strong>générer et installer</strong> le jeu de ton choix depuis cette recherche, profiter des jeux <strong>en ligne</strong> et du reste des fonctionnalités SlimeDeals, un <strong>abonnement</strong> est nécessaire.</p>
+                        <p>Toutes les offres sont sur le site : <strong>slimedeals.fr/#tarifs</strong></p>
+                        <p>Tu peux aussi obtenir un abonnement <strong>gratuitement</strong> en suivant les consignes du salon Discord dédié.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn modal-cancel">Fermer</button>
+                        <button type="button" class="btn btn-primary" id="free-upsell-open-tarifs">Ouvrir slimedeals.fr/#tarifs</button>
+                        <button type="button" class="btn" id="free-upsell-open-discord">Abonnement gratuit (Discord)</button>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -627,144 +644,82 @@
         <!-- Page: Cloud Saves -->
         <section id="page-cloudsaves" class="page">
             <div class="page-header">
-                <h1 data-i18n="Cloud Saves">Sauvegardes Cloud</h1>
-                <p class="page-subtitle">Sauvegarder et restaurer les fichiers de sauvegarde Steam Cloud</p>
+                <h1 data-i18n="Cloud Saves">Sauvegardes cloud</h1>
+                <p class="page-subtitle">Tout part sur <strong>Google Drive</strong> après connexion. Pas de dossier local ni rclone sur cette page.</p>
             </div>
 
-            <div class="provider-section">
-                <h2 class="section-title">Fournisseur de stockage</h2>
-                <div class="provider-grid">
-                    <div class="provider-card active" data-provider="local" data-tooltip="Sauvegarder dans n importe quel dossier local">
-                        <svg class="provider-icon" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                        <span class="provider-name">Local</span>
-                        <span class="provider-desc">Sauvegarder dans un dossier</span>
-                    </div>
-                    <div class="provider-card" data-provider="gdrive" data-tooltip="Sauvegarder directement sur Google Drive via API — sans dossier de sync">
-                        <svg class="provider-icon" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg>
-                        <span class="provider-name">Google Drive</span>
-                        <span class="provider-desc">Upload direct via API</span>
-                    </div>
-                    <div class="provider-card" data-provider="rclone" data-tooltip="Uploader les sauvegardes vers n importe quel distant rclone (Google Drive, S3, SFTP...)">
-                        <svg class="provider-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-                        <span class="provider-name">rclone</span>
-                        <span class="provider-desc">Upload vers n importe quel distant</span>
-                    </div>
+            <div class="tool-card" style="margin-bottom:16px;">
+                <h2 class="section-title" style="margin-top:0;">1. Connecter Google Drive</h2>
+                <p class="section-desc" style="margin-bottom:10px;">Obligatoire avant d’envoyer quoi que ce soit.</p>
+                <div class="gdrive-status-row" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+                    <span id="gdrive-status-text" style="min-width:12rem;">Non connecté</span>
+                    <button id="gdrive-connect-btn" type="button" class="btn btn-primary">Se connecter à Google Drive</button>
+                    <button id="gdrive-disconnect-btn" type="button" class="btn" style="display:none">Déconnecter</button>
                 </div>
-                <div class="provider-config" id="provider-config-folder" style="display:none">
-                    <div class="input-group">
-                        <label id="provider-folder-label">Chemin du dossier de sync :</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="provider-folder-path" placeholder="Parcourir vers le dossier de sync...">
-                            <button id="provider-folder-browse" class="btn">Parcourir</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="provider-config" id="provider-config-gdrive" style="display:none">
-                    <div class="input-group">
-                        <div class="gdrive-status-row">
-                            <span id="gdrive-status-text">Non connecté</span>
-                            <button id="gdrive-connect-btn" class="btn btn-primary">Connecter Google Drive</button>
-                            <button id="gdrive-disconnect-btn" class="btn" style="display:none">Déconnecter</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="provider-config" id="provider-config-rclone" style="display:none">
-                    <div class="input-group">
-                        <label>Exécutable rclone :</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="provider-rclone-exe" placeholder="Chemin vers rclone.exe...">
-                            <button id="provider-rclone-browse" class="btn">Parcourir</button>
-                            <button id="provider-rclone-list" class="btn" data-tooltip="Lister les remotes rclone configurés et remplir l autocomplétion">Charger les remotes</button>
-                            <button id="provider-rclone-setup" class="btn btn-primary" data-tooltip="Ouvrir la config rclone dans un terminal pour ajouter ou modifier des remotes">Configurer dans le terminal</button>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label>Fournisseur cloud <small style="opacity:0.6;">(cliquer pour pré-remplir le format)</small></label>
-                        <div class="rclone-provider-chips" id="rclone-provider-chips">
-                            <button class="btn rclone-chip" data-prefix="dropbox:SlimeDeals/Saves" data-tooltip="Dropbox — free 2 GB, paid plans available">Dropbox</button>
-                            <button class="btn rclone-chip" data-prefix="onedrive:SlimeDeals/Saves" data-tooltip="Microsoft OneDrive — 5 GB free with Microsoft account">OneDrive</button>
-                            <button class="btn rclone-chip" data-prefix="mega:SlimeDeals/Saves" data-tooltip="MEGA — 20 GB free storage">MEGA</button>
-                            <button class="btn rclone-chip" data-prefix="pcloud:SlimeDeals/Saves" data-tooltip="pCloud — 10 GB free, lifetime plans available">pCloud</button>
-                            <button class="btn rclone-chip" data-prefix="box:SlimeDeals/Saves" data-tooltip="Box — 10 GB free">Box</button>
-                            <button class="btn rclone-chip" data-prefix="protondrive:SlimeDeals/Saves" data-tooltip="Proton Drive — 1 GB free, privacy-focused">Proton Drive</button>
-                            <button class="btn rclone-chip" data-prefix="b2:your-bucket/SlimeDeals/Saves" data-tooltip="Backblaze B2 — very cheap object storage ($0.006/GB/month)">Backblaze B2</button>
-                            <button class="btn rclone-chip" data-prefix="s3:your-bucket/SlimeDeals/Saves" data-tooltip="Amazon S3 — industry-standard object storage">Amazon S3</button>
-                            <button class="btn rclone-chip" data-prefix="s3:your-bucket/SlimeDeals/Saves" data-tooltip="Wasabi — S3-compatible, no egress fees ($7/TB/month)">Wasabi</button>
-                            <button class="btn rclone-chip" data-prefix="yandex:SlimeDeals/Saves" data-tooltip="Yandex Disk — 10 GB free">Yandex Disk</button>
-                            <button class="btn rclone-chip" data-prefix="jottacloud:SlimeDeals/Saves" data-tooltip="Jottacloud — unlimited storage plans, Norwegian provider">Jottacloud</button>
-                            <button class="btn rclone-chip" data-prefix="koofr:SlimeDeals/Saves" data-tooltip="Koofr — 10 GB free, European provider, privacy-focused">Koofr</button>
-                            <button class="btn rclone-chip" data-prefix="storj:your-bucket/SlimeDeals/Saves" data-tooltip="Storj — decentralized cloud storage">Storj</button>
-                            <button class="btn rclone-chip" data-prefix="iclouddrive:SlimeDeals/Saves" data-tooltip="iCloud Drive — requires macOS/Windows iCloud app signed in">iCloud Drive</button>
-                            <button class="btn rclone-chip" data-prefix="sftp:hostname/SlimeDeals/Saves" data-tooltip="SFTP — any SSH server (your NAS, VPS, home server)">SFTP</button>
-                            <button class="btn rclone-chip" data-prefix="ftp:hostname/SlimeDeals/Saves" data-tooltip="FTP — legacy FTP servers">FTP</button>
-                            <button class="btn rclone-chip" data-prefix="webdav:SlimeDeals/Saves" data-tooltip="WebDAV — Nextcloud, ownCloud, Seafile, and others">WebDAV</button>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label>Destination distante <small style="opacity:0.6;">(remplace le nom du remote par le tien)</small></label>
-                        <div class="input-with-btn">
-                            <input type="text" id="provider-rclone-remote" list="rclone-remotes-list" placeholder="e.g. dropbox:SlimeDeals/Saves  or  onedrive:SlimeDeals/Saves">
-                            <datalist id="rclone-remotes-list"></datalist>
-                            <button id="provider-rclone-test" class="btn" data-tooltip="Tester que la destination distante est accessible">Tester</button>
-                        </div>
-                        <small style="opacity:0.6;">No remote yet? Click <b>Configurer dans le terminal</b> above, then run <code>rclone config</code> and follow the prompts. <a href="#" id="rclone-docs-link" style="opacity:0.8;">rclone.org/docs</a></small>
-                    </div>
-                </div>
-                <button id="provider-save-config" class="btn btn-primary" style="margin-top:10px;display:none">Enregistrer la config</button>
+                <p class="section-desc" style="margin-top:10px;font-size:0.88em;opacity:0.92;">Les sauvegardes sont rangées dans un dossier à la racine de ton Drive nommé <strong>SLIMEDEALS BACKUP</strong>. Si tu utilises <strong>un autre compte</strong> Google sur ce PC, clique <strong>Déconnecter</strong> puis reconnecte-toi avec ce compte : le launcher parle alors au Drive de <em>ce</em> compte (les fichiers du compte précédent restent sur l’autre compte Google). Le chemin Steam et l’ID userdata sur le PC, eux, ne changent pas automatiquement.</p>
             </div>
 
-            <div class="cloudsaves-setup">
-                <h2 class="section-title">Configuration</h2>
+            <div class="tool-card" style="margin-bottom:16px;border:2px solid var(--accent, #3b82f6);">
+                <h2 class="section-title" style="margin-top:0;">2. Sauvegarder tout automatiquement</h2>
+                <p class="section-desc">Envoie <strong>toutes</strong> les sauvegardes détectées sur Drive tant que le launcher reste ouvert.</p>
+                <p class="section-desc" style="margin-top:8px;color:var(--muted,#888);font-size:0.95em;">Ce n’est pas suffisant de connecter Drive seul : il faut aussi le <strong>dossier Steam</strong> et l’<strong>ID userdata</strong> (étape 3, ou les mêmes champs dans <strong>Paramètres</strong>). Sinon le launcher ne sait pas où lire les fichiers et l’auto ne fait rien.</p>
+                <p class="section-desc" style="margin-top:6px;font-size:0.92em;">Tout est <strong>enregistré sur le disque</strong> (comme le reste du launcher) : au prochain lancement, intervalle, chemin Steam, ID et destination Drive restent tels que tu les as laissés.</p>
                 <div class="input-group">
-                    <label>Chemin Steam :</label>
+                    <label>Minutes entre chaque envoi (0 = désactivé) :</label>
+                    <input type="number" id="cloud-auto-interval" value="15" min="0" max="1440" style="max-width:8rem;">
+                </div>
+                <p class="section-desc" style="margin-top:4px;font-size:0.88em;opacity:0.9;">Modifier ce nombre l’<strong>enregistre tout de suite</strong> (tu peux ensuite activer ou non l’auto ci‑dessous).</p>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;">
+                    <button type="button" id="cloud-auto-enable-btn" class="btn btn-primary btn-lg">Activer la sauvegarde auto sur Google Drive</button>
+                    <button type="button" id="cloud-auto-disable-btn" class="btn btn-lg">Désactiver l’auto</button>
+                </div>
+            </div>
+
+            <div class="cloudsaves-setup tool-card" style="margin-bottom:16px;">
+                <h2 class="section-title" style="margin-top:0;">3. Où sont tes sauvegardes Steam ? <strong style="color:var(--warning,#d97706);font-weight:600;">obligatoire</strong></h2>
+                <p class="section-desc" style="margin-bottom:12px;">Sans ces deux infos, le launcher ne peut pas trouver tes dossiers de jeu (<code>userdata/…/appid</code>). C’est requis pour : scan d’un jeu, sauvegarde manuelle, envoi de tout, et la sauvegarde auto. Les valeurs viennent des <strong>paramètres enregistrés</strong> et <strong>restent après redémarrage</strong> du launcher.</p>
+                <div class="input-group">
+                    <label>Dossier d’installation Steam <span style="color:var(--warning,#d97706);">*</span> <small style="font-weight:normal;opacity:0.85;">(dossier qui contient <code>steam.exe</code>)</small></label>
+                    <p class="section-desc" style="margin:4px 0 8px;font-size:0.9em;">Choisis-le avec <strong>Parcourir</strong> ou colle le chemin puis clique ailleurs : il est <strong>enregistré tout seul</strong> dans les paramètres.</p>
                     <div class="input-with-btn">
-                        <input type="text" id="cloud-steam-path" placeholder="Détection automatique" data-tooltip="Chemin vers l installation Steam">
-                        <button id="cloud-steam-browse" class="btn" data-tooltip="Parcourir le dossier Steam">Parcourir</button>
+                        <input type="text" id="cloud-steam-path" placeholder="Ex. C:\Program Files (x86)\Steam" autocomplete="off" data-tooltip="Chemin complet vers le dossier Steam (steam.exe dedans)">
+                        <button id="cloud-steam-browse" type="button" class="btn" data-tooltip="Choisir le dossier Steam">Parcourir</button>
                     </div>
                 </div>
                 <div class="input-group">
-                    <label>Steam32 ID :</label>
+                    <label>Numéro du dossier <code>userdata</code> <span style="color:var(--warning,#d97706);">*</span> <small style="font-weight:normal;opacity:0.85;">(pas ton pseudo Steam)</small></label>
+                    <p class="section-desc" style="margin:4px 0 8px;font-size:0.9em;">Ouvre l’explorateur : <code>Steam → userdata →</code> tu vois un ou plusieurs dossiers <strong>uniquement en chiffres</strong> — mets <strong>celui qui est à toi</strong> (souvent différent du SteamID64 du profil web). Indication : <a href="https://steamid.xyz" target="_blank" rel="noopener">steamid.xyz</a>. Enregistré aussi quand tu quittes le champ.</p>
                     <div class="input-with-btn">
-                        <input type="text" id="cloud-steam32" placeholder="Entrer le Steam32 ID" data-tooltip="Trouve le tien sur steamid.xyz">
-                        <button id="cloud-save-id" class="btn" data-tooltip="Enregistrer le Steam32 ID pour une utilisation future">Enregistrer</button>
+                        <input type="text" id="cloud-steam32" inputmode="numeric" pattern="[0-9]*" placeholder="Ex. 123456789" autocomplete="off" data-tooltip="Nom du dossier chiffres sous Steam/userdata/">
+                        <button id="cloud-save-id" type="button" class="btn" data-tooltip="Enregistrer tout de suite dans les paramètres">Enregistrer l’ID</button>
                     </div>
                 </div>
-                <button id="cloud-scan" class="btn btn-primary" data-tooltip="Scanner le dossier Steam userdata pour les jeux avec des sauvegardes">Scanner les jeux</button>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;">
+                    <button id="cloud-self-test-btn" type="button" class="btn btn-secondary" data-tooltip="Vérifie Steam, userdata et Google Drive">Tester la configuration</button>
+                    <span class="section-desc" style="margin:0;font-size:0.88em;max-width:36rem;">Une fois Drive connecté et les champs remplis, clique ici pour voir si tout est bon avant un scan ou une sauvegarde.</span>
+                </div>
+                <button id="cloud-scan" type="button" class="btn btn-primary" data-tooltip="Liste les jeux avec sauvegardes détectées">Scanner les jeux</button>
+                <p id="cloud-scan-hint" class="section-desc hidden" style="margin-top:10px;color:var(--warning,#d97706);max-width:52rem;"></p>
+                <div id="cloud-games" class="data-table hidden" style="margin-top:14px;">
+                    <table>
+                        <thead><tr><th>App ID</th><th>Nom du jeu</th><th>Taille</th></tr></thead>
+                        <tbody id="cloud-games-tbody"></tbody>
+                    </table>
+                </div>
+                <button id="cloud-backup-btn" type="button" class="btn btn-primary btn-lg" style="margin-top:16px;display:block;width:100%;max-width:32rem;">Sauvegarder ce jeu sur Google Drive</button>
             </div>
 
-            <div id="cloud-games" class="data-table hidden">
-                <h2 class="section-title">Jeux avec données de sauvegarde</h2>
-                <table>
-                    <thead><tr><th>App ID</th><th>Nom du jeu</th><th>Taille sauvegarde</th></tr></thead>
-                    <tbody id="cloud-games-tbody"></tbody>
-                </table>
-            </div>
-
-            <div class="cloudsaves-actions">
-                <div class="tool-card">
-                    <h3>Sauvegarder</h3>
-                    <p>Sélectionne un jeu ci-dessus, puis choisis où sauvegarder.</p>
-                    <div class="input-group" id="cloud-backup-dest-row">
-                        <label>Destination de sauvegarde :</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="cloud-backup-dest" placeholder="Choisir un dossier..." data-tooltip="Folder to save the backup to">
-                            <button id="cloud-backup-browse" class="btn">Parcourir</button>
-                        </div>
+            <div class="tool-card" style="margin-bottom:16px;">
+                <h2 class="section-title" style="margin-top:0;">4. Restaurer dans Steam (dossier de sauvegarde)</h2>
+                <p class="section-desc">Choisis un jeu <strong>dans le tableau ci‑dessus</strong> après scan, puis le dossier où tu as une ancienne sauvegarde.</p>
+                <div class="input-group">
+                    <label>Dossier de la sauvegarde à remettre dans Steam :</label>
+                    <div class="input-with-btn">
+                        <input type="text" id="cloud-import-path" placeholder="Dossier contenant remote/ ..." data-tooltip="Dossier de backup du jeu">
+                        <button id="cloud-import-browse" type="button" class="btn">Parcourir</button>
                     </div>
-                    <button id="cloud-backup-btn" class="btn btn-primary" data-tooltip="Sauvegarder les données du jeu sélectionné">Sauvegarder le jeu sélectionné</button>
                 </div>
-                <div class="tool-card">
-                    <h3>Importer (Restaurer) des sauvegardes</h3>
-                    <p>Parcourez vers un dossier de sauvegarde créé précédemment pour restaurer les sauvegardes.</p>
-                    <div class="input-group">
-                        <label>Dossier de sauvegarde :</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="cloud-import-path" placeholder="Parcourir vers le dossier de sauvegarde..." data-tooltip="The Game Name [AppID] folder from a previous backup">
-                            <button id="cloud-import-browse" class="btn">Parcourir</button>
-                        </div>
-                    </div>
-                    <button id="cloud-import-btn" class="btn btn-primary" data-tooltip="Restaurer les sauvegardes depuis la sauvegarde sélectionnée">Importer les sauvegardes</button>
-                </div>
+                <button id="cloud-import-btn" type="button" class="btn btn-primary btn-lg" style="margin-top:8px;">Restaurer ce jeu dans Steam</button>
             </div>
 
             <div id="cloud-log" class="log-output hidden">
@@ -772,19 +727,12 @@
                 <pre id="cloud-log-content"></pre>
             </div>
 
-            <div class="cloudsaves-allsaves" id="all-saves-section">
-                <h2 class="section-title">Tous les emplacements de sauvegarde</h2>
-                <p class="section-desc">Scanner et sauvegarder tous les dossiers de sauvegarde (CODEX, EMPRESS, RUNE, OnlineFix, Goldberg, GSE, Steam userdata).</p>
-                <div class="all-saves-actions">
-                    <button id="all-saves-scan-btn" class="btn btn-primary">Scanner tous les emplacements</button>
-                    <button id="all-saves-backup-btn" class="btn btn-primary" style="display:none">Tout sauvegarder</button>
-                </div>
-                <div id="all-saves-dest-row" class="input-group" style="display:none">
-                    <label>Destination de sauvegarde :</label>
-                    <div class="input-with-btn">
-                        <input type="text" id="all-saves-dest" placeholder="Choisir un dossier...">
-                        <button id="all-saves-dest-browse" class="btn">Parcourir</button>
-                    </div>
+            <div class="cloudsaves-allsaves tool-card" id="all-saves-section" style="margin-bottom:16px;">
+                <h2 class="section-title" style="margin-top:0;">5. Tout envoyer sur Google Drive (une fois)</h2>
+                <p class="section-desc">Utilise les mêmes infos Steam qu’à l’<strong>étape 3</strong>. Steam + emplacements cracks / Goldberg / etc. Clique <strong>Scanner tout</strong>, vérifie les coches, puis <strong>Tout envoyer sur Google Drive</strong>.</p>
+                <div class="all-saves-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+                    <button id="all-saves-scan-btn" type="button" class="btn btn-primary">Scanner tout</button>
+                    <button id="all-saves-backup-btn" type="button" class="btn btn-primary btn-lg" style="display:none">Tout envoyer sur Google Drive</button>
                 </div>
                 <div id="all-saves-progress" class="backup-progress hidden">
                     <div class="backup-progress-header">
@@ -807,15 +755,16 @@
                     </table>
                 </div>
                 <div class="restore-panel">
-                    <h3>Restaurer depuis une sauvegarde</h3>
+                    <h3>6. Restaurer depuis Google Drive</h3>
+                    <p class="section-desc" style="margin-bottom:10px;">Lit la copie déjà sur ton Drive (pas besoin de dossier local ici).</p>
                     <div id="restore-source-row" class="input-group">
-                        <label id="restore-source-label">Dossier racine de sauvegarde :</label>
+                        <label id="restore-source-label">Source</label>
                         <div class="input-with-btn" id="restore-folder-input-row">
-                            <input type="text" id="restore-backup-root" placeholder="Parcourir vers le dossier AllSaves...">
-                            <button id="restore-backup-browse" class="btn">Parcourir</button>
+                            <input type="text" id="restore-backup-root" placeholder="(non utilisé pour Drive)">
+                            <button id="restore-backup-browse" type="button" class="btn">Parcourir</button>
                         </div>
                     </div>
-                    <button id="restore-scan-btn" class="btn">Scanner les sauvegardes</button>
+                    <button id="restore-scan-btn" type="button" class="btn btn-primary">Lire les jeux sauvegardés sur Drive</button>
                     <div id="restore-results" class="hidden">
                         <div class="input-group">
                             <label>Emplacement :</label>
@@ -906,23 +855,26 @@
                 <div class="input-group">
                     <label>Steam32 ID :</label>
                     <div class="input-with-btn">
-                        <input type="text" id="setting-steam32-id" placeholder="Entrer le Steam32 ID" data-tooltip="Your Steam32 ID (find at steamid.xyz)">
+                        <input type="text" id="setting-steam32-id" placeholder="Entrer le Steam32 ID" data-tooltip="SteamID32 / dossier userdata — https://steamid.xyz">
                         <button class="btn btn-primary setting-save-btn" data-key="steam32_id" data-input="setting-steam32-id">Enregistrer</button>
                     </div>
                 </div>
+                <p id="settings-onlinefix-embedded-notice" class="section-desc" style="display:none;">Le correctif multijoueur utilise un compte déjà configuré dans cette version. Aucun identifiant à saisir.</p>
+                <div id="settings-onlinefix-credentials">
                 <div class="input-group">
-                    <label>Pseudo online-fix.me :</label>
+                    <label>Pseudo (correctif multijoueur) :</label>
                     <div class="input-with-btn">
-                        <input type="text" id="setting-onlinefix-user" placeholder="Pseudo online-fix.me" data-tooltip="Username for online-fix.me multiplayer fixes">
+                        <input type="text" id="setting-onlinefix-user" placeholder="Pseudo du compte multijoueur" data-tooltip="Identifiant pour le correctif multijoueur (stocke de maniere securisee)">
                         <button class="btn btn-primary setting-save-btn" data-key="online_fix_user" data-input="setting-onlinefix-user">Enregistrer</button>
                     </div>
                 </div>
                 <div class="input-group">
-                    <label>Mot de passe online-fix.me :</label>
+                    <label>Mot de passe (correctif multijoueur) :</label>
                     <div class="input-with-btn">
-                        <input type="password" id="setting-onlinefix-pass" placeholder="Mot de passe online-fix.me" data-tooltip="Password for online-fix.me (stored encrypted)">
+                        <input type="password" id="setting-onlinefix-pass" placeholder="Mot de passe du compte multijoueur" data-tooltip="Mot de passe (stocke de maniere chiffree)">
                         <button class="btn btn-primary setting-save-btn" data-key="online_fix_pass" data-input="setting-onlinefix-pass">Enregistrer</button>
                     </div>
+                </div>
                 </div>
             </div>
 
@@ -1103,41 +1055,15 @@
                 </div>
             </div>
 
-            <div class="settings-section">
+            <div class="settings-section" id="section-autobackup">
                 <h2 class="section-title">Sauvegarde automatique</h2>
-                <p class="setting-hint" style="margin-bottom:12px;">SlimeDeals surveille tes fichiers de sauvegarde in the background and backs them up automatically. Choose the provider and interval below.</p>
+                <p class="setting-hint" style="margin-bottom:12px;">Les envois vont sur <strong>Google Drive</strong> (même logique que l’onglet <strong>Sauvegardes cloud</strong>). Connecte-toi là-bas d’abord.</p>
                 <div class="input-group">
-                    <label>Intervalle de vérification (minutes, 0 = désactivé) :</label>
-                    <input type="number" id="setting-autobackup-interval" value="10" min="0" max="1440" data-tooltip="How often to check for changed saves. Set to 0 to disable.">
-                </div>
-                <div class="input-group">
-                    <label>Fournisseur de sauvegarde :</label>
-                    <div class="rclone-provider-chips" id="autobackup-provider-chips">
-                        <button class="rclone-chip autobackup-chip active" data-provider="local">Dossier local</button>
-                        <button class="rclone-chip autobackup-chip" data-provider="rclone">rclone</button>
-                        <button class="rclone-chip autobackup-chip" data-provider="gdrive_api">Google Drive</button>
-                    </div>
-                </div>
-                <div id="autobackup-local-panel" class="input-group">
-                    <label>Dossier de destination :</label>
-                    <div style="display:flex;gap:6px;align-items:center;">
-                        <input type="text" id="setting-autobackup-local-dest" placeholder="C:\Backups\SlimeDeals" style="flex:1;" data-tooltip="Local folder to store save backups">
-                        <button id="setting-autobackup-local-browse" class="btn btn-secondary" style="white-space:nowrap;">Parcourir</button>
-                    </div>
-                </div>
-                <div id="autobackup-rclone-panel" class="input-group hidden">
-                    <label>Remote destination (e.g. mydrive:SlimeDealsBackups):</label>
-                    <div style="display:flex;gap:6px;align-items:center;">
-                        <input type="text" id="setting-autobackup-rclone-dest" placeholder="mydrive:SlimeDealsBackups" style="flex:1;" list="autobackup-rclone-datalist" data-tooltip="rclone remote and path, e.g. gdrive:SlimeDealsBackups">
-                        <datalist id="autobackup-rclone-datalist"></datalist>
-                        <button id="setting-autobackup-rclone-loadremotes" class="btn btn-secondary" style="white-space:nowrap;">Charger les remotes</button>
-                    </div>
-                </div>
-                <div id="autobackup-gdrive-panel" class="input-group hidden">
-                    <p class="setting-hint">Utilise ton compte Google Drive connecté. Connecte-le dans l onglet Sauvegardes Cloud d abord.</p>
+                    <label>Minutes entre chaque envoi (0 = désactivé) :</label>
+                    <input type="number" id="setting-autobackup-interval" value="10" min="0" max="1440" data-tooltip="Fréquence de la sauvegarde auto en arrière-plan">
                 </div>
                 <div class="input-group" style="margin-top:8px;">
-                    <button id="setting-autobackup-save" class="btn btn-primary">Enregistrer les paramètres de sauvegarde auto</button>
+                    <button id="setting-autobackup-save" type="button" class="btn btn-primary">Enregistrer (Drive + intervalle)</button>
                 </div>
             </div>
 
@@ -1351,16 +1277,16 @@
         </div>
     </div>
 
-    <!-- Update Manifests Modal -->
+    <!-- Mise à jour manifests AppList (accueil : « Mettre à jour les jeux ») -->
     <div id="update-manifests-modal" class="modal hidden">
         <div class="modal-overlay"></div>
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Mettre à jour tous les manifests</h2>
+                <h2>Mettre à jour les jeux</h2>
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom:10px;opacity:0.85;">Sélectionnez les jeux à mettre à jour. Seuls les jeux avec des fichiers Lua sauvegardés sont affichés.</p>
+                <p style="margin-bottom:10px;opacity:0.85;">Choisis les jeux à mettre à jour (manifests Steam / AppList). Seuls les titres ayant un fichier Lua sauvegardé apparaissent.</p>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                     <span style="font-size:12px;opacity:0.6;" id="um-count">Chargement...</span>
                     <button id="um-toggle-all" class="btn btn-sm" style="font-size:12px;padding:3px 10px;">Tout désélectionner</button>
@@ -1515,6 +1441,113 @@
                         Je comprends &mdash; Continuer (<span id="hv-countdown">20</span>s)
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plan FREE : ROCKSTAR BYPASS → upsell abonnement + Discord -->
+    <div id="bprg-free-upsell-modal" class="modal modal-bprg-premium hidden" aria-labelledby="bprg-free-upsell-title">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header bprg-upsell-header">
+                <div class="bprg-upsell-heading">
+                    <span class="bprg-upsell-badge" aria-hidden="true">★</span>
+                    <div>
+                        <p class="bprg-upsell-kicker">Outil avancé</p>
+                        <h2 id="bprg-free-upsell-title">ROCKSTAR BYPASS</h2>
+                    </div>
+                </div>
+                <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
+            </div>
+            <div class="modal-body bprg-upsell-body">
+                <p class="bprg-upsell-lead">Le <strong>ROCKSTAR BYPASS</strong> est réservé au plan <strong>Triple Monstre</strong> (FREE, Monstre, 24H PASS : passer au Triple pour y accéder).</p>
+                <p class="bprg-upsell-sub">Passe à une offre payante pour y accéder, obtiens un accès gratuit via la communauté Discord, ou partage un avis pour débloquer d’autres avantages selon les règles du serveur.</p>
+                <ul class="bprg-upsell-links-hint">
+                    <li><strong>Tarifs</strong> — slimedeals.fr/#tarifs</li>
+                    <li><strong>#avis</strong> — retours vérifiés, communauté</li>
+                    <li><strong>Abonnement gratuit</strong> — salon dédié sur Discord</li>
+                </ul>
+            </div>
+            <div class="modal-footer bprg-upsell-footer">
+                <button type="button" class="btn modal-cancel">Fermer</button>
+                <button type="button" class="btn btn-primary" id="bprg-upsell-tarifs">Voir les abonnements</button>
+                <button type="button" class="btn bprg-upsell-btn-discord" id="bprg-upsell-avis">Salon #avis (Discord)</button>
+                <button type="button" class="btn bprg-upsell-btn-discord-secondary" id="bprg-upsell-free-sub">Abonnement gratuit (Discord)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plan FREE : sauvegardes cloud Google Drive -->
+    <div id="cloudsaves-free-upsell-modal" class="modal modal-bprg-premium hidden" aria-labelledby="cloudsaves-free-upsell-title">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header bprg-upsell-header">
+                <div class="bprg-upsell-heading">
+                    <span class="bprg-upsell-badge" aria-hidden="true">☁</span>
+                    <div>
+                        <p class="bprg-upsell-kicker">Sauvegardes</p>
+                        <h2 id="cloudsaves-free-upsell-title">Google Drive</h2>
+                    </div>
+                </div>
+                <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
+            </div>
+            <div class="modal-body bprg-upsell-body">
+                <p id="cloudsaves-free-upsell-lead" class="bprg-upsell-lead">Les <strong>sauvegardes cloud</strong> (Google Drive) sont réservées au plan <strong>Triple Monstre</strong>.</p>
+                <p class="bprg-upsell-sub">À quoi ça sert : envoyer sur ton Drive les <strong>dossiers de sauvegarde des jeux</strong> (progression, options, parties Steam Cloud ou fichiers locaux), les <strong>récupérer</strong> sur un autre PC ou après une réinstall, et optionnellement les <strong>sauvegarder automatiquement</strong> tant que le launcher est ouvert.</p>
+                <ul class="bprg-upsell-links-hint">
+                    <li><strong>Tarifs</strong> — slimedeals.fr/#tarifs</li>
+                    <li><strong>#avis</strong> — retours vérifiés sur Discord</li>
+                    <li><strong>Abonnement gratuit</strong> — salon dédié sur Discord (règles du serveur)</li>
+                </ul>
+            </div>
+            <div class="modal-footer bprg-upsell-footer">
+                <button type="button" class="btn modal-cancel">Fermer</button>
+                <button type="button" class="btn btn-primary" id="cloudsaves-free-upsell-tarifs">Voir slimedeals.fr/#tarifs</button>
+                <button type="button" class="btn bprg-upsell-btn-discord" id="cloudsaves-free-upsell-avis">Salon #avis (Discord)</button>
+                <button type="button" class="btn bprg-upsell-btn-discord-secondary" id="cloudsaves-free-upsell-free-sub">Abonnement gratuit (Discord)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plan FREE : ONLINE FIX (bibliothèque) — abonnement + Discord #avis -->
+    <div id="library-onlinefix-free-modal" class="modal modal-bprg-premium hidden" aria-labelledby="library-onlinefix-free-title">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header bprg-upsell-header">
+                <div class="bprg-upsell-heading">
+                    <span class="bprg-upsell-badge" aria-hidden="true">◎</span>
+                    <div>
+                        <p class="bprg-upsell-kicker">Bibliothèque</p>
+                        <h2 id="library-onlinefix-free-title">ONLINE FIX</h2>
+                    </div>
+                </div>
+                <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
+            </div>
+            <div class="modal-body bprg-upsell-body">
+                <p id="library-onlinefix-free-msg" class="bprg-upsell-lead">L’option <strong>ONLINE FIX</strong> (correctif multijoueur intégré au launcher) est réservée au plan <strong>Triple Monstre</strong> uniquement.</p>
+                <p class="bprg-upsell-sub">Les offres sont sur <strong>slimedeals.fr/#tarifs</strong>. Tu peux aussi rejoindre le salon <strong>#avis</strong> sur Discord pour les retours communautaires.</p>
+            </div>
+            <div class="modal-footer bprg-upsell-footer">
+                <button type="button" class="btn modal-cancel">Fermer</button>
+                <button type="button" class="btn btn-primary" id="library-onlinefix-tarifs">Voir slimedeals.fr/#tarifs</button>
+                <button type="button" class="btn bprg-upsell-btn-discord" id="library-onlinefix-avis">Salon #avis (Discord)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Résultat correctif multijoueur (bibliothèque) -->
+    <div id="multiplayer-result-modal" class="modal hidden" aria-labelledby="multiplayer-result-title">
+        <div class="modal-overlay"></div>
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header" id="multiplayer-result-header">
+                <h2 id="multiplayer-result-title">Multijoueur</h2>
+                <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="multiplayer-result-msg" style="margin:0;font-size:15px;line-height:1.5;"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary modal-cancel" style="min-width:120px;">OK</button>
             </div>
         </div>
     </div>

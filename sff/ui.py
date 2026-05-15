@@ -1,4 +1,4 @@
-﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
+# SlimeDeals - Steam game setup and manifest tool (SFF)
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 #
 # This file is part of SlimeDeals.
@@ -28,7 +28,7 @@ import zipfile
 from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 from colorama import Fore, Style
 
@@ -172,7 +172,22 @@ class UI:
         self.analytics_tracker = get_analytics_tracker()
         # Set by GUI (SFFMainWindow) so process_lua_full can track downloads
         self.download_manager: Optional["DownloadManager"] = None
+        # Salon Discord « activité » (SlimeDeals) — défini par WebBridge lorsque l’UI web est active
+        self.post_install_notify: Optional[Callable[[str], None]] = None
         self.init_midi_player()
+
+    def _maybe_post_install_notify(self, app_id: Union[str, int, None]) -> None:
+        """Appelé après une installation réussie (Lua / DepotDownloader) pour notifier le serveur."""
+        fn = self.post_install_notify
+        if not fn or app_id is None:
+            return
+        aid = str(app_id).strip()
+        if not aid:
+            return
+        try:
+            fn(aid)
+        except Exception:
+            logger.debug("post_install_notify a échoué", exc_info=True)
 
     def _steam_provider(self):
         import threading
@@ -914,6 +929,7 @@ class UI:
             auto_launch = steam_proc.prompt_launch_or_restart()
         else:
             auto_launch = False
+        self._maybe_post_install_notify(parsed_lua.app_id)
         if sys.platform != "win32":
             print(
                 Fore.GREEN
@@ -1098,6 +1114,17 @@ class UI:
                 + "\nDownload complete! Game ready to play."
                 + Style.RESET_ALL
             )
+            self._maybe_post_install_notify(parsed_lua.app_id)
+            try:
+                from sff.premium_manifest_lock import maybe_register_paid_install
+
+                maybe_register_paid_install(
+                    self.steam_path,
+                    parsed_lua,
+                    manifest_override=dict(manifest_override),
+                )
+            except Exception:
+                pass
         else:
             print(
                 Fore.YELLOW

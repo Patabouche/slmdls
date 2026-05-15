@@ -525,21 +525,19 @@ class GameHandler:
         return game_name
 
     def apply_multiplayer_fix(self, app_info):
-        print("\n" + Fore.CYAN + "Multiplayer Fix (online-fix.me)" + Style.RESET_ALL)
+        print("\n" + Fore.CYAN + "Multiplayer fix" + Style.RESET_ALL)
         print("This will download and apply a multiplayer fix for the selected game.")
         print("The fix will be extracted directly to the game folder.\n")
         game_name = self._resolve_game_name(app_info)
         print(f"Game: {Fore.YELLOW}{game_name}{Style.RESET_ALL}")
         print(f"Folder: {Fore.YELLOW}{app_info.path}{Style.RESET_ALL}\n")
-        if not prompt_confirm("Continue with multiplayer fix via online-fix.me?"):
-            return
-        success = apply_online_fix(game_name, app_info.path)
+        if not prompt_confirm("Continue with multiplayer fix?"):
+            return "cancelled", game_name
+        success = apply_online_fix(game_name, app_info.path, getattr(app_info, "app_id", None))
         if success:
             print("\n" + Fore.GREEN + "Multiplayer fix applied successfully!" + Style.RESET_ALL)
             print("You can now launch the game and try multiplayer features.")
-        else:
-            print("\n" + Fore.RED + "Failed to apply multiplayer fix." + Style.RESET_ALL)
-            print("Check the error messages above for details.")
+        return ("ok" if success else "fail", game_name)
 
     def apply_crack_fix(self, app_info):
         print("\n" + Fore.CYAN + "Fixes & Bypasses" + Style.RESET_ALL)
@@ -780,7 +778,7 @@ class GameHandler:
         elif choice == MainMenu.CHECK_MOD_UPDATES:
             self.check_mod_updates(app_info.app_id)
         elif choice == MainMenu.MULTIPLAYER_FIX:
-            self.apply_multiplayer_fix(app_info)
+            return self.apply_multiplayer_fix(app_info)
         elif choice == MainMenu.CRACK_FIX:
             self.apply_crack_fix(app_info)
         elif choice == MainMenu.HV_FIX:

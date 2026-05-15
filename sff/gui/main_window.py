@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, Qt, QThread, QTimer, QUrl, pyqtSignal
-from PyQt6.QtGui import QDesktopServices, QTextCursor
+from PyQt6.QtGui import QDesktopServices, QTextCursor, QColor, QFont, QFontMetrics, QPainter
 from PyQt6.QtWebChannel import QWebChannel
 from PyQt6.QtWebEngineCore import QWebEngineSettings
 from PyQt6.QtWebEngineWidgets import QWebEngineView
@@ -45,6 +45,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
     QTabWidget,
@@ -128,6 +129,86 @@ class GameComboBox(QComboBox):
         )
 
 
+class LauncherNewsTicker(QWidget):
+    """Banderole défilante (annonces serveur) entre Discord et le bloc utilisateur."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._msg = ""
+        self._scroll = 0
+        self._cycle = 400
+        self._timer = QTimer(self)
+        self._timer.setInterval(32)
+        self._timer.timeout.connect(self._tick)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setFixedHeight(22)
+        self.setMinimumWidth(64)
+        self.setStyleSheet(
+            "LauncherNewsTicker{background:rgba(21,23,34,0.92);border-radius:5px;"
+            "border:1px solid rgba(114,137,218,0.38);}"
+        )
+
+    def set_message(self, text: str):
+        t = (text or "").strip()
+        self._msg = t
+        self._scroll = 0
+        if not t:
+            self.setVisible(False)
+            self._timer.stop()
+            self.update()
+            return
+        f = QFont()
+        f.setPointSize(9)
+        f.setWeight(600)
+        fm = QFontMetrics(f)
+        gap = 56
+        self._cycle = max(160, fm.horizontalAdvance(t) + gap)
+        self.setVisible(True)
+        if not self._timer.isActive():
+            self._timer.start()
+        self.update()
+
+    def _tick(self):
+        if self._msg:
+            self._scroll = (self._scroll + 1) % self._cycle
+            self.update()
+
+    def paintEvent(self, event):
+        if not self._msg:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+        f = QFont()
+        f.setPointSize(9)
+        f.setWeight(600)
+        p.setFont(f)
+        fm = p.fontMetrics()
+        w, h = self.width(), self.height()
+        baseline = (h + fm.ascent() - fm.descent()) // 2
+        p.setPen(QColor("#c5cee0"))
+        cy = max(1, self._cycle)
+        off = self._scroll % cy
+        x = -off
+        while x < w + cy:
+            p.drawText(int(x), baseline, self._msg)
+            x += cy
+
+
+def _launcher_auth_strictly_free() -> bool:
+    """True si auth.json indique le seul plan FREE (même logique que le WebUI / web_bridge)."""
+    import json
+
+    p = Path.home() / ".slimedeals" / "auth.json"
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return True
+    r = str(data.get("rank") or "free").strip().lower().replace(" ", "_")
+    if not r or r in ("none", "null"):
+        r = "free"
+    return r == "free"
+
+
 class SFFMainWindow(QMainWindow):
     def __init__(self, ui, steam_path):
         super().__init__()
@@ -178,7 +259,7 @@ class SFFMainWindow(QMainWindow):
         discord_btn.setFlat(True)
         discord_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         discord_btn.setStyleSheet("color: #7289da; font-weight: 600; border: none; padding: 2px 8px;")
-        discord_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://discord.gg/slimedeals")))
+        discord_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://discord.gg/c2pRJKjvgE")))
 
         # Logout button (hidden until authenticated)
         self._logout_btn = QPushButton("⎋  Déconnexion")
@@ -203,12 +284,23 @@ class SFFMainWindow(QMainWindow):
         self._user_emoji_lbl.setStyleSheet(
             "font-size: 13px; border: none; background: transparent; padding: 2px 0;"
         )
-        self._user_name_lbl = QLabel()
-        self._user_name_lbl.setStyleSheet(
-            "font-size: 13px; font-weight: 700; border: none; background: transparent; "
-            "padding: 2px 2px; color: #e8e8f0;"
+        self._user_name_btn = QPushButton()
+        self._user_name_btn.setFlat(True)
+        self._user_name_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._user_name_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._user_name_btn.setToolTip("Profil du compte — abonnement Stripe")
+        self._user_name_btn.setStyleSheet(
+            "QPushButton { font-size: 13px; font-weight: 700; border: none; background: transparent; "
+            "padding: 2px 2px; color: #e8e8f0; text-align: left; }"
+            "QPushButton:hover { color: #ffffff; text-decoration: underline; }"
         )
-        self._user_name_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        self._user_name_btn.clicked.connect(self._show_account_profile_dialog)
+        self._user_quota_lbl = QLabel()
+        self._user_quota_lbl.setStyleSheet(
+            "font-size: 11px; font-weight: 600; border: none; background: transparent; "
+            "padding: 2px 4px; color: #94a3b8; letter-spacing: 0.02em;"
+        )
+        self._user_quota_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         self._user_rank_lbl = QLabel()
         self._user_rank_lbl.setStyleSheet(
             "font-size: 11px; font-weight: 800; border: none; background: transparent; "
@@ -217,7 +309,8 @@ class SFFMainWindow(QMainWindow):
         self._user_rank_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
 
         self._user_bar_layout.addWidget(self._user_emoji_lbl)
-        self._user_bar_layout.addWidget(self._user_name_lbl)
+        self._user_bar_layout.addWidget(self._user_name_btn)
+        self._user_bar_layout.addWidget(self._user_quota_lbl)
         self._user_bar_layout.addWidget(self._user_rank_lbl)
 
         self._user_triple_anim_timer = QTimer(self)
@@ -235,12 +328,20 @@ class SFFMainWindow(QMainWindow):
         )
         self._user_bar_widget.setVisible(False)
 
+        self._news_ticker = LauncherNewsTicker()
+        self._last_banner_rev = -10**9
         toggle_bar.addWidget(site_btn)
         toggle_bar.addWidget(discord_btn)
-        toggle_bar.addStretch()
+        toggle_bar.addWidget(self._news_ticker, 1)
         toggle_bar.addWidget(self._user_bar_widget)
         toggle_bar.addWidget(self._logout_btn)
         root_layout.addLayout(toggle_bar)
+
+        self._banner_poll_timer = QTimer(self)
+        self._banner_poll_timer.setInterval(1100)
+        self._banner_poll_timer.timeout.connect(self._poll_launcher_banner_tick)
+        self._banner_poll_timer.start()
+        QTimer.singleShot(350, self._poll_launcher_banner_tick)
 
         # ── Classic tab UI (hidden by default — new UI is primary) ──
         self.tabs = QTabWidget()
@@ -263,7 +364,8 @@ class SFFMainWindow(QMainWindow):
         self._web_ui_loaded = False
         self._authenticated = False       # set only after server-verified auth
         self._current_username = ""
-        self._current_rank = "free"       # 'free' | 'triple_monstre' (from server)
+        self._current_rank = "free"       # brut serveur ; affichage via launcher_rank_bucket
+        self._profile_sync_timer: QTimer | None = None  # rafraîchit rang / free_claim depuis le serveur
         main_tab_widget = QWidget()
         main_tab_layout = QVBoxLayout(main_tab_widget)
         scroll = QScrollArea()
@@ -292,7 +394,7 @@ class SFFMainWindow(QMainWindow):
             "  - Open Workshop: Browse the Workshop for the selected game.\n"
             "  - Check mod updates: See if downloaded Workshop mods have\n"
             "    newer versions available.\n"
-            "  - Multiplayer fix: Apply online-fix.me multiplayer patches.\n"
+            "  - Multiplayer fix: apply integrated multiplayer patches.\n"
             "  - Fixes & Bypasses: Apply community-maintained fixes.\n"
             "  - DLC Unlockers: Manage CreamAPI / SmokeAPI / other DLC\n"
             "    unlocker DLLs for the selected game.\n"
@@ -379,7 +481,7 @@ class SFFMainWindow(QMainWindow):
         self._outside_name_label = QLabel("Nom du jeu :")
         outside_row.addWidget(self._outside_name_label)
         self.outside_name_edit = QLineEdit()
-        self.outside_name_edit.setPlaceholderText("For search (e.g. online-fix.me)")
+        self.outside_name_edit.setPlaceholderText("For search (e.g. game or site name)")
         outside_row.addWidget(self.outside_name_edit)
         self._outside_appid_label = QLabel("App ID :")
         outside_row.addWidget(self._outside_appid_label)
@@ -409,7 +511,7 @@ class SFFMainWindow(QMainWindow):
             T("Workshop item"): "Télécharge un mod Steam Workshop en entrant son identifiant",
             T("Open Workshop"): "Ouvre le navigateur Steam Workshop pour ce jeu",
             T("Check mod updates"): "Vérifie si les mods Workshop téléchargés ont des mises à jour disponibles",
-            T("Multiplayer fix"): "Applique les patches multijoueur online-fix.me pour jouer en ligne",
+            T("Multiplayer fix"): "Applique les patches multijoueur en ligne — compte préconfiguré dans le launcher, aucune saisie",
             T("Fixes & Bypasses"): "Applique des correctifs et contournements maintenus par la communauté",
             T("DLC Unlockers"): "Gère les DLLs de déverrouillage DLC : CreamAPI, SmokeAPI et autres",
             T("SteamAutoCrack"): "Lance l'outil SteamAutoCrack en ligne de commande sur ce jeu",
@@ -664,6 +766,14 @@ class SFFMainWindow(QMainWindow):
         """Always show the auth page first; the page JS calls auth_check_saved()."""
         self._load_auth_page()
 
+    def _user_name_btn_style(self, color: str, font_weight: str = "700") -> None:
+        self._user_name_btn.setStyleSheet(
+            "QPushButton { font-size: 13px; font-weight: %s; border: none; background: transparent; "
+            "padding: 2px 2px; color: %s; text-align: left; }"
+            "QPushButton:hover { text-decoration: underline; color: #ffffff; }"
+            % (font_weight, color)
+        )
+
     def _stop_user_triple_anim(self) -> None:
         self._user_triple_anim_timer.stop()
 
@@ -671,35 +781,56 @@ class SFFMainWindow(QMainWindow):
         colors = self._user_triple_name_colors
         c = colors[self._user_triple_anim_phase % len(colors)]
         self._user_triple_anim_phase += 1
-        self._user_name_lbl.setStyleSheet(
-            "font-size: 13px; font-weight: 800; border: none; background: transparent; "
-            f"padding: 2px 2px; color: {c};"
+        self._user_name_btn.setStyleSheet(
+            "QPushButton { font-size: 13px; font-weight: 800; border: none; background: transparent; "
+            "padding: 2px 2px; color: %s; text-align: left; }"
+            "QPushButton:hover { text-decoration: underline; }"
+            % (c,)
         )
 
+    def _user_bar_quota_text(self, rank: str) -> str:
+        """Compteur jeux distincts : Monstre / 24H PASS / Triple (illimite)."""
+        from sff.launcher_ranks import launcher_rank_bucket, paid_install_slot_cap_for_bucket
+        from sff.premium_manifest_lock import paid_distinct_game_count_for_steam
+
+        bucket = launcher_rank_bucket(rank)
+        cap = paid_install_slot_cap_for_bucket(bucket)
+        sp = getattr(self, "steam_path", None)
+        if bucket == "triple":
+            u = paid_distinct_game_count_for_steam(sp) if sp else 0
+            return f"{u}/illimité"
+        if cap is not None and bucket in ("monstre", "pass24h"):
+            u = paid_distinct_game_count_for_steam(sp) if sp else 0
+            return f"{u}/{cap}"
+        return ""
+
     def _set_user_bar_display(self, username: str, rank: str) -> None:
-        """Barre du haut : pseudo + rang (pseudo animé si TRIPLE MONSTRE)."""
+        """Barre du haut : pseudo + quota jeux + rang FREE / 24H PASS / MONSTRE / TRIPLE MONSTRE."""
+        from sff.launcher_ranks import launcher_rank_bucket
+
         self._stop_user_triple_anim()
         name = username or ""
-        r = (rank or "free").strip().lower().replace(" ", "_")
-        self._user_name_lbl.setText(name)
+        bucket = launcher_rank_bucket(rank)
+        self._user_name_btn.setText(name)
 
-        if r == "free":
+        quota_txt = self._user_bar_quota_text(rank)
+        self._user_quota_lbl.setText(quota_txt)
+        self._user_quota_lbl.setVisible(bool(quota_txt))
+
+        if bucket == "free":
             self._user_bar_widget.setToolTip(
                 "Plan FREE — 1 jeu au choix parmi le catalogue (onglet Télécharger)"
             )
-            self._user_name_lbl.setStyleSheet(
-                "font-size: 13px; font-weight: 700; border: none; background: transparent; "
-                "padding: 2px 2px; color: #4ade80;"
-            )
+            self._user_name_btn_style("#4ade80")
             self._user_rank_lbl.setText("FREE")
             self._user_rank_lbl.setStyleSheet(
                 "font-size: 11px; font-weight: 600; border: none; background: transparent; "
                 "padding: 2px 0; color: #94a3b8; letter-spacing: 0.04em;"
             )
-        elif r in ("triple_monstre", "triplemonstre", "unlimited", "role_unlimited"):
+        elif bucket == "triple":
             self._user_bar_widget.setToolTip(
-                "TRIPLE MONSTRE — abonnement 1 mois : jeux Steam illimités au choix "
-                "(recherche par lien dans Télécharger). Le plan gratuit (4 jeux catalogue) ne s'applique pas."
+                "TRIPLE MONSTRE — palier le plus haut : jeux Steam illimites au choix "
+                "(recherche par lien dans Telecharger). Online FIX, ROCKSTAR BYPASS et sauvegardes cloud."
             )
             self._user_triple_anim_phase = 0
             self._tick_user_triple_name_color()
@@ -709,16 +840,30 @@ class SFFMainWindow(QMainWindow):
                 "font-size: 10px; font-weight: 800; border: none; background: transparent; "
                 "padding: 2px 0; color: #e9d5ff; letter-spacing: 0.1em;"
             )
-        else:
-            self._user_bar_widget.setToolTip("")
-            self._user_name_lbl.setStyleSheet(
-                "font-size: 13px; font-weight: 700; border: none; background: transparent; "
-                "padding: 2px 2px; color: #e8e8f0;"
+        elif bucket == "pass24h":
+            self._user_bar_widget.setToolTip(
+                "24H PASS — jusqu'a 8 jeux distincts sur ce PC via le launcher "
+                "(reinstaller un jeu deja en liste ne consomme pas de slot). "
+                "Pas d'Online FIX, pas de ROCKSTAR BYPASS ni sauvegardes cloud (reserves au Triple Monstre)."
             )
-            self._user_rank_lbl.setText(rank.strip() if rank else "?")
+            self._user_name_btn_style("#5eead4")
+            self._user_rank_lbl.setText("24H PASS")
             self._user_rank_lbl.setStyleSheet(
-                "font-size: 11px; font-weight: 600; border: none; background: transparent; "
-                "padding: 2px 0; color: #94a3b8; letter-spacing: 0.04em;"
+                "font-size: 10px; font-weight: 800; border: none; background: transparent; "
+                "padding: 2px 0; color: #2dd4bf; letter-spacing: 0.08em;"
+            )
+        else:
+            # bucket == "monstre" (ou rang payant non reconnu, traite comme Monstre)
+            self._user_bar_widget.setToolTip(
+                "MONSTRE — jusqu'a 10 jeux distincts sur ce PC via le launcher "
+                "(reinstaller un jeu deja en liste ne consomme pas de slot). "
+                "Pas d'Online FIX ni ROCKSTAR BYPASS (reserves au Triple Monstre). Pas de sauvegardes cloud."
+            )
+            self._user_name_btn_style("#fdba74")
+            self._user_rank_lbl.setText("MONSTRE")
+            self._user_rank_lbl.setStyleSheet(
+                "font-size: 11px; font-weight: 700; border: none; background: transparent; "
+                "padding: 2px 0; color: #fb923c; letter-spacing: 0.06em;"
             )
 
     def _on_auth_success(self, username: str, rank: str = "free"):
@@ -737,6 +882,165 @@ class SFFMainWindow(QMainWindow):
         self._logout_btn.setVisible(True)
         self._load_web_ui()
         self._web_ui_loaded = True
+        if self._profile_sync_timer is None:
+            self._profile_sync_timer = QTimer(self)
+            self._profile_sync_timer.setInterval(90_000)
+            self._profile_sync_timer.timeout.connect(self._on_profile_sync_tick)
+        if not self._profile_sync_timer.isActive():
+            self._profile_sync_timer.start()
+        QTimer.singleShot(2500, self._on_profile_sync_tick)
+
+    def _on_profile_sync_tick(self) -> None:
+        if self._authenticated and getattr(self, "_web_bridge", None):
+            self._web_bridge.sync_launcher_profile()
+
+    def _apply_rank_from_server(self, username: str, rank: str) -> None:
+        """Après un /verify : met à jour la barre du haut sans recharger la page web."""
+        if not self._authenticated:
+            return
+        if username:
+            self._current_username = username
+        self._current_rank = rank or "free"
+        self._set_user_bar_display(self._current_username, self._current_rank)
+
+    def _show_account_profile_dialog(self) -> None:
+        """Profil compte + lien portail Stripe pour abonnements payants."""
+        from datetime import datetime
+
+        from sff.gui.web_bridge import _load_auth, launcher_fetch_billing_portal
+        from sff.launcher_ranks import launcher_rank_bucket
+
+        auth = _load_auth()
+        uname = (self._current_username or auth.get("username") or "").strip()
+        rank = self._current_rank or auth.get("rank") or "free"
+        bucket = launcher_rank_bucket(rank)
+        plan_labels = {
+            "free": "Gratuit (catalogue)",
+            "triple": "Triple Monstre",
+            "pass24h": "Pass 24 h",
+            "monstre": "Monstre",
+        }
+        plan_human = plan_labels.get(bucket, str(rank))
+        re_raw = auth.get("rank_expires_at")
+        exp_line = ""
+        if re_raw is not None and str(re_raw).strip() != "":
+            try:
+                ts = int(re_raw)
+                if ts > 0:
+                    exp_line = datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M")
+            except (TypeError, ValueError, OSError):
+                exp_line = ""
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Mon compte SlimeDeals")
+        lay = QVBoxLayout(dlg)
+
+        body_html = (
+            f"<p style='margin-bottom:12px;'><b>Pseudo</b><br>{uname}</p>"
+            f"<p style='margin-bottom:12px;'><b>Palier</b><br>{plan_human}</p>"
+        )
+        info = QLabel(body_html)
+        info.setTextFormat(Qt.TextFormat.RichText)
+        lay.addWidget(info)
+
+        if bucket == "free" and auth.get("free_claimed"):
+            fc = QLabel(
+                f"<p><b>Jeu catalogue Free</b><br>App ID <code>{auth.get('free_claimed')}</code></p>"
+            )
+            fc.setTextFormat(Qt.TextFormat.RichText)
+            lay.addWidget(fc)
+
+        quota = self._user_bar_quota_text(rank)
+        if quota:
+            ql = QLabel(f"<p><b>Jeux distincts sur ce PC</b><br>{quota}</p>")
+            ql.setTextFormat(Qt.TextFormat.RichText)
+            lay.addWidget(ql)
+
+        if exp_line:
+            el = QLabel(f"<p><b>Fin de période affichée (rang)</b><br>{exp_line}</p>")
+            el.setTextFormat(Qt.TextFormat.RichText)
+            lay.addWidget(el)
+
+        hint = QLabel(
+            "Avec un abonnement payé via Stripe, ouvre le portail ci-dessous pour la carte, "
+            "les factures ou l’arrêt du renouvellement."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #94a3b8; font-size: 12px;")
+        lay.addWidget(hint)
+
+        btn_row = QHBoxLayout()
+        portal_btn = QPushButton("Gérer mon abonnement (Stripe)…")
+        portal_btn.setToolTip("Ouvre le portail client Stripe dans le navigateur")
+        close_btn = QPushButton("Fermer")
+        btn_row.addWidget(portal_btn)
+        btn_row.addStretch()
+        btn_row.addWidget(close_btn)
+        lay.addLayout(btn_row)
+
+        def _open_portal() -> None:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            try:
+                out = launcher_fetch_billing_portal()
+            finally:
+                QApplication.restoreOverrideCursor()
+            if not out.get("ok"):
+                QMessageBox.warning(
+                    dlg,
+                    "Portail Stripe",
+                    (out.get("error") or "Impossible de contacter le serveur."),
+                )
+                return
+            if not out.get("has_portal"):
+                QMessageBox.information(
+                    dlg,
+                    "Abonnement",
+                    "Aucun paiement Stripe n’est lié à ce compte logiciel.\n\n"
+                    "Si ton palier vient d’une invitation Discord ou d’une offre sans carte bancaire ici, "
+                    "il n’y a pas de portail de facturation.",
+                )
+                return
+            url = (out.get("url") or "").strip()
+            if url.startswith("http"):
+                QDesktopServices.openUrl(QUrl(url))
+
+        portal_btn.clicked.connect(_open_portal)
+        close_btn.clicked.connect(dlg.accept)
+
+        dlg.resize(440, 360)
+        dlg.exec()
+
+    def _poll_launcher_banner_tick(self):
+        import threading
+
+        def work():
+            try:
+                from sff.launcher_session import fetch_launcher_banner
+
+                data = fetch_launcher_banner()
+            except Exception:
+                data = None
+
+            def apply():
+                self._apply_launcher_banner_payload(data)
+
+            QTimer.singleShot(0, apply)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _apply_launcher_banner_payload(self, d):
+        if not isinstance(d, dict) or d.get("rev") is None:
+            return
+        try:
+            rev = int(d["rev"])
+        except (TypeError, ValueError):
+            return
+        if rev < 0:
+            return
+        if rev == self._last_banner_rev:
+            return
+        self._last_banner_rev = rev
+        self._news_ticker.set_message(str(d.get("text") or ""))
 
     def _do_logout(self):
         """Disconnect the user: wipe saved token and return to login page."""
@@ -748,6 +1052,8 @@ class SFFMainWindow(QMainWindow):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
+        if self._profile_sync_timer is not None and self._profile_sync_timer.isActive():
+            self._profile_sync_timer.stop()
         # Wipe saved auth
         from sff.gui.web_bridge import _clear_auth
         _clear_auth()
@@ -757,7 +1063,9 @@ class SFFMainWindow(QMainWindow):
         # Hide user info
         self._stop_user_triple_anim()
         self._user_bar_widget.setVisible(False)
-        self._user_name_lbl.setText("")
+        self._user_name_btn.setText("")
+        self._user_quota_lbl.setText("")
+        self._user_quota_lbl.setVisible(False)
         self._user_rank_lbl.setText("")
         self._user_bar_widget.setToolTip("")
         self._logout_btn.setVisible(False)
@@ -1126,6 +1434,21 @@ class SFFMainWindow(QMainWindow):
                 import logging
                 logging.getLogger(__name__).warning(f"Failed to reinit AppListManager: {e}")
         elif s == Settings.STEAM_PATH:
+            from sff.storage.settings import get_setting
+            new_path = (get_setting(Settings.STEAM_PATH) or "").strip()
+            if new_path:
+                p = Path(new_path)
+                self.steam_path = p
+                br = getattr(self, "_web_bridge", None)
+                if br is not None:
+                    br._steam_path = p
+                if hasattr(self.ui, "steam_path"):
+                    try:
+                        self.ui.steam_path = str(p)
+                    except Exception:
+                        pass
+                if getattr(self, "_authenticated", False):
+                    self._set_user_bar_display(self._current_username, self._current_rank)
             if parent_widget:
                 QMessageBox.information(
                     parent_widget,
@@ -1180,14 +1503,20 @@ class SFFMainWindow(QMainWindow):
         import json
         from sff.storage.settings import get_setting
         from sff.structs import Settings as _S
-        steam32_id = get_setting(_S.STEAM32_ID)
-        steam_path = getattr(self, 'steam_path', None)
+        steam32_id = (get_setting(_S.STEAM32_ID) or "").strip()
+        steam_path = (get_setting(_S.STEAM_PATH) or "").strip() or getattr(self, "steam_path", None)
+        if isinstance(steam_path, Path):
+            steam_path = str(steam_path)
+        elif steam_path:
+            steam_path = str(steam_path).strip()
         provider_config_raw = get_setting(_S.LAST_BACKUP_PROVIDER_CONFIG)
         if not steam32_id or not steam_path:
             return
         try:
             if provider_config_raw:
                 cfg = json.loads(provider_config_raw)
+                if str(cfg.get("provider", "")).lower() == "gdrive_api" and _launcher_auth_strictly_free():
+                    return
                 self._cloud_save_backup(cfg, steam_path, steam32_id)
             else:
                 self._local_save_backup(steam_path, steam32_id)

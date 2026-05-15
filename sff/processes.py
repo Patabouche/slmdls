@@ -20,15 +20,11 @@
 from functools import partial
 
 import logging
-
 import subprocess
-
+import sys
 import threading
-
 import time
-
 from pathlib import Path
-
 
 import psutil
 
@@ -51,6 +47,59 @@ def is_proc_running(process_name: str):
         except psutil.Error:
             pass
 
+    return False
+
+
+def _kill_steam_exe_windows_silent() -> None:
+    """taskkill + psutil, sans print (usage en arriere-plan)."""
+    try:
+        subprocess.run(
+            ["taskkill", "/F", "/IM", "steam.exe"],
+            capture_output=True,
+            timeout=10,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    except Exception as e:
+        logger.debug("taskkill steam.exe: %s", e)
+    try:
+        for proc in psutil.process_iter(["pid", "name"]):
+            try:
+                n = (proc.info.get("name") or "").lower()
+                if n == "steam.exe":
+                    proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except Exception as e:
+        logger.debug("psutil kill steam.exe: %s", e)
+
+
+def force_close_steam_client(*, wait_seconds: float = 16.0, poll: float = 0.4) -> bool:
+    """
+    Termine le client Steam pour que la bibliotheque recharge ACF / Lua / cles
+    sans redemarrage manuel par l'utilisateur.
+
+    Retourne True si steam.exe (Windows) ou Steam (Linux) semblait actif au depart.
+    """
+    if sys.platform == "win32":
+        if not is_proc_running("steam.exe"):
+            return False
+        _kill_steam_exe_windows_silent()
+        deadline = time.time() + wait_seconds
+        while time.time() < deadline and is_proc_running("steam.exe"):
+            time.sleep(poll)
+        if is_proc_running("steam.exe"):
+            logger.warning("Steam: steam.exe encore actif apres fermeture forcee")
+        else:
+            logger.info("Steam: client ferme pour appliquer le verrou d'abonnement")
+        return True
+    if sys.platform == "linux":
+        try:
+            from sff.linux.steam_process import kill_steam
+
+            return bool(kill_steam(print_fn=lambda *_a, **_k: None))
+        except Exception as e:
+            logger.debug("linux kill_steam: %s", e)
+            return False
     return False
 
 

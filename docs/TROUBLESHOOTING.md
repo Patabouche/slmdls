@@ -140,15 +140,15 @@ If the multiplayer fix needs a browser and you get a Chrome or ChromeDriver erro
 
 ---
 
-## Login failed (online-fix.me)
+## Login failed (multiplayer fix)
 
-Check your username and password on the online-fix.me website. If you can log in there, update your credentials in SteaMidra under Settings. Some games may no longer be available on the site.
+Check your username and password in **Settings** (they must match the account you use for the multiplayer fix flow). If the game is missing, it may no longer be published in the remote catalog.
 
 ---
 
 ## Download timeout or extraction failed
 
-Check your internet connection. Try disabling antivirus temporarily and run SteaMidra again. Make sure you have 7-Zip or WinRAR installed if SteaMidra needs to extract archives. If a download keeps failing, you can try downloading the fix manually from online-fix.me and extracting it into the game folder yourself.
+Check your internet connection. Try disabling antivirus temporarily and run SteaMidra again. Make sure you have 7-Zip or WinRAR installed if SteaMidra needs to extract archives. If a download keeps failing, try again later or use **Fixes & Bypasses** if a package is available there.
 
 ---
 

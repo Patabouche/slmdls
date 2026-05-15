@@ -1,5 +1,5 @@
-# Single requirements file — covers CLI, GUI (PyQt6), online-fix (Selenium), and Tor fallback.
-# Versions taken from requirements-consumer.txt (more recent); gui + online-fix merged in.
+# Single requirements file — covers CLI, GUI (PyQt6), multiplayer fix (Selenium), and Tor fallback.
+# Versions taken from requirements-consumer.txt (more recent); gui + multiplayer fix merged in.
 #
 # ---------------------------------------------------------------
 # INSTALLATION (two commands required due to steam urllib3 conflict)

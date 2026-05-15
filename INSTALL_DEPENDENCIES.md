@@ -19,7 +19,7 @@ pip install steam==1.4.4 --no-deps
 
 Why two commands? `steam==1.4.4` has a stale `urllib3<2` constraint that conflicts with Selenium 4.x. Using `--no-deps` skips that outdated check — steam works fine with urllib3 2.x at runtime.
 
-`requirements.txt` covers everything in one file: CLI, GUI (PyQt6), online-fix (Selenium), and Tor fallback (`torpy`).
+`requirements.txt` covers everything in one file: CLI, GUI (PyQt6), multiplayer fix (Selenium), and Tor fallback (`torpy`).
 
 ## Avoid Dependency Conflicts
 
@@ -35,7 +35,7 @@ pip install steam==1.4.4 --no-deps
 ## What Gets Installed
 
 - **httpx** — HTTP client for web requests
-- **beautifulsoup4 / lxml** — HTML parsing for online-fix
+- **beautifulsoup4 / lxml** — HTML parsing for multiplayer fix and related web flows
 - **selenium** — Browser automation for multiplayer fix (Chrome required)
 - **seleniumbase** — UC mode for SteamDB Cloudflare bypass (Layer 3)
 - **curl_cffi** — Chrome impersonation for SteamDB fast path (Layer 1)
@@ -45,7 +45,7 @@ pip install steam==1.4.4 --no-deps
 - **google-auth / google-auth-oauthlib / google-api-python-client** — Google Drive cloud save support
 - All other transitive dependencies
 
-## Multiplayer fix (online-fix.me)
+## Multiplayer fix
 
 The **Apply multiplayer fix** option uses Selenium + Chrome. Chrome browser must be installed separately.
 

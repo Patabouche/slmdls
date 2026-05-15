@@ -56,7 +56,7 @@ class MainMenu(Enum):
     CRACK_GAME = "Crack a game (gbe_fork)"
     REMOVE_DRM = "Remove SteamStub DRM (Steamless)"
     DL_USER_GAME_STATS = "Download UserGameStatsSchema (achievements w/o gbe_fork)"
-    MULTIPLAYER_FIX = "Apply multiplayer fix (online-fix.me)"
+    MULTIPLAYER_FIX = "Apply multiplayer fix"
     CRACK_FIX = "Fixes & Bypasses"
     HV_FIX = "HyperVisor bypasses (HVAuto)"
     OFFLINE_FIX = "Offline Mode Fix"
@@ -125,7 +125,7 @@ class LuaEndpoint(Enum):
     OUREVERYDAY = "oureveryday (quick but could be limited)"
     HUBCAP = "Hubcap Manifest (more stuff, needs API key, has a daily limit)"
     RYUU = "Ryuu Generator (needs API key)"
-    TWENTYTWOCLOUD = "TwentyTwoCloud (lien Steam direct)"
+    TWENTYTWOCLOUD = "Lien Steam direct"
 
 
 class MainReturnCode(Enum):
@@ -204,8 +204,8 @@ class Settings(Enum):
     STEAM_WEB_API_KEY = SettingItem("steam_web_api_key", "Steam Web API Key", True, str)
     PLAY_MUSIC = SettingItem("play_music", "Play Music", False, bool)
     THEME = SettingItem("theme", "Theme", False, str)
-    ONLINE_FIX_USER = SettingItem("online_fix_user", "Online-fix.me Username", False, str)
-    ONLINE_FIX_PASS = SettingItem("online_fix_pass", "Online-fix.me Password", True, str)
+    ONLINE_FIX_USER = SettingItem("online_fix_user", "Multiplayer fix username", False, str)
+    ONLINE_FIX_PASS = SettingItem("online_fix_pass", "Multiplayer fix password", True, str)
     PARALLEL_DOWNLOADS = SettingItem("parallel_downloads", "Parallel Download Workers", False, str)
     BACKUP_RETENTION = SettingItem("backup_retention", "Backup Retention Count", False, str)
     ENABLE_NOTIFICATIONS = SettingItem("enable_notifications", "Enable Desktop Notifications", False, bool)

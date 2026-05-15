@@ -1,4 +1,4 @@
-﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
+# SlimeDeals - Steam game setup and manifest tool (SFF)
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 #
 # This file is part of SlimeDeals.
@@ -44,7 +44,7 @@ from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
 from sff.steam_path import validate_steam_path
 from sff.storage.settings import get_setting, set_setting
 from sff.structs import OSType, Settings
-from sff.utils import root_folder
+from sff.utils import iter_application_icon_files, root_folder
 
 try:
     _root = root_folder(outside_internal=True)
@@ -101,6 +101,16 @@ def main():
         from sff.i18n import set_language
         set_language(str(lang))
 
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            # Avant toute fenêtre : groupe la barre des tâches sur notre appli (pas l'icône Python générique).
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "SlimeDeals.SFF.Launcher.1"
+            )
+        except Exception:
+            pass
+
     app = QApplication(sys.argv)
     app.setApplicationName("SlimeDeals")
     app.setApplicationDisplayName("SlimeDeals")
@@ -111,8 +121,8 @@ def main():
         sys.exit(0)
 
     _app_icon = QIcon()
-    for _ic in ("SFF.ico", "SFF.png"):
-        _candidate = QIcon(str(Path(_ic)))
+    for _path in iter_application_icon_files():
+        _candidate = QIcon(str(_path))
         if not _candidate.isNull():
             _app_icon = _candidate
             break
@@ -163,6 +173,8 @@ def main():
     app.setQuitOnLastWindowClosed(False)
 
     window = SFFMainWindow(ui, steam_path)
+    if not _app_icon.isNull():
+        window.setWindowIcon(_app_icon)
     window.show()
 
     from sff.tray_icon import TrayIcon

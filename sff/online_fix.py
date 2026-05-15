@@ -17,7 +17,7 @@
 # along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Online-fix.me integration for multiplayer fixes.
+Téléchargement et application de correctifs multijoueur (sources distantes).
 Smart Matching Hybrid Model: selenium login + container-aware link discovery + recursive frame-piercing.
 Includes a strict 50% match threshold to avoid false positives (like "thank you" links).
 """
@@ -44,22 +44,105 @@ from sff.utils import root_folder
 
 logger = logging.getLogger(__name__)
 
+
+def _safe_log_fragment(s: str) -> str:
+    """Evite UnicodeEncodeError sur consoles Windows (cp1252) pour les logs."""
+    if not s:
+        return ""
+    try:
+        import sys
+
+        enc = getattr(getattr(sys, "stderr", None), "encoding", None) or "utf-8"
+    except Exception:
+        enc = "utf-8"
+    try:
+        return str(s).encode(enc, errors="replace").decode(enc, errors="replace")
+    except Exception:
+        return str(s).encode("ascii", errors="replace").decode("ascii")
+
+
+def _title_match_score(game_name: str, anchor_text: str) -> float:
+    """Score 0–1 entre le nom du jeu et le texte du lien (réduit faux positifs type RoadCraft vs Raft)."""
+    g = (game_name or "").strip().lower()
+    t = (anchor_text or "").strip().lower()
+    if not g or not t:
+        return 0.0
+    base = SequenceMatcher(None, g, t).ratio()
+    tokens = re.split(r"[^\w\u0400-\u04FF]+", t)
+    tokens = [x for x in tokens if x]
+    if g in tokens:
+        return max(base, 0.93)
+    if t == g or t.startswith(g + " ") or t.startswith(g + "("):
+        return max(base, 0.91)
+    if len(g) >= 6 and g in t:
+        return max(base, 0.78)
+    return base
+
+
+MSG_NO_ONLINE_FIX = "Nous n'avons pas trouvé de correctif multijoueur pour ce jeu."
+
+# Fallback interne : AppID Steam -> URL d'article (si la recherche ne remonte pas le jeu).
+ONLINE_FIX_DIRECT_PAGE_BY_STEAM_APPID: dict[str, str] = {
+    "648800": "https://online-fix.me/games/survival/16179-raft-po-seti.html",
+}
+
+
+def _direct_online_fix_page_url(app_id, game_name: str) -> str | None:
+    """URL d'article à ouvrir directement si la recherche échoue (ex. Raft)."""
+    aid = str(app_id).strip() if app_id is not None else ""
+    if aid in ONLINE_FIX_DIRECT_PAGE_BY_STEAM_APPID:
+        return ONLINE_FIX_DIRECT_PAGE_BY_STEAM_APPID[aid]
+    if (game_name or "").strip().lower() == "raft":
+        return ONLINE_FIX_DIRECT_PAGE_BY_STEAM_APPID.get("648800")
+    return None
+
 CREDENTIALS_FILE = "credentials.json"
 ONLINE_FIX_BASE_URL = "https://online-fix.me"
 
 def _get_credentials_path(): return root_folder() / CREDENTIALS_FILE
 
+
+def _embedded_online_fix_credentials():
+    """Identifiants fournis avec la build (online_fix_embed*.py)."""
+    for mod_name in ("sff.online_fix_embed_local", "sff.online_fix_embed"):
+        try:
+            mod = __import__(mod_name, fromlist=["USER"])
+        except ImportError:
+            continue
+        u = (getattr(mod, "USER", "") or "").strip()
+        p = (getattr(mod, "PASSWORD", "") or "").strip()
+        if u and p:
+            return u, p
+    return None, None
+
+
+def online_fix_has_embedded_credentials() -> bool:
+    u, p = _embedded_online_fix_credentials()
+    return bool(u and p)
+
+
 def _read_credentials():
     username = get_setting(Settings.ONLINE_FIX_USER)
     password = get_setting(Settings.ONLINE_FIX_PASS)
-    if username and password: return username, password
+    if username and password:
+        return username, password
     cred_path = _get_credentials_path()
     if cred_path.exists():
         try:
             with open(cred_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return data.get("username"), data.get("password")
-        except Exception: pass
+                u, p = data.get("username"), data.get("password")
+                if u and p:
+                    return u, p
+        except Exception:
+            pass
+    eu, ep = _embedded_online_fix_credentials()
+    if eu and ep:
+        try:
+            _save_credentials(eu, ep)
+        except Exception:
+            pass
+        return eu, ep
     return None, None
 
 def _save_credentials(username, password):
@@ -85,13 +168,13 @@ def _download_with_session(url, cookies_list, user_agent, save_path):
             with httpx.stream("GET", url, cookies=cookies, headers=headers, follow_redirects=True, timeout=None) as response:
                 if response.status_code in (403, 404):
                     if _attempt < 2:
-                        print(f"{Fore.YELLOW}⚠ Server returned {response.status_code}, retrying ({_attempt + 1}/3)...{Style.RESET_ALL}")
+                        print(f"{Fore.YELLOW}[!] Server returned {response.status_code}, retrying ({_attempt + 1}/3)...{Style.RESET_ALL}")
                         time.sleep(3)
                         continue
-                    print(f"{Fore.RED}✗ Connection rejected by file server: {response.status_code}{Style.RESET_ALL}")
+                    print(f"{Fore.RED}[X] Connection rejected by file server: {response.status_code}{Style.RESET_ALL}")
                     return False
                 if response.status_code != 200:
-                    print(f"{Fore.RED}✗ Connection rejected by file server: {response.status_code}{Style.RESET_ALL}")
+                    print(f"{Fore.RED}[X] Connection rejected by file server: {response.status_code}{Style.RESET_ALL}")
                     return False
                 try: total = int(response.headers.get("Content-Length", "0"))
                 except (ValueError, TypeError): total = 0
@@ -100,7 +183,7 @@ def _download_with_session(url, cookies_list, user_agent, save_path):
                         f.write(chunk); pbar.update(len(chunk))
             return True
         except Exception as e:
-            print(f"{Fore.RED}✗ Download stream interrupted: {e}{Style.RESET_ALL}"); return False
+            print(f"{Fore.RED}[X] Download stream interrupted: {e}{Style.RESET_ALL}"); return False
     return False
 
 def _run_extraction_with_timeout(cmd, timeout=300):
@@ -136,9 +219,9 @@ def _extract_archive_with_backup(archive, target, atype, apath, game_name, pwd="
                 except Exception: pass
         for rel, src in extracted.items():
             dest = os.path.join(target, rel); os.makedirs(os.path.dirname(dest), exist_ok=True); shutil.move(src, dest)
-        print(f"{Fore.GREEN}✓ Fix applied successfully!{Style.RESET_ALL}"); return True
+        print(f"{Fore.GREEN}[OK] Fix applied successfully!{Style.RESET_ALL}"); return True
     except Exception as e:
-        print(f"{Fore.RED}✗ Installation error: {e}. Recovering...{Style.RESET_ALL}")
+        print(f"{Fore.RED}[X] Installation error: {e}. Recovering...{Style.RESET_ALL}")
         for o, b in backed_up: 
             try: 
                 if os.path.exists(o): os.remove(o)
@@ -182,16 +265,42 @@ def _find_archives_recursive(driver):
     except Exception: pass
     return results
 
-def _run_multiplayer_fix_process(game_name, game_folder, username, password, atype, apath):
+def _run_multiplayer_fix_process(game_name, game_folder, username, password, atype, apath, app_id=None):
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
-    from selenium.common.exceptions import TimeoutException
 
-    driver = None; THRESHOLD = 0.5
+    driver = None
+    THRESHOLD = 0.5
+
+    def _best_anchor_match():
+        try:
+            wait.until(EC.presence_of_element_located((By.ID, "dle-content")))
+        except Exception:
+            pass
+        g = (game_name or "").strip().lower()
+        anchors = driver.find_elements(By.CSS_SELECTOR, "div#dle-content a")
+        if not anchors:
+            anchors = driver.find_elements(By.TAG_NAME, "a")
+        best_a = None
+        best_ratio = 0.0
+        for a in anchors:
+            try:
+                txt = (a.text or "").strip()
+                href = a.get_attribute("href") or ""
+                if "/page/" in href or "/user/" in href or not txt:
+                    continue
+                r = _title_match_score(g, txt)
+                if r > best_ratio:
+                    best_ratio = r
+                    best_a = a
+            except Exception:
+                pass
+        return best_a, best_ratio
+
     try:
         print()
         print(Fore.CYAN + "============================================================" + Style.RESET_ALL)
@@ -201,34 +310,59 @@ def _run_multiplayer_fix_process(game_name, game_folder, username, password, aty
         opts.add_argument("--window-size=1280,800"); opts.add_argument("--headless=new")
         opts.add_argument("--log-level=3"); opts.add_argument("--no-sandbox"); opts.add_argument("--disable-gpu")
         driver = webdriver.Chrome(options=opts); wait = WebDriverWait(driver, 15)
-        print(Fore.GREEN + "✓ Secure engine ready" + Style.RESET_ALL)
-        # Searching with explicit Story query
-        driver.get(f"https://online-fix.me/index.php?do=search&subaction=search&story={quote(re.sub(r'[^\w\s]', '', game_name))}")
-        # QUALITY GATE: Restrict search to dle-content to avoid "thank you" links in footers/sidebars
-        try: wait.until(EC.presence_of_element_located((By.ID, "dle-content")))
-        except Exception: pass
-        best = None; best_r = 0.0
-        # Only scan anchors INSIDE the search content area
-        anchors = driver.find_elements(By.CSS_SELECTOR, "div#dle-content a")
-        if not anchors: 
-             # Fallback to the broad search only if container is missing (old site layout)
-             anchors = driver.find_elements(By.TAG_NAME, "a")
-        for a in anchors:
-            try:
-                txt = (a.text or "").strip().lower()
-                href = a.get_attribute("href") or ""
-                # Skip pagination, profile, and non-game links
-                if "/page/" in href or "/user/" in href or not txt: continue
-                r = SequenceMatcher(None, game_name.lower(), txt).ratio()
-                if r > best_r: best_r = r; best = a
-            except Exception: pass
+        print(Fore.GREEN + "[OK] Secure engine ready" + Style.RESET_ALL)
+        q = quote(re.sub(r"[^\w\s]", "", game_name))
+        driver.get(f"{ONLINE_FIX_BASE_URL}/index.php?do=search&subaction=search&story={q}")
+        best, best_r = _best_anchor_match()
+
+        aid = str(app_id).strip() if app_id is not None else ""
+        if aid.isdigit() and int(aid) > 0 and (not best or best_r < THRESHOLD):
+            logger.debug("mpfix: second pass search by Steam app id %s", aid)
+            driver.get(f"{ONLINE_FIX_BASE_URL}/index.php?do=search&subaction=search&story={quote(aid)}")
+            time.sleep(1.2)
+            b2, r2 = _best_anchor_match()
+            if b2 and r2 > best_r:
+                best, best_r = b2, r2
+
+        direct_url = _direct_online_fix_page_url(app_id, game_name)
+        used_direct_article = False
         if not best or best_r < THRESHOLD:
-            reason = f"No legitimate results found. Best was '{best.text.strip()}' ({best_r*100:.0f}%)" if best else "No results found"
-            print(Fore.RED + f"✗ {reason}. Search likely failed." + Style.RESET_ALL)
-            return False
-        print(Fore.GREEN + f"✓ Target verified: {best.text.strip()} ({best_r*100:.0f}%)" + Style.RESET_ALL)
-        driver.execute_script("arguments[0].click();", best)
-        time.sleep(2)
+            if direct_url:
+                logger.info("multiplayer fix: opening fallback curated article (search miss)")
+                driver.get(direct_url)
+                time.sleep(1.8)
+                try:
+                    wait.until(EC.presence_of_element_located((By.ID, "dle-content")))
+                except Exception:
+                    pass
+                used_direct_article = True
+            else:
+                reason = (
+                    f"No legitimate results found. Best was '{best.text.strip()}' ({best_r*100:.0f}%)"
+                    if best
+                    else "No results found"
+                )
+                logger.debug("mpfix search: %s", _safe_log_fragment(reason))
+                print(Fore.RED + MSG_NO_ONLINE_FIX + Style.RESET_ALL)
+                return False
+
+        if used_direct_article:
+            print(
+                Fore.GREEN
+                + "[OK] Article cible (correspondance directe — "
+                + _safe_log_fragment(game_name or "jeu")
+                + ")"
+                + Style.RESET_ALL
+            )
+            time.sleep(1)
+        else:
+            print(
+                Fore.GREEN
+                + f"[OK] Target verified: {_safe_log_fragment(best.text.strip())} ({best_r*100:.0f}%)"
+                + Style.RESET_ALL
+            )
+            driver.execute_script("arguments[0].click();", best)
+            time.sleep(2)
         # Authentication
         if driver.find_elements(By.NAME, "login_name"):
             print(Fore.CYAN + "Authenticating session..." + Style.RESET_ALL)
@@ -286,7 +420,7 @@ def _run_multiplayer_fix_process(game_name, game_folder, username, password, aty
                                     logger.debug("Subdir scan %s: %s", _sd, _e2)
                         if _found:
                             archives = _found
-                            print(Fore.GREEN + "✓ Archives found via httpx redirect follow (ad bypassed)" + Style.RESET_ALL)
+                            print(Fore.GREEN + "[OK] Archives found via httpx redirect follow (ad bypassed)" + Style.RESET_ALL)
             except Exception as _e:
                 logger.debug("httpx bypass attempt: %s", _e)
         if not archives:
@@ -298,13 +432,13 @@ def _run_multiplayer_fix_process(game_name, game_folder, username, password, aty
                 driver.switch_to.window(h)
                 if "uploads.online-fix.me" in driver.current_url.lower(): break
             logger.debug("File server URL: %s", driver.current_url)
-            print(Fore.YELLOW + "⚠ Waiting for Cloudflare/server resolution (up to 30s)..." + Style.RESET_ALL)
+            print(Fore.YELLOW + "[!] Waiting for Cloudflare/server resolution (up to 30s)..." + Style.RESET_ALL)
             start_wait = time.time()
             while (time.time() - start_wait) < 30:
                 # Check for 401 Unauthorized or login screen on server
                 src = driver.page_source or ""
                 if "401 Authorization Required" in src or "Log in to go to the folder" in src:
-                     print(Fore.RED + "✗ Access denied by file server (Session Sync Failed)." + Style.RESET_ALL)
+                     print(Fore.RED + "[X] Access denied by file server (Session Sync Failed)." + Style.RESET_ALL)
                      return False
                 # Refresh on transient 403/404 from the server
                 if "403 Forbidden" in src or "404 Not Found" in src:
@@ -318,7 +452,8 @@ def _run_multiplayer_fix_process(game_name, game_folder, username, password, aty
                 except Exception: pass
                 time.sleep(2)
         if not archives:
-            print(Fore.RED + "✗ No download files located. Directory listing might be empty." + Style.RESET_ALL)
+            logger.debug("mpfix: no archive files on file server listing")
+            print(Fore.RED + MSG_NO_ONLINE_FIX + Style.RESET_ALL)
             return False
         archives.sort(key=lambda x: x[0], reverse=True); target_url = archives[0][1]
         print()
@@ -333,26 +468,42 @@ def _run_multiplayer_fix_process(game_name, game_folder, username, password, aty
             return success
         return False
     except Exception as e:
-        print(Fore.RED + f"✗ Search/Navigation failed: {e}{Style.RESET_ALL}"); return False
+        print(Fore.RED + f"[X] Search/Navigation failed: {e}{Style.RESET_ALL}"); return False
     finally:
         if driver: driver.quit()
 
-def apply_multiplayer_fix(game_name, game_folder):
+def apply_multiplayer_fix(game_name, game_folder, app_id=None):
     username, password = _read_credentials()
-    if not username:
-        username = prompt_text("\nOnline-fix Username:"); password = prompt_secret("Password:")
-        if not username: return False
-        _save_credentials(username, password)
+    if not username or not password:
+        import sys
+        if sys.stdin.isatty():
+            username = prompt_text("\nMultiplayer fix username:")
+            password = prompt_secret("Password:")
+            if not username or not password:
+                return False
+            _save_credentials(username, password)
+        else:
+            print(
+                Fore.RED
+                + "[X] Compte multijoueur indisponible : aucun identifiant intégré ni enregistré."
+                + Style.RESET_ALL
+            )
+            return False
     atype, apath = _detect_archiver()
     if not atype:
-        print(Fore.RED + "✗ No archive tool found. Install 7-Zip or WinRAR to apply the fix." + Style.RESET_ALL)
+        print(Fore.RED + "[X] No archive tool found. Install 7-Zip or WinRAR to apply the fix." + Style.RESET_ALL)
         return False
     # Pre-flight: verify site is reachable before launching ChromeDriver
-    print(Fore.CYAN + "Checking connectivity to online-fix.me..." + Style.RESET_ALL)
+    print(Fore.CYAN + "Checking network connectivity..." + Style.RESET_ALL)
     try:
         httpx.get(ONLINE_FIX_BASE_URL, timeout=10, follow_redirects=True)
     except Exception as _conn_err:
-        print(Fore.RED + "✗ Cannot reach online-fix.me. Check your internet connection, disable VPN if active, and verify the site is accessible in your browser." + Style.RESET_ALL)
-        logger.debug("online-fix.me pre-flight failed: %s", _conn_err)
+        print(
+            Fore.RED
+            + "[X] Connexion impossible au service multijoueur. Verifie ta connexion internet, "
+            "desactive le VPN si besoin, et reessaie."
+            + Style.RESET_ALL
+        )
+        logger.debug("multiplayer fix pre-flight failed: %s", _safe_log_fragment(str(_conn_err)))
         return False
-    return _run_multiplayer_fix_process(game_name, game_folder, username, password, atype, apath)
+    return _run_multiplayer_fix_process(game_name, game_folder, username, password, atype, apath, app_id)

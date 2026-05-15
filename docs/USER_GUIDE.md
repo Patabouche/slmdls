@@ -35,7 +35,7 @@ Providers:
   5. Select your remote from the dropdown or type it in, then click **Test** to confirm it works.
   6. Click **Save Provider Config**, then back up normally.
 
-**All Save Locations** (at the bottom of the tab): click Scan All to find saves across all known emu save paths — CODEX, EMPRESS, RUNE, OnlineFix, Goldberg, GSE, and Steam userdata. Check the rows you want, pick a destination, and click Backup. To restore, scan an existing backup root and pick a location and game from the dropdowns.
+**All Save Locations** (at the bottom of the tab): click Scan All to find saves across all known emu save paths — CODEX, EMPRESS, RUNE, public patch-save folders, Goldberg, GSE, and Steam userdata. Check the rows you want, pick a destination, and click Backup. To restore, scan an existing backup root and pick a location and game from the dropdowns.
 
 **Settings** — change theme (11+ options), Steam path, API keys, AppList profiles, and all other preferences. Settings apply immediately. Language changes take effect without restarting the app.
 
@@ -142,12 +142,12 @@ Some games have SteamStub DRM that causes them to fail when launched without Ste
 ### Download UserGameStatsSchema
 Downloads the achievements schema for a game. Uncracked games can use Steam's own achievement system when running in Offline Mode. Use this to create the files needed for that.
 
-### Apply multiplayer fix (online-fix.me)
-Logs into online-fix.me, finds the fix for your game, downloads it, and extracts it into the game folder. You need an account on online-fix.me. SteaMidra stores your credentials securely after the first use. See [Multiplayer Fix](MULTIPLAYER_FIX.md) for more detail.
+### Apply multiplayer fix
+Logs in, finds a multiplayer fix for your game, downloads it, and extracts it into the game folder. An account may be required unless your build ships with embedded credentials. SteaMidra stores your credentials securely after the first use. See [Multiplayer Fix](MULTIPLAYER_FIX.md) for more detail.
 
 
 ### Fixes & Bypasses
-Searches a curated fix list for a fix or bypass for your game. No account needed — SteaMidra fetches the list, lets you search with fuzzy matching, downloads the fix, and extracts it straight into the game folder. This is a second source of fixes that often covers games not found on online-fix.me. See [Fixes & Bypasses](CRACK_FIX.md) for more detail.
+Searches a curated fix list for a fix or bypass for your game. No account needed — SteaMidra fetches the list, lets you search with fuzzy matching, downloads the fix, and extracts it straight into the game folder. This is a second source of fixes that often covers games the multiplayer fix flow does not list. See [Fixes & Bypasses](CRACK_FIX.md) for more detail.
 
 ### Offline Mode Fix
 GreenLuma has a bug where Steam gets stuck if launched in Offline Mode. This toggles the Offline Mode flag in Steam's loginusers.vdf for the selected user so you can get back to Online Mode.
@@ -215,10 +215,10 @@ Two modes:
 
 ## Tips
 
-- **Use full game names** when searching online-fix.me (e.g. "Counter-Strike: Global Offensive" not "CS:GO").
-- **Fixes & Bypasses** — if a game isn't found on online-fix.me, try the **Fixes & Bypasses** option. It has a broader fix list and no account required.
+- **Use full game names** when searching for a multiplayer fix (e.g. "Counter-Strike: Global Offensive" not "CS:GO").
+- **Fixes & Bypasses** — if the multiplayer fix flow does not find your game, try the **Fixes & Bypasses** option. It has a broader fix list and no account required.
 - **Language** — change the GUI display language in Settings → Language.
-- **Credentials** for online-fix.me are stored encrypted after the first use. Update them in Settings if they change.
+- **Multiplayer fix credentials** are stored encrypted after the first use. Update them in Settings if they change.
 - **If Steam path is wrong**, go to Settings → Steam Installation Path and set it manually to the folder containing steam.exe.
 - **Antivirus** may flag files downloaded by SteaMidra (false positives are common with game-related tools). Exclude the SteaMidra folder and `sff\dlc_unlockers\resources` from Windows Security if needed.
 - **Run as administrator** if you get permission errors.

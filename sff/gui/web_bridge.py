@@ -34,8 +34,20 @@ import time
 import urllib.request
 import urllib.error
 from pathlib import Path
+from typing import Callable, Optional
 
-from PyQt6.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
+from sff.log_redact import redact_sensitive_log_text
+
+from sff.launcher_ranks import (
+    MONSTRE_MAX_DISTINCT_INSTALLS,
+    PASS24H_MAX_DISTINCT_INSTALLS,
+    cloud_saves_launcher_allowed_for_rank,
+    launcher_rank_bucket as _launcher_rank_bucket,
+    norm_launcher_rank as _norm_saved_launcher_rank,
+    triple_exclusive_tools_allowed_for_rank,
+)
+
+from PyQt6.QtCore import QObject, QThread, Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QFileDialog
 
 logger = logging.getLogger(__name__)
@@ -46,6 +58,16 @@ _AUTH_FILE  = Path.home() / ".slimedeals" / "auth.json"
 # Deep-link salon #avis (https://discord.com/channels/<guild>/<channel>). Sinon → invite.
 _SLIMEDEALS_DISCORD_GUILD_ID = os.getenv("SLIMEDEALS_DISCORD_GUILD_ID", "").strip()
 _DISCORD_AVIS_CHANNEL_ID = "1502728174356660274"
+# Salon « abonnement gratuit » (deep-link si SLIMEDEALS_DISCORD_GUILD_ID défini)
+_DISCORD_FREE_SUB_CHANNEL_ID = "1501929971764166677"
+
+
+def _log_download_source(source: str) -> str:
+    """Libellé neutre pour les journaux (pas de nom de fournisseur tiers)."""
+    s = (source or "").strip().lower()
+    if s == "twentytwocloud":
+        return "catalogue"
+    return s or "auto"
 
 
 def _get_hwid() -> str:
@@ -78,19 +100,74 @@ def _api_post(path: str, payload: dict) -> dict:
             body = json.loads(e.read().decode())
         except Exception:
             body = {}
-        return {"ok": False, "error": body.get("error", f"Erreur HTTP {e.code}")}
+        err_msg = body.get("error", f"Erreur HTTP {e.code}")
+        return {"ok": False, "error": err_msg, "http_status": e.code}
     except Exception as exc:
-        return {"ok": False, "error": f"Serveur injoignable : {exc}"}
+        logger.debug("api_post: %s", redact_sensitive_log_text(str(exc)))
+        return {"ok": False, "error": "Serveur injoignable"}
 
 
-def _save_auth(token: str, username: str, rank: str = "free", free_claimed=None) -> None:
+def _notify_launcher_gen_activity(app_id: str, ui_log: Optional[Callable[[str], None]] = None) -> None:
+    """Notifie Discord (salon activité) après une installation — FREE, Monstre ou Triple Monstre uniquement."""
+
+    def _u(msg: str) -> None:
+        if ui_log:
+            try:
+                ui_log(msg)
+            except Exception:
+                pass
+        logger.debug("[Discord activité] %s", msg)
+
+    aid = str(app_id).strip()
+    if not aid.isdigit():
+        _u("Notification d’activité ignorée : identifiant de jeu invalide.")
+        return
+    saved = _load_auth()
+    token = (saved.get("token") or "").strip()
+    if not token:
+        _u("Notification d’activité ignorée : connecte-toi dans le launcher pour activer les annonces.")
+        return
+    _u("Envoi de la notification d’activité sur Discord…")
+    out = _api_post(
+        "/api/launcher/notify-gen",
+        {"token": token, "hwid": _get_hwid(), "app_id": aid},
+    )
+    if not out.get("ok") or not out.get("sent"):
+        http_st = out.get("http_status")
+        err = out.get("error") or out.get("reason") or ""
+        if http_st == 404 or "404" in str(err):
+            _u(
+                "La notification d’activité sur Discord n’a pas pu être envoyée "
+                "(service temporairement indisponible). Réessaie plus tard."
+            )
+        else:
+            _u("La notification d’activité sur Discord n’a pas pu être envoyée (erreur réseau ou serveur).")
+    else:
+        _u("Notification d’activité sur Discord envoyée.")
+
+
+def _save_auth(
+    token: str,
+    username: str,
+    rank: str = "free",
+    free_claimed=None,
+    rank_expires_at=None,
+) -> None:
     _AUTH_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _AUTH_FILE.write_text(json.dumps({
+    payload = {
         "token": token,
         "username": username,
         "rank": rank,
         "free_claimed": free_claimed,
-    }))
+        "rank_expires_at": rank_expires_at,
+    }
+    _AUTH_FILE.write_text(json.dumps(payload))
+    try:
+        from sff.launcher_session import invalidate_launcher_verify_cache
+
+        invalidate_launcher_verify_cache()
+    except Exception:
+        pass
 
 
 def _load_auth() -> dict:
@@ -105,19 +182,27 @@ def _clear_auth() -> None:
         _AUTH_FILE.unlink(missing_ok=True)
     except Exception:
         pass
+    try:
+        from sff.launcher_session import invalidate_launcher_verify_cache
+
+        invalidate_launcher_verify_cache()
+    except Exception:
+        pass
 
 
 # Jeux catalogue plan FREE (doit rester aligné avec le bot / store.js)
 _LAUNCHER_FREE_CATALOG_IDS = frozenset({"2416450", "284160", "3241660", "1943950"})
 
+_CLOUD_SAVES_DENIED_MSG = (
+    "Les sauvegardes cloud Google Drive sont reservees au plan Triple Monstre "
+    "(pas au plan Monstre ni au plan FREE). Voir slimedeals.fr/#tarifs."
+)
 
-def _norm_saved_launcher_rank(rank) -> str:
-    if rank is None:
-        return "free"
-    r = str(rank).strip().lower().replace(" ", "_")
-    if not r or r in ("none", "null"):
-        return "free"
-    return r
+
+def _cloud_saves_feature_allowed() -> bool:
+    """Sauvegardes cloud : Triple Monstre uniquement."""
+    saved = _load_auth()
+    return cloud_saves_launcher_allowed_for_rank(saved.get("rank"))
 
 
 def _launcher_free_catalog_download_allowed(app_id: str) -> tuple[bool, str]:
@@ -129,7 +214,7 @@ def _launcher_free_catalog_download_allowed(app_id: str) -> tuple[bool, str]:
     if aid not in _LAUNCHER_FREE_CATALOG_IDS:
         return False, (
             "Plan FREE : seuls les 4 jeux du catalogue (onglet « Télécharger ») sont autorisés. "
-            "Passe au rang Triple Monstre pour installer n'importe quel jeu Steam."
+            "Passe a un abonnement Monstre ou Triple Monstre pour installer n'importe quel jeu Steam."
         )
     claimed = saved.get("free_claimed")
     if claimed is None or str(claimed).strip() != aid:
@@ -138,6 +223,18 @@ def _launcher_free_catalog_download_allowed(app_id: str) -> tuple[bool, str]:
             "« Choisir ce jeu » pour enregistrer ta réclamation, puis lance l'installation."
         )
     return True, ""
+
+
+def launcher_fetch_billing_portal() -> dict:
+    """Demande une URL de portail Stripe pour le compte connecté (abonnement payant lié)."""
+    saved = _load_auth()
+    token = (saved.get("token") or "").strip()
+    if not token:
+        return {"ok": False, "error": "Non connecté"}
+    return _api_post(
+        "/api/launcher/billing-portal",
+        {"token": token, "hwid": _get_hwid()},
+    )
 
 
 def launcher_verify_saved_token() -> dict:
@@ -165,8 +262,9 @@ class _Worker(QObject):
             result = self._func(*self._args, **self._kwargs)
             self.finished.emit(result)
         except Exception as e:
-            logger.exception("Worker error: %s", e)
-            self.error.emit(str(e))
+            safe = redact_sensitive_log_text(str(e))
+            logger.warning("Worker error (%s): %s", type(e).__name__, safe)
+            self.error.emit(safe)
             self.finished.emit(None)
 
 
@@ -183,6 +281,9 @@ class WebBridge(QObject):
     log_message = pyqtSignal(str)
     ttc_game_info   = pyqtSignal(str)
     auth_done       = pyqtSignal(str)   # emitted with username after successful login
+    launcher_profile_synced = pyqtSignal(str)  # JSON {ok, rank?, free_claimed?, username?} après /verify
+    # Notification Discord d’activité : traitement sur le thread UI uniquement
+    request_notify_gen = pyqtSignal(str)
 
     def __init__(self, ui, steam_path, parent=None):
         super().__init__(parent)
@@ -192,6 +293,38 @@ class WebBridge(QObject):
         self._api_key = None
         self._store_client = None
         self._workers = []  # prevent GC of running workers
+        self.request_notify_gen.connect(self._deliver_notify_gen, Qt.ConnectionType.QueuedConnection)
+        if ui is not None and hasattr(ui, "post_install_notify"):
+            def _post_install_hook(aid: str, br=self) -> None:
+                br._log_ui(
+                    f"Fin d’installation (Lua / DepotDownloader) — demande notification Discord app_id={aid}"
+                )
+                br.request_notify_gen.emit(str(aid))
+
+            ui.post_install_notify = _post_install_hook
+
+    def _log_ui(self, msg: str) -> None:
+        """Affiche une ligne dans l'onglet Journaux (signal log_message → app.js)."""
+        try:
+            safe = redact_sensitive_log_text(msg)
+        except Exception:
+            safe = msg
+        try:
+            ts = time.strftime("%H:%M:%S")
+            self.log_message.emit(f"[{ts}] [Téléchargement] {safe}")
+        except Exception:
+            logger.info("[Téléchargement] %s", safe)
+
+    @pyqtSlot(str)
+    def _deliver_notify_gen(self, app_id: str) -> None:
+        self._log_ui("Préparation de la notification d’activité sur Discord…")
+        _notify_launcher_gen_activity(app_id, ui_log=self._log_ui)
+
+    @pyqtSlot(str)
+    def notify_gen_activity(self, app_id: str) -> None:
+        """Slot public (QWebChannel) — même effet que l’auto-notify après install."""
+        self._log_ui(f"Notification d’activité (appel manuel) pour le jeu {app_id!r}")
+        self.request_notify_gen.emit(str(app_id).strip())
 
     # ── helpers ──────────────────────────────────────────────────
 
@@ -231,11 +364,20 @@ class WebBridge(QObject):
             thread.wait()
             if worker in self._workers:
                 self._workers.remove(worker)
+            try:
+                safe_msg = redact_sensitive_log_text(str(msg))
+            except Exception:
+                safe_msg = str(msg)
+            try:
+                ts = time.strftime("%H:%M:%S")
+                self.log_message.emit(f"[{ts}] [Worker] Erreur : {safe_msg}")
+            except Exception:
+                logger.warning("[Worker] Erreur : %s", safe_msg)
             if on_error:
-                on_error(msg)
+                on_error(safe_msg)
             else:
                 self.task_finished.emit(json.dumps({
-                    "task": "unknown", "success": False, "message": msg
+                    "task": "unknown", "success": False, "message": safe_msg
                 }))
 
         worker.finished.connect(_cleanup)
@@ -285,8 +427,13 @@ class WebBridge(QObject):
             "hwid": hwid,
         })
         if result.get("ok"):
-            _save_auth(result["token"], result["username"],
-                       result.get("rank", "free"), result.get("free_claimed"))
+            _save_auth(
+                result["token"],
+                result["username"],
+                result.get("rank", "free"),
+                result.get("free_claimed"),
+                result.get("rank_expires_at"),
+            )
         return json.dumps(result)
 
     @pyqtSlot(str, str, result=str)
@@ -299,8 +446,13 @@ class WebBridge(QObject):
             "hwid": hwid,
         })
         if result.get("ok"):
-            _save_auth(result["token"], result["username"],
-                       result.get("rank", "free"), result.get("free_claimed"))
+            _save_auth(
+                result["token"],
+                result["username"],
+                result.get("rank", "free"),
+                result.get("free_claimed"),
+                result.get("rank_expires_at"),
+            )
         return json.dumps(result)
 
     @pyqtSlot(str)
@@ -329,7 +481,23 @@ class WebBridge(QObject):
                     result.get("username", ""),
                     result.get("rank", "free"),
                     result.get("free_claimed"),
+                    result.get("rank_expires_at"),
                 )
+                try:
+                    from sff.premium_manifest_lock import apply_rank_transition
+
+                    apply_rank_transition(
+                        self._steam_path,
+                        result.get("rank", "free"),
+                    )
+                except Exception as _e:
+                    logger.warning("premium_manifest_lock (auth_success): %s", _e)
+                try:
+                    from sff.premium_manifest_lock import run_startup_check
+
+                    run_startup_check(self._steam_path)
+                except Exception:
+                    pass
                 parent = self.parent()
                 if parent and hasattr(parent, "_on_auth_success"):
                     parent._on_auth_success(
@@ -345,14 +513,115 @@ class WebBridge(QObject):
 
     @pyqtSlot(result=str)
     def get_user_rank(self) -> str:
-        """Returns JSON {rank, free_claimed, username} from local auth.json.
-        Called by store.js to know which UI to display."""
+        """Returns JSON {rank, free_claimed, username, monstre_slots_*, cloud_saves_enabled} from local auth."""
         saved = _load_auth()
-        return json.dumps({
-            "rank": saved.get("rank", "free"),
+        rank = saved.get("rank", "free")
+        bucket = _launcher_rank_bucket(rank)
+        out = {
+            "rank": rank,
             "free_claimed": saved.get("free_claimed"),
             "username": saved.get("username", ""),
-        })
+            "rank_expires_at": saved.get("rank_expires_at"),
+            "cloud_saves_enabled": cloud_saves_launcher_allowed_for_rank(rank),
+        }
+        if bucket in ("monstre", "pass24h", "triple") and self._steam_path:
+            from sff.premium_manifest_lock import paid_distinct_game_count_for_steam
+
+            out["monstre_slots_used"] = paid_distinct_game_count_for_steam(self._steam_path)
+            if bucket == "triple":
+                out["monstre_slots_max"] = None
+            elif bucket == "pass24h":
+                out["monstre_slots_max"] = PASS24H_MAX_DISTINCT_INSTALLS
+            else:
+                out["monstre_slots_max"] = MONSTRE_MAX_DISTINCT_INSTALLS
+        else:
+            out["monstre_slots_used"] = None
+            out["monstre_slots_max"] = None
+        return json.dumps(out)
+
+    @pyqtSlot()
+    def sync_launcher_profile(self) -> None:
+        """Re-vérifie la session sur le serveur (rang, free_claimed) sans recharger toute la webview.
+        Met à jour auth.json, la barre utilisateur Qt et émet ``launcher_profile_synced`` pour le JS."""
+        def _do():
+            try:
+                from sff.launcher_session import invalidate_launcher_verify_cache
+
+                invalidate_launcher_verify_cache()
+                saved = _load_auth()
+                token = saved.get("token", "")
+                if not token:
+                    return None
+                hwid = _get_hwid()
+                return _api_post("/api/launcher/verify", {"token": token, "hwid": hwid})
+            except Exception as e:
+                logger.warning(
+                    "[Auth] sync_launcher_profile: %s",
+                    redact_sensitive_log_text(str(e)),
+                )
+                return None
+
+        def _done(result):
+            if not result or not result.get("ok"):
+                err = (result or {}).get("error") if isinstance(result, dict) else None
+                self.launcher_profile_synced.emit(
+                    json.dumps({"ok": False, "error": err or "verify_failed"})
+                )
+                return
+            saved = _load_auth()
+            tok = saved.get("token", "")
+            uname = result.get("username", "") or saved.get("username", "")
+            rank = result.get("rank", "free")
+            claimed = result.get("free_claimed")
+            _save_auth(tok, uname, rank, claimed, result.get("rank_expires_at"))
+            try:
+                from sff.premium_manifest_lock import apply_rank_transition
+
+                apply_rank_transition(self._steam_path, rank)
+            except Exception as _e:
+                logger.warning("premium_manifest_lock (sync): %s", _e)
+            try:
+                from sff.premium_manifest_lock import run_startup_check
+
+                run_startup_check(self._steam_path)
+            except Exception:
+                pass
+            try:
+                from sff.premium_manifest_lock import paid_distinct_game_count_for_steam
+
+                b = _launcher_rank_bucket(rank)
+                if b in ("monstre", "pass24h", "triple") and self._steam_path:
+                    ms_used = paid_distinct_game_count_for_steam(self._steam_path)
+                    if b == "triple":
+                        ms_max = None
+                    elif b == "pass24h":
+                        ms_max = PASS24H_MAX_DISTINCT_INSTALLS
+                    else:
+                        ms_max = MONSTRE_MAX_DISTINCT_INSTALLS
+                else:
+                    ms_used = ms_max = None
+            except Exception:
+                ms_used = ms_max = None
+            self.launcher_profile_synced.emit(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "rank": rank,
+                        "free_claimed": claimed,
+                        "username": uname,
+                        "rank_expires_at": result.get("rank_expires_at"),
+                        "cloud_saves_enabled": cloud_saves_launcher_allowed_for_rank(rank),
+                        "monstre_slots_used": ms_used,
+                        "monstre_slots_max": ms_max,
+                    }
+                )
+            )
+            parent = self.parent()
+            if parent and getattr(parent, "_authenticated", False):
+                if hasattr(parent, "_apply_rank_from_server"):
+                    parent._apply_rank_from_server(uname, rank)
+
+        self._run_async(_do, on_done=_done)
 
     @pyqtSlot(str, result=str)
     def record_free_claim(self, app_id: str) -> str:
@@ -370,7 +639,7 @@ class WebBridge(QObject):
         })
         if result.get("ok"):
             # Update local auth.json (toujours string pour cohérence avec la vérif d'install)
-            _save_auth(token, saved.get("username", ""), "free", str(app_id).strip())
+            _save_auth(token, saved.get("username", ""), "free", str(app_id).strip(), None)
         return json.dumps(result)
 
     @pyqtSlot(result=str)
@@ -381,20 +650,50 @@ class WebBridge(QObject):
                 f"https://discord.com/channels/{_SLIMEDEALS_DISCORD_GUILD_ID}/"
                 f"{_DISCORD_AVIS_CHANNEL_ID}"
             )
-        return "https://discord.gg/slimedeals"
+        return "https://discord.gg/c2pRJKjvgE"
+
+    @pyqtSlot(result=str)
+    def discord_free_subscribe_url(self) -> str:
+        """URL salon Discord pour un abonnement gratuit (procédure communautaire)."""
+        if _SLIMEDEALS_DISCORD_GUILD_ID.isdigit():
+            return (
+                f"https://discord.com/channels/{_SLIMEDEALS_DISCORD_GUILD_ID}/"
+                f"{_DISCORD_FREE_SUB_CHANNEL_ID}"
+            )
+        return "https://discord.gg/c2pRJKjvgE"
 
     # ── ASYNC slots — dispatch to QThread ────────────────────────
 
     @pyqtSlot(str)
     def lookup_ttc_game(self, app_id):
-        """Appelle l'API TwentyTwoCloud /info pour un app_id donné.
-        Émet ttc_game_info avec un JSON contenant name, header_image, available."""
+        """Récupère les infos jeu pour l’onglet Télécharger (métadonnées catalogue).
+        Émet ttc_game_info avec un JSON contenant name, header_image, available, dlc_count."""
         def _do():
-            from sff.lua.endpoints import ttc_get_game_info
+            from sff.launcher_session import apply_verify_to_local_auth, verify_launcher_session
+            from sff.lua.endpoints import steam_store_dlc_count, ttc_get_game_info
+
+            auth = _load_auth()
+            if (auth.get("token") or "").strip():
+                vr = verify_launcher_session(force_refresh=True)
+                apply_verify_to_local_auth(vr)
+                if not vr.get("ok"):
+                    return {
+                        "app_id": app_id,
+                        "available": False,
+                        "name": f"App {app_id}",
+                        "header_image": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg",
+                        "dlc_count": None,
+                    }
+            dlc_n = steam_store_dlc_count(str(app_id))
             info = ttc_get_game_info(str(app_id))
             if info is None:
-                return {"app_id": app_id, "available": False, "name": f"App {app_id}",
-                        "header_image": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg"}
+                return {
+                    "app_id": app_id,
+                    "available": False,
+                    "name": f"App {app_id}",
+                    "header_image": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg",
+                    "dlc_count": dlc_n,
+                }
             data = info.get("data", info)
             common = data.get("common", {}) if isinstance(data, dict) else {}
             name = (common.get("name") or data.get("name") or
@@ -404,6 +703,7 @@ class WebBridge(QObject):
                 "available": True,
                 "name": name,
                 "header_image": f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg",
+                "dlc_count": dlc_n,
             }
 
         def _on_done(result):
@@ -524,9 +824,27 @@ class WebBridge(QObject):
         Windows: prompt-free 11-step pipeline mirroring process_lua_full().
         Linux: auto-selects latest manifests, wraps process_from_store().
         Emits download_progress + task_finished signals."""
+        self._log_ui(f"[Slot] download_game_fastest({app_id!r}) — lancement thread worker…")
+
         def _do():
+            self._log_ui(f"download_game_fastest : démarrage worker app_id={app_id!r}")
+            from sff.launcher_session import apply_verify_to_local_auth, verify_launcher_session
+
+            vr = verify_launcher_session(force_refresh=True)
+            apply_verify_to_local_auth(vr)
+            if not vr.get("ok"):
+                err = (vr.get("error") or "Session invalide").strip()
+                self._log_ui(f"Refus (verification compte) : {err}")
+                self._emit_task_result(
+                    "download_fastest",
+                    False,
+                    "Connexion ou PC non autorise pour ce compte. Reconnecte-toi ou contacte le support.",
+                    app_id=str(app_id),
+                )
+                return False
             allow, deny_msg = _launcher_free_catalog_download_allowed(str(app_id))
             if not allow:
+                self._log_ui(f"Refus (plan FREE / catalogue) : {deny_msg}")
                 self._emit_task_result(
                     "download_fastest",
                     False,
@@ -534,17 +852,34 @@ class WebBridge(QObject):
                     app_id=str(app_id),
                 )
                 return False
+            from sff.premium_manifest_lock import monstre_new_install_allowed
+
+            m_ok, m_deny = monstre_new_install_allowed(self._steam_path, str(app_id))
+            if not m_ok:
+                self._log_ui(f"Refus (plan Monstre / quota jeux) : {m_deny}")
+                self._emit_task_result(
+                    "download_fastest",
+                    False,
+                    m_deny,
+                    app_id=str(app_id),
+                )
+                return False
+            self._log_ui("Contrôle catalogue / plan : OK — lancement pipeline (Starting → 0 %)")
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Starting", "progress": 0
             }))
 
             if sys.platform == "win32":
+                self._log_ui("Windows : pipeline _run_windows_fastest (source auto)")
                 return self._run_windows_fastest(app_id)
-            else:
-                return self._run_linux_fastest(app_id)
+            self._log_ui("Linux : _run_linux_fastest (manifests → process_from_store)")
+            return self._run_linux_fastest(app_id)
 
         def _on_done(result):
-            success = result is True
+            success = (result is True) or (result == True)
+            self._log_ui(
+                f"download_game_fastest terminé : success={success!r} result={result!r} app_id={app_id}"
+            )
             self._emit_task_result(
                 "download_fastest",
                 success,
@@ -555,6 +890,9 @@ class WebBridge(QObject):
                 ),
                 app_id=app_id,
             )
+            if success and sys.platform == "win32":
+                self._log_ui(f"File d’attente : notification d’activité Discord pour le jeu {app_id}")
+                self.request_notify_gen.emit(str(app_id))
 
         self._run_async(_do, on_done=_on_done)
 
@@ -562,9 +900,33 @@ class WebBridge(QObject):
     def download_game_with_source(self, app_id, source, request_update='0'):
         """Fastest download with explicit source choice ('hubcap' or 'oureveryday').
         Emits download_progress + task_finished signals."""
+        self._log_ui(
+            f"[Slot] download_game_with_source(app_id={app_id!r}, source={_log_download_source(source)!r}, "
+            f"request_update={request_update!r}) — lancement thread worker…"
+        )
+
         def _do():
+            self._log_ui(
+                f"download_game_with_source : worker démarré app_id={app_id!r} source={_log_download_source(source)!r} "
+                f"request_update={request_update!r}"
+            )
+            from sff.launcher_session import apply_verify_to_local_auth, verify_launcher_session
+
+            vr = verify_launcher_session(force_refresh=True)
+            apply_verify_to_local_auth(vr)
+            if not vr.get("ok"):
+                err = (vr.get("error") or "Session invalide").strip()
+                self._log_ui(f"Refus (verification compte) : {err}")
+                self._emit_task_result(
+                    "download_fastest",
+                    False,
+                    "Connexion ou PC non autorise pour ce compte. Reconnecte-toi ou contacte le support.",
+                    app_id=str(app_id),
+                )
+                return False
             allow, deny_msg = _launcher_free_catalog_download_allowed(str(app_id))
             if not allow:
+                self._log_ui(f"Refus (plan FREE / catalogue) : {deny_msg}")
                 self._emit_task_result(
                     "download_fastest",
                     False,
@@ -572,16 +934,37 @@ class WebBridge(QObject):
                     app_id=str(app_id),
                 )
                 return False
+            from sff.premium_manifest_lock import monstre_new_install_allowed
+
+            m_ok, m_deny = monstre_new_install_allowed(self._steam_path, str(app_id))
+            if not m_ok:
+                self._log_ui(f"Refus (plan Monstre / quota jeux) : {m_deny}")
+                self._emit_task_result(
+                    "download_fastest",
+                    False,
+                    m_deny,
+                    app_id=str(app_id),
+                )
+                return False
+            self._log_ui("Contrôle catalogue / plan : OK — lancement pipeline (Starting → 0 %)")
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Starting", "progress": 0
             }))
             if sys.platform == "win32":
-                return self._run_windows_fastest(app_id, source=source, request_update=(request_update == '1'))
-            else:
-                return self._run_linux_fastest(app_id)
+                self._log_ui(
+                    f"Windows : _run_windows_fastest (request_update={(request_update == '1')!r})"
+                )
+                return self._run_windows_fastest(
+                    app_id, source=source, request_update=(request_update == '1')
+                )
+            self._log_ui("Linux : _run_linux_fastest")
+            return self._run_linux_fastest(app_id)
 
         def _on_done(result):
-            success = result is True
+            success = (result is True) or (result == True)
+            self._log_ui(
+                f"download_game_with_source terminé : success={success!r} result={result!r} app_id={app_id}"
+            )
             self._emit_task_result(
                 "download_fastest",
                 success,
@@ -592,6 +975,9 @@ class WebBridge(QObject):
                 ),
                 app_id=app_id,
             )
+            if success and sys.platform == "win32":
+                self._log_ui(f"File d’attente : notification d’activité Discord pour le jeu {app_id}")
+                self.request_notify_gen.emit(str(app_id))
 
         self._run_async(_do, on_done=_on_done)
 
@@ -608,6 +994,10 @@ class WebBridge(QObject):
 
             steam_path = self._steam_path
             lib_path = Path(self._active_library) if self._active_library else steam_path
+            self._log_ui(
+                f"_run_windows_fastest : steam_path={steam_path} lib_path={lib_path} "
+                f"source={_log_download_source(source)!r} request_update={request_update}"
+            )
 
             # Step 1: download lua
             self.download_progress.emit(json.dumps({
@@ -623,6 +1013,9 @@ class WebBridge(QObject):
                 selected_source = LuaEndpoint.TWENTYTWOCLOUD
             else:
                 selected_source = LuaEndpoint.HUBCAP if self._api_key else LuaEndpoint.OUREVERYDAY
+            self._log_ui(
+                f"Téléchargement Lua ({getattr(selected_source, 'value', str(selected_source))})…"
+            )
             lua_path = download_lua_direct(
                 dest=steam_path / "config",
                 app_id=app_id,
@@ -631,8 +1024,12 @@ class WebBridge(QObject):
                 request_update=request_update,
             )
             if not lua_path:
+                self._log_ui(
+                    "Échec : download_lua_direct n’a renvoyé aucun chemin (réseau, source, ou jeu indisponible)."
+                )
                 return False
 
+            self._log_ui(f"Lua obtenu : {lua_path}")
             saved_lua = Path.cwd() / "saved_lua"
             saved_lua.mkdir(exist_ok=True)
             backup_target = saved_lua / f"{app_id}.lua"
@@ -649,6 +1046,7 @@ class WebBridge(QObject):
             lua_contents = lua_path.read_text(encoding="utf-8", errors="replace")
             parsed = parse_lua_contents(lua_contents, lua_path)
             if not parsed:
+                self._log_ui("Échec : parse_lua_contents → None (fichier Lua invalide ou incomplet).")
                 return False
 
             # Step 3: set stats and achievements (Windows only)
@@ -717,6 +1115,7 @@ class WebBridge(QObject):
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Downloading manifests", "progress": 85
             }))
+            _manifest_paths = []
             try:
                 from sff.manifest.downloader import ManifestDownloader
                 from sff.steam_client import create_provider_for_current_thread
@@ -726,9 +1125,9 @@ class WebBridge(QObject):
                 _dl = ManifestDownloader(_provider, steam_path)
                 _use_parallel = _get_setting(_Settings.USE_PARALLEL_DOWNLOADS)
                 if _use_parallel:
-                    _dl.download_manifests_parallel(parsed, auto_manifest=True)
+                    _manifest_paths = _dl.download_manifests_parallel(parsed, auto_manifest=True) or []
                 else:
-                    _dl.download_manifests(parsed, auto_manifest=True)
+                    _manifest_paths = _dl.download_manifests(parsed, auto_manifest=True) or []
             except Exception as e:
                 logger.warning("download_manifests failed: %s", e)
 
@@ -750,10 +1149,18 @@ class WebBridge(QObject):
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Complete", "progress": 100
             }))
+            self._log_ui("Pipeline Windows : succès (100 %) — manifests / bibliothèque mis à jour.")
+            try:
+                from sff.premium_manifest_lock import maybe_register_paid_install
+
+                maybe_register_paid_install(steam_path, parsed, manifest_paths=_manifest_paths)
+            except Exception as _e:
+                logger.warning("premium_manifest_lock (register): %s", _e)
             return True
 
         except Exception as e:
             logger.exception("Windows fastest download failed: %s", e)
+            self._log_ui(f"Exception pipeline Windows : {e!r}")
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": f"Error: {e}", "progress": 0
             }))
@@ -764,6 +1171,7 @@ class WebBridge(QObject):
         try:
             from sff.manifest.depot_history import get_depots_for_app
 
+            self._log_ui(f"_run_linux_fastest : récupération dépôts pour app_id={app_id}")
             # Auto-select latest manifest for each depot
             depots = get_depots_for_app(app_id)
             manifest_override = {}
@@ -772,8 +1180,12 @@ class WebBridge(QObject):
                     manifest_override[str(depot_id)] = str(entries[0].manifest_id)
 
             if not manifest_override:
+                self._log_ui(
+                    "Linux : aucun manifest automatique — get_depots_for_app vide ou sans entrées."
+                )
                 return False
 
+            self._log_ui(f"Linux : lancement process_from_store ({len(manifest_override)} dépôt(s))…")
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Downloading via DepotDownloader", "progress": 30
             }))
@@ -787,25 +1199,33 @@ class WebBridge(QObject):
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Complete", "progress": 100
             }))
+            self._log_ui("Linux : process_from_store terminé (100 %).")
             return True
 
         except Exception as e:
             logger.exception("Linux fastest download failed: %s", e)
+            self._log_ui(f"Exception _run_linux_fastest : {e!r}")
             return False
 
     @pyqtSlot(str, str)
     def download_game_version(self, app_id, manifest_override_json):
         """Download specific version via process_from_store().
         Emits download_progress + task_finished signals."""
+        self._log_ui(f"[Slot] download_game_version app_id={app_id!r} — lancement worker…")
+
         def _do():
+            self._log_ui("download_game_version : worker démarré")
             try:
                 manifest_override = json.loads(manifest_override_json)
-            except (json.JSONDecodeError, TypeError):
+            except (json.JSONDecodeError, TypeError) as ex:
+                self._log_ui(f"JSON manifestes invalide : {ex}")
                 return False
 
             if not manifest_override:
+                self._log_ui("Manifestes vides après parse — abandon.")
                 return False
 
+            self._log_ui(f"Téléchargement version spécifique ({len(manifest_override)} dépôt(s))…")
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Starting version download", "progress": 10
             }))
@@ -823,10 +1243,14 @@ class WebBridge(QObject):
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Complete", "progress": 100
             }))
+            self._log_ui("download_game_version : process_from_store terminé → True")
             return True
 
         def _on_done(result):
-            success = result is True
+            success = (result is True) or (result == True)
+            self._log_ui(
+                f"download_game_version terminé : success={success!r} result={result!r} app_id={app_id}"
+            )
             self._emit_task_result(
                 "download_version",
                 success,
@@ -860,6 +1284,11 @@ class WebBridge(QObject):
 
         def _do():
             from sff.structs import MainMenu
+
+            if action == "download_games":
+                self._log_ui(
+                    f"run_game_action(download_games) app_id={app_id!r} — pipeline Lua interactif…"
+                )
 
             # Non-game-specific actions — call ui methods directly
             non_game_actions = {
@@ -918,15 +1347,68 @@ class WebBridge(QObject):
             if acf is None:
                 return f"No game found for App ID: {app_id}"
 
+            if action == "multiplayer":
+                saved = _load_auth()
+                if not triple_exclusive_tools_allowed_for_rank(saved.get("rank")):
+                    self._emit_task_result(
+                        "multiplayer",
+                        False,
+                        "L'option ONLINE FIX est reservee au plan Triple Monstre. Offres : slimedeals.fr/#tarifs — salon #avis sur Discord.",
+                        free_plan_denied=True,
+                    )
+                    return "__noop__"
+
             try:
-                self._ui.run_game_action_with_selection(menu_choice, acf)
+                ret = self._ui.run_game_action_with_selection(menu_choice, acf)
+                if (
+                    action == "multiplayer"
+                    and isinstance(ret, tuple)
+                    and len(ret) == 2
+                    and isinstance(ret[0], str)
+                    and ret[0] in ("ok", "fail", "cancelled")
+                ):
+                    return ret
                 return None
             except Exception as e:
                 return str(e)
 
-        def _on_done(error_msg):
-            if error_msg:
-                self._emit_task_result(action, False, str(error_msg))
+        def _on_done(result):
+            if result == "__noop__":
+                return
+            if (
+                isinstance(result, tuple)
+                and len(result) == 2
+                and isinstance(result[0], str)
+                and result[0] in ("ok", "fail", "cancelled")
+                and action == "multiplayer"
+            ):
+                status, gname = result
+                g = (gname or "").strip() or "ce jeu"
+                if status == "ok":
+                    self._emit_task_result(
+                        action,
+                        True,
+                        f"Mod online ajouté sur « {g} ».",
+                        game_name=g,
+                    )
+                elif status == "cancelled":
+                    self._emit_task_result(
+                        action,
+                        False,
+                        f"Opération multijoueur annulée. (Jeu : « {g} »)",
+                        game_name=g,
+                        cancelled=True,
+                    )
+                else:
+                    self._emit_task_result(
+                        action,
+                        False,
+                        f"Mode online introuvable pour « {g} ».",
+                        game_name=g,
+                    )
+                return
+            if result:
+                self._emit_task_result(action, False, str(result))
             else:
                 self._emit_task_result(action, True, f"Action '{action}' completed")
 
@@ -1056,33 +1538,58 @@ class WebBridge(QObject):
     @pyqtSlot(str, str)
     def scan_cloud_games(self, steam_path, steam32_id):
         """Scan userdata for cloud saves."""
+        if not _cloud_saves_feature_allowed():
+            self._emit_task_result(
+                "scan_cloud_games",
+                False,
+                _CLOUD_SAVES_DENIED_MSG,
+                games=[],
+                scan_hint="",
+            )
+            return
+
         def _do():
-            from sff.cloud_saves import CloudSaves
-            pairs = CloudSaves.list_steam_games(steam_path, steam32_id)
+            from sff.cloud_saves import CloudSaves, normalize_steam_userdata_folder_id, scan_hint_for_empty_userdata
+            sid = normalize_steam_userdata_folder_id(str(steam32_id or "").strip())
+            pairs = CloudSaves.list_steam_games(steam_path, sid)
             games = []
             for app_id, game_name in pairs:
-                remote_dir = Path(steam_path) / "userdata" / steam32_id / str(app_id) / "remote"
+                base = Path(steam_path) / "userdata" / sid / str(app_id)
+                remote_dir = base / "remote"
+                local_dir = base / "local"
                 size = 0
-                if remote_dir.exists():
-                    try:
+                try:
+                    if remote_dir.exists():
                         size = sum(f.stat().st_size for f in remote_dir.rglob("*") if f.is_file())
-                    except Exception:
-                        pass
+                    elif local_dir.exists():
+                        size = sum(f.stat().st_size for f in local_dir.rglob("*") if f.is_file())
+                except Exception:
+                    pass
                 games.append({
                     "app_id": str(app_id),
                     "name": game_name,
                     "size": _format_size(size),
                 })
-            return games
+            hint = ""
+            if not games:
+                hint = scan_hint_for_empty_userdata(str(steam_path).strip(), sid)
+            return (games, hint)
 
-        def _on_done(games):
-            self._emit_task_result("scan_cloud_games", True, "", games=games or [])
+        def _on_done(result):
+            games, hint = [], ""
+            if isinstance(result, tuple) and len(result) == 2:
+                games, hint = result[0] or [], (result[1] or "")
+            self._emit_task_result("scan_cloud_games", True, "", games=games, scan_hint=hint)
 
         self._run_async(_do, on_done=_on_done)
 
     @pyqtSlot(str)
     def backup_cloud_save(self, config_json):
         """Backup cloud saves for a game."""
+        if not _cloud_saves_feature_allowed():
+            self._emit_task_result("backup_cloud_save", False, _CLOUD_SAVES_DENIED_MSG, log="")
+            return
+
         def _do():
             config = json.loads(config_json)
             app_id = str(config.get("app_id", "")).strip()
@@ -1115,6 +1622,10 @@ class WebBridge(QObject):
     @pyqtSlot(str)
     def restore_cloud_save(self, config_json):
         """Restore cloud saves from backup."""
+        if not _cloud_saves_feature_allowed():
+            self._emit_task_result("restore_cloud_save", False, _CLOUD_SAVES_DENIED_MSG, log="")
+            return
+
         def _do():
             config = json.loads(config_json)
             backup_path = config.get("backup_path", "").strip()
@@ -1176,6 +1687,10 @@ class WebBridge(QObject):
     @pyqtSlot(str)
     def rclone_backup_save(self, config_json):
         """Upload a game's Steam userdata saves to an rclone remote."""
+        if not _cloud_saves_feature_allowed():
+            self._emit_task_result("rclone_backup_save", False, _CLOUD_SAVES_DENIED_MSG, log="")
+            return
+
         def _do():
             import subprocess
             import tempfile
@@ -1774,15 +2289,67 @@ class WebBridge(QObject):
             menu_choice = game_action_map.get(action)
             if menu_choice is None:
                 return f"Unknown action: {action}"
+            if action == "multiplayer":
+                saved = _load_auth()
+                if not triple_exclusive_tools_allowed_for_rank(saved.get("rank")):
+                    self._emit_task_result(
+                        "multiplayer",
+                        False,
+                        "L'option ONLINE FIX est reservee au plan Triple Monstre. Offres : slimedeals.fr/#tarifs — salon #avis sur Discord.",
+                        free_plan_denied=True,
+                    )
+                    return "__noop__"
             try:
-                self._ui.run_game_action_with_selection(menu_choice, acf)
+                ret = self._ui.run_game_action_with_selection(menu_choice, acf)
+                if (
+                    action == "multiplayer"
+                    and isinstance(ret, tuple)
+                    and len(ret) == 2
+                    and isinstance(ret[0], str)
+                    and ret[0] in ("ok", "fail", "cancelled")
+                ):
+                    return ret
                 return None
             except Exception as e:
                 return str(e)
 
-        def _on_done(error_msg):
-            if error_msg:
-                self._emit_task_result(action, False, str(error_msg))
+        def _on_done(result):
+            if result == "__noop__":
+                return
+            if (
+                isinstance(result, tuple)
+                and len(result) == 2
+                and isinstance(result[0], str)
+                and result[0] in ("ok", "fail", "cancelled")
+                and action == "multiplayer"
+            ):
+                status, gname = result
+                g = (gname or "").strip() or "ce jeu"
+                if status == "ok":
+                    self._emit_task_result(
+                        action,
+                        True,
+                        f"Mod online ajouté sur « {g} ».",
+                        game_name=g,
+                    )
+                elif status == "cancelled":
+                    self._emit_task_result(
+                        action,
+                        False,
+                        f"Opération multijoueur annulée. (Jeu : « {g} »)",
+                        game_name=g,
+                        cancelled=True,
+                    )
+                else:
+                    self._emit_task_result(
+                        action,
+                        False,
+                        f"Mode online introuvable pour « {g} ».",
+                        game_name=g,
+                    )
+                return
+            if result:
+                self._emit_task_result(action, False, str(result))
             else:
                 self._emit_task_result(action, True, f"Action '{action}' completed")
 
@@ -1867,6 +2434,69 @@ class WebBridge(QObject):
                 self.task_finished.emit(_json.dumps({"task": "auto_gl_setup", "success": False, "message": "Setup failed"}))
 
         self._run_async(_do, on_done=_on_done)
+
+    @pyqtSlot()
+    def launch_slimedeals_bprg(self):
+        """Lance ROCKSTAR BYPASS (Windows) — SlimeDealsBPRG à côté de l'exe ou embarqué (_internal)."""
+        from sff.utils import root_folder
+
+        if sys.platform != "win32":
+            self._emit_task_result(
+                "slimedeals_bprg",
+                False,
+                "ROCKSTAR BYPASS n'est disponible que sous Windows.",
+            )
+            return
+
+        saved = _load_auth()
+        if not triple_exclusive_tools_allowed_for_rank(saved.get("rank")):
+            self._emit_task_result(
+                "slimedeals_bprg",
+                False,
+                "ROCKSTAR BYPASS est reserve au plan Triple Monstre. Voir slimedeals.fr/#tarifs",
+            )
+            return
+
+        rel = Path("SlimeDealsBPRG") / "SlimeDealsBPRG.exe"
+        candidates: list[Path] = []
+        if getattr(sys, "frozen", False):
+            # D'abord à côté du .exe (copie manuelle / zip) ; puis bundle PyInstaller (souvent _internal\…)
+            candidates.append(Path(root_folder(outside_internal=True)) / rel)
+            candidates.append(Path(root_folder(outside_internal=False)) / rel)
+        else:
+            candidates.append(Path(root_folder()) / rel)
+
+        exe: Optional[Path] = None
+        for p in candidates:
+            rp = p.resolve()
+            if rp.is_file():
+                exe = rp
+                break
+
+        if exe is None:
+            hint = candidates[0] if candidates else rel
+            self._emit_task_result(
+                "slimedeals_bprg",
+                False,
+                f"Introuvable : {hint}. Compilez / copiez SlimeDealsBPRG avant le build — voir SlimeDealsBPRG/README.txt.",
+            )
+            return
+
+        cwd = exe.parent
+        try:
+            flags = 0
+            if sys.platform == "win32":
+                flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            subprocess.Popen(
+                [str(exe)],
+                cwd=str(cwd),
+                close_fds=True,
+                creationflags=flags,
+            )
+            self._emit_task_result("slimedeals_bprg", True, "ROCKSTAR BYPASS lancé.")
+        except Exception as exc:
+            logger.exception("launch_slimedeals_bprg")
+            self._emit_task_result("slimedeals_bprg", False, str(exc))
 
     @pyqtSlot(str)
     def connect_store(self, api_key):
@@ -2357,6 +2987,11 @@ class WebBridge(QObject):
             else:
                 ok, msg = False, "Download failed"
             self._emit_task_result("download_ddmod", ok, msg, app_id=app_id)
+            if ok:
+                self._log_ui(f"DDMod terminé — notification d’activité Discord pour le jeu {app_id}")
+                self.request_notify_gen.emit(str(app_id))
+            else:
+                self._log_ui(f"DDMod échec : {msg} (app_id={app_id})")
 
         self._run_async(_do, on_done=_on_done)
 
@@ -2529,6 +3164,12 @@ class WebBridge(QObject):
                 result[s.key_name] = ""
             else:
                 result[s.key_name] = str(raw)
+        try:
+            from sff.online_fix import online_fix_has_embedded_credentials
+
+            result["online_fix_embedded"] = online_fix_has_embedded_credentials()
+        except Exception:
+            result["online_fix_embedded"] = False
         return json.dumps(result)
 
     @pyqtSlot(result=str)
@@ -2679,10 +3320,19 @@ class WebBridge(QObject):
     @pyqtSlot()
     def gdrive_authorize(self):
         """Start the Google Drive OAuth flow in a background thread."""
+        if not _cloud_saves_feature_allowed():
+            self._emit_task_result("gdrive_authorize", False, _CLOUD_SAVES_DENIED_MSG)
+            return
+
         def _do():
             from sff.google_drive import authorize, is_available
             if not is_available():
-                return (False, "Google Drive is not available in this build.")
+                return (
+                    False,
+                    "Google Drive indisponible : paquets Python manquants ou identifiants OAuth "
+                    "non configurés (fichier gdrive_oauth_client.json dans le dossier SteaMidra "
+                    "ou variables STEAMIDRA_GDRIVE_CLIENT_ID / STEAMIDRA_GDRIVE_CLIENT_SECRET).",
+                )
             log_lines = []
             ok = authorize(log_func=log_lines.append)
             return (ok, "\n".join(log_lines))
@@ -2702,6 +3352,17 @@ class WebBridge(QObject):
 
         self._run_async(_do, on_done=_on_done)
 
+    @pyqtSlot()
+    def gdrive_disconnect(self):
+        """Supprime le jeton OAuth Google Drive enregistré localement."""
+        from sff.google_drive import clear_saved_token
+
+        try:
+            clear_saved_token()
+            self._emit_task_result("gdrive_disconnect", True, "Google Drive déconnecté.")
+        except Exception as e:
+            self._emit_task_result("gdrive_disconnect", False, str(e))
+
     @pyqtSlot(result=str)
     def gdrive_status(self):
         """Return GDrive connection status as JSON (synchronous)."""
@@ -2714,11 +3375,120 @@ class WebBridge(QObject):
         email = get_user_email(svc) if svc else ""
         return json.dumps({"available": True, "connected": bool(svc), "email": email})
 
+    @pyqtSlot(str, str, result=str)
+    def cloud_saves_self_test(self, steam_path: str, steam32_id: str) -> str:
+        """Vérifie chemin Steam, dossier userdata et accès Google Drive — retour JSON pour le WebUI."""
+        import sys
+        from pathlib import Path
+
+        from sff.cloud_saves import normalize_steam_userdata_folder_id
+
+        steam_path = (steam_path or "").strip()
+        steam32_raw = str(steam32_id or "").strip()
+        msgs: list[str] = []
+        out = {
+            "ok": False,
+            "steam_path_set": bool(steam_path),
+            "steam_install_ok": False,
+            "steam_exe_found": False,
+            "userdata_id_set": bool(steam32_raw),
+            "account_id": "",
+            "userdata_folder_ok": False,
+            "gdrive_oauth_available": False,
+            "gdrive_connected": False,
+            "gdrive_backup_root_ok": False,
+            "messages": msgs,
+        }
+
+        if not _cloud_saves_feature_allowed():
+            msgs.append(_CLOUD_SAVES_DENIED_MSG)
+            return json.dumps(out, ensure_ascii=False)
+
+        if not steam_path:
+            msgs.append("Chemin Steam vide — remplis le champ ou utilise Parcourir.")
+            return json.dumps(out, ensure_ascii=False)
+
+        root = Path(steam_path)
+        if not root.exists():
+            msgs.append("Ce dossier Steam n’existe pas sur le disque (chemin incorrect ?).")
+            return json.dumps(out, ensure_ascii=False)
+        if not root.is_dir():
+            msgs.append("Le chemin Steam n’est pas un dossier.")
+            return json.dumps(out, ensure_ascii=False)
+
+        out["steam_install_ok"] = True
+        if sys.platform == "win32":
+            out["steam_exe_found"] = (root / "steam.exe").is_file()
+            if not out["steam_exe_found"]:
+                msgs.append("steam.exe introuvable ici — indique le dossier qui contient steam.exe.")
+        else:
+            out["steam_exe_found"] = (root / "steam.sh").is_file() or (root / "steam").is_file()
+            if not out["steam_exe_found"]:
+                msgs.append("steam / steam.sh introuvable dans ce dossier (installation Steam Linux).")
+
+        sid = ""
+        if steam32_raw:
+            sid = normalize_steam_userdata_folder_id(steam32_raw)
+            out["account_id"] = sid
+            ud = root / "userdata" / sid
+            out["userdata_folder_ok"] = ud.is_dir()
+            if not out["userdata_folder_ok"]:
+                msgs.append(
+                    f"Dossier userdata introuvable : …/userdata/{sid}/ "
+                    "(vérifie le numéro du dossier sous Steam/userdata/)."
+                )
+        else:
+            msgs.append("ID userdata vide — le numéro du dossier sous Steam/userdata/.")
+
+        try:
+            from sff.google_drive import get_backup_root, get_service, is_authenticated, is_available
+
+            out["gdrive_oauth_available"] = bool(is_available())
+            if not out["gdrive_oauth_available"]:
+                msgs.append("OAuth Google non configuré (client JSON / variables d’environnement).")
+            elif not is_authenticated():
+                msgs.append("Google Drive non connecté — clique sur « Se connecter à Google Drive ».")
+            else:
+                out["gdrive_connected"] = True
+                svc = get_service()
+                if not svc:
+                    msgs.append("Impossible d’obtenir le service Google Drive.")
+                else:
+                    br = get_backup_root(svc)
+                    if br:
+                        out["gdrive_backup_root_ok"] = True
+                    else:
+                        msgs.append("Impossible d’accéder au dossier racine des sauvegardes sur Drive.")
+        except Exception as exc:
+            msgs.append(f"Erreur Google Drive : {exc}")
+
+        out["ok"] = bool(
+            out["steam_install_ok"]
+            and out["steam_exe_found"]
+            and out["userdata_id_set"]
+            and out["userdata_folder_ok"]
+            and out["gdrive_oauth_available"]
+            and out["gdrive_connected"]
+            and out["gdrive_backup_root_ok"]
+        )
+        if out["ok"]:
+            msgs.insert(0, "Tout est OK — tu peux scanner les jeux ou lancer une sauvegarde.")
+        return json.dumps(out, ensure_ascii=False)
+
     # ── All Save Locations ────────────────────────────────────────
 
     @pyqtSlot(str)
     def scan_all_save_locations(self, config_json):
         """Scan all emu save locations + Steam userdata. Emits task_finished with results list."""
+        if not _cloud_saves_feature_allowed():
+            self._emit_task_result(
+                "scan_all_save_locations",
+                False,
+                _CLOUD_SAVES_DENIED_MSG,
+                entries=[],
+            )
+            return
+
         def _do():
             config = json.loads(config_json)
             steam_path = config.get("steam_path", "").strip()
@@ -2740,6 +3510,15 @@ class WebBridge(QObject):
     @pyqtSlot(str)
     def backup_all_save_locations(self, config_json):
         """Backup all (or selected) save location entries using the configured provider."""
+        if not _cloud_saves_feature_allowed():
+            self._emit_task_result(
+                "backup_all_save_locations",
+                False,
+                _CLOUD_SAVES_DENIED_MSG,
+                log=_CLOUD_SAVES_DENIED_MSG,
+            )
+            return
+
         def _do():
             config = json.loads(config_json)
             entries = config.get("entries", [])
@@ -2944,6 +3723,15 @@ class WebBridge(QObject):
     @pyqtSlot(str)
     def scan_backup_root(self, config_json):
         """Scan a backup root (local or GDrive) and return location/game tree."""
+        try:
+            _cfg = json.loads(config_json)
+            _prov = str(_cfg.get("provider", "local")).lower()
+        except Exception:
+            _prov = "local"
+        if _prov == "gdrive_api" and not _cloud_saves_feature_allowed():
+            self._emit_task_result("scan_backup_root", False, _CLOUD_SAVES_DENIED_MSG, locations={})
+            return
+
         def _do():
             config = json.loads(config_json)
             provider = config.get("provider", "local").lower()
@@ -2988,6 +3776,15 @@ class WebBridge(QObject):
     @pyqtSlot(str)
     def restore_save_location(self, game_entry_json):
         """Restore a single game's saves from backup to its original source_path."""
+        if not _cloud_saves_feature_allowed():
+            self._emit_task_result(
+                "restore_save_location",
+                False,
+                _CLOUD_SAVES_DENIED_MSG,
+                log=_CLOUD_SAVES_DENIED_MSG,
+            )
+            return
+
         def _do():
             game_entry = json.loads(game_entry_json)
             log_lines = []

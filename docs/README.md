@@ -35,7 +35,7 @@ Parallel downloads, download tracking, settings backup, library scanner, store b
 How to use the online fix feature for multiplayer games.
 
 [Fixes & Bypasses](CRACK_FIX.md)  
-Using the community fix list as an alternative or supplement to online-fix.me. No account required.
+Using the community fix list as an alternative or supplement to the built-in multiplayer fix flow. No account required.
 
 [HyperVisor Guide](HV_GUIDE.md)  
 How HV cracks work, what Windows security features they require you to disable, security implications, and step-by-step setup. Read before using HV Auto.

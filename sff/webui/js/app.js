@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SteaMidra — Main App Router & Sidebar Navigation
  * Handles page switching, platform detection, and global initialization.
  */
@@ -10,6 +10,144 @@ window.App = (function() {
     var _platform = 'win32';
     var _outsideMode = false;
 
+    /** Aligné sur web_bridge : FREE + rangs Monstre + rangs Triple Monstre */
+    function _normLauncherRank(r) {
+        var s = String(r == null || r === '' ? 'free' : r).trim().toLowerCase().replace(/\s+/g, '_');
+        if (!s || s === 'none' || s === 'null') return 'free';
+        return s;
+    }
+
+    var _TR_HOME = {
+        triple_monstre: 1, triplemonstre: 1, triple_monster: 1, triplemonster: 1,
+        triple: 1, tm: 1, unlimited: 1, role_unlimited: 1, vip: 1, premium: 1
+    };
+    var _MR_HOME = {
+        monstre: 1, monster: 1, plan_monstre: 1, role_monstre: 1,
+        double_monstre: 1, deux_monstres: 1, pass_monstre: 1
+    };
+    var _P24_HOME = {
+        '24hpass': 1, '24h_pass': 1, pass_24h: 1, pass24h: 1, hpass24: 1,
+        day_pass_24h: 1, pass_24hpass: 1
+    };
+
+    /** Masque la section Lua accueil pour FREE / Monstre / 24H PASS / Triple (aligne launcher_ranks). */
+    function _rankHidesHomeLuaSection(rank) {
+        var r = _normLauncherRank(rank);
+        if (r === 'free') return true;
+        if (_TR_HOME[r]) return true;
+        if (_P24_HOME[r]) return true;
+        if (_MR_HOME[r]) return true;
+        return false;
+    }
+
+    /** Plan catalogue FREE seul (rang normalise === free) */
+    function _isStrictlyFreePlan(rank) {
+        return _normLauncherRank(rank) === 'free';
+    }
+
+    function _launcherRankBucketHome(rank) {
+        var r = _normLauncherRank(rank);
+        if (r === 'free') return 'free';
+        if (_TR_HOME[r]) return 'triple';
+        if (_P24_HOME[r]) return 'pass24h';
+        if (_MR_HOME[r]) return 'monstre';
+        return 'monstre';
+    }
+
+    function _tripleExclusiveToolsAllowed(rank) {
+        return _launcherRankBucketHome(rank) === 'triple';
+    }
+
+    function _cloudSavesNavAllowed(rank) {
+        return _launcherRankBucketHome(rank) === 'triple';
+    }
+
+    var _bprgFreeUpsellBound = false;
+    function _bindBprgFreeUpsellModal() {
+        if (_bprgFreeUpsellBound) return;
+        var btnT = document.getElementById('bprg-upsell-tarifs');
+        var btnA = document.getElementById('bprg-upsell-avis');
+        var btnF = document.getElementById('bprg-upsell-free-sub');
+        if (!btnT || !btnA || !btnF) return;
+        _bprgFreeUpsellBound = true;
+        btnT.addEventListener('click', function() {
+            Bridge.call('open_url', 'https://slimedeals.fr/#tarifs');
+        });
+        btnA.addEventListener('click', function() {
+            Bridge.onReady(function(py) {
+                if (typeof py.discord_avis_url !== 'function') {
+                    Bridge.call('open_url', 'https://discord.gg/c2pRJKjvgE');
+                    return;
+                }
+                py.discord_avis_url(function(url) {
+                    Bridge.call('open_url', url && url.indexOf('http') === 0 ? url : 'https://discord.gg/c2pRJKjvgE');
+                });
+            });
+        });
+        btnF.addEventListener('click', function() {
+            Bridge.onReady(function(py) {
+                if (typeof py.discord_free_subscribe_url !== 'function') {
+                    Bridge.call('open_url', 'https://discord.gg/c2pRJKjvgE');
+                    return;
+                }
+                py.discord_free_subscribe_url(function(url) {
+                    Bridge.call('open_url', url && url.indexOf('http') === 0 ? url : 'https://discord.gg/c2pRJKjvgE');
+                });
+            });
+        });
+    }
+
+    function _configureCloudSavesUpsellForRank(bucket) {
+        var lead = document.getElementById('cloudsaves-free-upsell-lead');
+        if (!lead) return;
+        if (bucket === 'monstre' || bucket === 'pass24h') {
+            lead.innerHTML = 'Tu es sur un <strong>palier sans sauvegardes cloud</strong> (Monstre ou 24H PASS). Les <strong>sauvegardes cloud</strong> (Google Drive) sont reservees au <strong>Triple Monstre</strong> — passe au palier superieur pour activer cette page.';
+        } else {
+            lead.innerHTML = 'Tu es sur le <strong>plan FREE</strong>. Les <strong>sauvegardes cloud</strong> (Google Drive) sont reservees au <strong>Triple Monstre</strong>.';
+        }
+    }
+
+    var _cloudSavesFreeUpsellBound = false;
+    function _bindCloudSavesFreeUpsellModal() {
+        if (_cloudSavesFreeUpsellBound) return;
+        var btnT = document.getElementById('cloudsaves-free-upsell-tarifs');
+        var btnA = document.getElementById('cloudsaves-free-upsell-avis');
+        var btnF = document.getElementById('cloudsaves-free-upsell-free-sub');
+        if (!btnT || !btnA || !btnF) return;
+        _cloudSavesFreeUpsellBound = true;
+        btnT.addEventListener('click', function() {
+            Bridge.call('open_url', 'https://slimedeals.fr/#tarifs');
+        });
+        btnA.addEventListener('click', function() {
+            Bridge.onReady(function(py) {
+                if (typeof py.discord_avis_url !== 'function') {
+                    Bridge.call('open_url', 'https://discord.gg/c2pRJKjvgE');
+                    return;
+                }
+                py.discord_avis_url(function(url) {
+                    Bridge.call('open_url', url && url.indexOf('http') === 0 ? url : 'https://discord.gg/c2pRJKjvgE');
+                });
+            });
+        });
+        btnF.addEventListener('click', function() {
+            Bridge.onReady(function(py) {
+                if (typeof py.discord_free_subscribe_url !== 'function') {
+                    Bridge.call('open_url', 'https://discord.gg/c2pRJKjvgE');
+                    return;
+                }
+                py.discord_free_subscribe_url(function(url) {
+                    Bridge.call('open_url', url && url.indexOf('http') === 0 ? url : 'https://discord.gg/c2pRJKjvgE');
+                });
+            });
+        });
+    }
+
+    function _applyHomeLuaSectionForRank(rank) {
+        var sec = document.getElementById('section-lua-manifest');
+        if (!sec) return;
+        sec.style.display = _rankHidesHomeLuaSection(rank) ? 'none' : '';
+    }
+
     function init() {
         Components.initModals();
         new Components.CustomSelect('home-game-select', 'home-game-select-ui');
@@ -19,6 +157,8 @@ window.App = (function() {
         new Components.CustomSelect('profile-select', 'profile-select-ui');
         new Components.CustomSelect('setting-language', 'setting-language-ui');
         Tooltips.init();
+        _bindBprgFreeUpsellModal();
+        _bindCloudSavesFreeUpsellModal();
         _initSidebar();
         _initLogPanel();
         _initGlobalListeners();
@@ -80,7 +220,42 @@ window.App = (function() {
             Bridge.on('task_finished', function(json) {
                 try {
                     var result = JSON.parse(json);
-                    if (result.message) {
+                    if (result.task === 'multiplayer') {
+                        if (result.free_plan_denied) {
+                            var libMsg = document.getElementById('library-onlinefix-free-msg');
+                            if (libMsg && !libMsg.getAttribute('data-default-inner')) {
+                                libMsg.setAttribute('data-default-inner', libMsg.innerHTML);
+                            }
+                            if (libMsg && result.message) {
+                                libMsg.textContent = result.message;
+                            } else if (libMsg) {
+                                var defInner = libMsg.getAttribute('data-default-inner');
+                                if (defInner) libMsg.innerHTML = defInner;
+                            }
+                            if (window.Library && typeof Library.ensureOnlineFixFreeModalBindings === 'function') {
+                                Library.ensureOnlineFixFreeModalBindings();
+                            }
+                            Components.showModal('library-onlinefix-free-modal');
+                        } else {
+                            var hdr = document.getElementById('multiplayer-result-header');
+                            var ttl = document.getElementById('multiplayer-result-title');
+                            var msgEl = document.getElementById('multiplayer-result-msg');
+                            if (hdr) {
+                                hdr.style.background = result.success
+                                    ? 'rgba(34, 197, 94, 0.14)'
+                                    : 'rgba(239, 68, 68, 0.12)';
+                            }
+                            if (ttl) {
+                                ttl.textContent = result.success
+                                    ? 'Mod online installé'
+                                    : (result.cancelled ? 'Multijoueur annulé' : 'Mode online introuvable');
+                            }
+                            if (msgEl) {
+                                msgEl.textContent = result.message || '';
+                            }
+                            Components.showModal('multiplayer-result-modal');
+                        }
+                    } else if (result.message) {
                         Components.showToast(
                             result.success ? 'success' : 'error',
                             result.message
@@ -110,12 +285,50 @@ window.App = (function() {
                 _appendLog(msg);
                 _appendHomeLog(msg);
             });
+
+            py.get_user_rank(function(jsonStr) {
+                var d, r;
+                try {
+                    d = JSON.parse(jsonStr);
+                    r = d.rank;
+                } catch (e) {
+                    r = 'free';
+                }
+                _applyHomeLuaSectionForRank(r);
+            });
+
+            Bridge.on('launcher_profile_synced', function(jsonStr) {
+                try {
+                    var d = JSON.parse(jsonStr);
+                    if (d && d.ok && d.rank != null) {
+                        _applyHomeLuaSectionForRank(d.rank);
+                    }
+                } catch (e) {}
+            });
         });
 
-        // Navigate to saved page or home
+        // Navigate to saved page or home (sauvegardes cloud : Triple Monstre uniquement)
         var savedPage = localStorage.getItem('currentPage');
         if (savedPage) {
-            navigateTo(savedPage);
+            if (savedPage === 'cloudsaves') {
+                Bridge.onReady(function(py) {
+                    py.get_user_rank(function(jsonStr) {
+                        var rnk = 'free';
+                        try {
+                            var d = JSON.parse(jsonStr || '{}');
+                            rnk = d.rank || 'free';
+                        } catch (e) {}
+                        if (!_cloudSavesNavAllowed(rnk)) {
+                            localStorage.setItem('currentPage', 'home');
+                            navigateTo('home');
+                        } else {
+                            navigateTo('cloudsaves');
+                        }
+                    });
+                });
+            } else {
+                navigateTo(savedPage);
+            }
         }
 
         // Apply saved theme
@@ -134,6 +347,29 @@ window.App = (function() {
     }
 
     function navigateTo(pageId) {
+        if (pageId === 'cloudsaves') {
+            Bridge.onReady(function(py) {
+                py.get_user_rank(function(jsonStr) {
+                    var rnk = 'free';
+                    try {
+                        var d = JSON.parse(jsonStr || '{}');
+                        rnk = d.rank || 'free';
+                    } catch (e) {}
+                    if (!_cloudSavesNavAllowed(rnk)) {
+                        _bindCloudSavesFreeUpsellModal();
+                        _configureCloudSavesUpsellForRank(_launcherRankBucketHome(rnk));
+                        Components.showModal('cloudsaves-free-upsell-modal');
+                        return;
+                    }
+                    _navigateToImpl(pageId);
+                });
+            });
+            return;
+        }
+        _navigateToImpl(pageId);
+    }
+
+    function _navigateToImpl(pageId) {
         // Hide all pages
         document.querySelectorAll('.page').forEach(function(page) {
             page.classList.remove('active');
@@ -530,7 +766,7 @@ window.App = (function() {
                 });
                 Bridge.call('set_setting', 'manifest_update_excludes', excludes.join(','));
                 Components.hideModal('update-manifests-modal');
-                Components.showToast('info', 'Mise à jour des manifests...');
+                Components.showToast('info', 'Mise à jour des jeux…');
                 Bridge.call('run_game_action', '', 'update_manifests');
             });
         }
@@ -1007,11 +1243,31 @@ window.App = (function() {
             return;
         }
 
+        if (action === 'slimedeals_bprg') {
+            Bridge.onReady(function(py) {
+                py.get_user_rank(function(jsonStr) {
+                    var d, rnk;
+                    try {
+                        d = JSON.parse(jsonStr);
+                        rnk = d.rank || 'free';
+                    } catch (e) {
+                        rnk = 'free';
+                    }
+                    if (!_tripleExclusiveToolsAllowed(rnk)) {
+                        Components.showModal('bprg-free-upsell-modal');
+                        return;
+                    }
+                    Bridge.call('launch_slimedeals_bprg');
+                });
+            });
+            return;
+        }
+
         // Non-game actions don't need a game selected
         var nonGameActions = [
             'download_games', 'download_manifests', 'recent_lua', 'update_manifests',
             'mute_toggle', 'remove_game', 'context_menu', 'applist_menu', 'offline_fix',
-            'check_updates', 'scan_library', 'analytics', 'auto_gl_setup'
+            'check_updates', 'scan_library', 'analytics', 'auto_gl_setup', 'slimedeals_bprg'
         ];
         // Outside-Steam game action
         if (_outsideMode && nonGameActions.indexOf(action) === -1) {

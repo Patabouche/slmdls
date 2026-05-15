@@ -40,7 +40,8 @@ window.Bridge = (function() {
             'task_finished',
             'log_message',
             'ttc_game_info',
-            'auth_done'
+            'auth_done',
+            'launcher_profile_synced'
         ];
         signalNames.forEach(function(name) {
             if (_py[name] && typeof _py[name].connect === 'function') {
@@ -166,9 +167,36 @@ window.Bridge = (function() {
             browse_game_folder: function(cb) { if (cb) cb(''); },
             run_game_action_outside: function() {},
             open_url: function() {},
-            get_user_rank: function(cb) { if (cb) cb(JSON.stringify({rank:'free',free_claimed:null,username:''})); },
+            launch_slimedeals_bprg: function() {},
+            gdrive_status: function(cb) {
+                if (cb) cb(JSON.stringify({ available: true, connected: false, email: '' }));
+            },
+            cloud_saves_self_test: function(steamPath, steam32, cb) {
+                if (cb) {
+                    cb(JSON.stringify({
+                        ok: !!(steamPath && steam32),
+                        steam_path_set: !!steamPath,
+                        steam_install_ok: !!steamPath,
+                        steam_exe_found: !!steamPath,
+                        userdata_id_set: !!steam32,
+                        account_id: steam32 || '',
+                        userdata_folder_ok: false,
+                        gdrive_oauth_available: true,
+                        gdrive_connected: false,
+                        gdrive_backup_root_ok: false,
+                        messages: [
+                            'Mode simulation : pas de vérification réelle. Lance l’app avec le launcher pour tester.'
+                        ]
+                    }));
+                }
+            },
+            gdrive_disconnect: function() {},
+            get_user_rank: function(cb) { if (cb) cb(JSON.stringify({rank:'free',free_claimed:null,username:'',rank_expires_at:null,monstre_slots_used:null,monstre_slots_max:null,cloud_saves_enabled:false})); },
+            sync_launcher_profile: function() {},
             record_free_claim: function(app_id, cb) { if (cb) cb(JSON.stringify({ok:false,error:'simulation'})); },
-            discord_avis_url: function(cb) { if (cb) cb('https://discord.gg/slimedeals'); },
+            notify_gen_activity: function() {},
+            discord_avis_url: function(cb) { if (cb) cb('https://discord.gg/c2pRJKjvgE'); },
+            discord_free_subscribe_url: function(cb) { if (cb) cb('https://discord.gg/c2pRJKjvgE'); },
         };
         _ready = true;
         _readyCallbacks.forEach(function(cb) { cb(_py); });

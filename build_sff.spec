@@ -5,6 +5,7 @@
 # - "pkg_resources is deprecated" from win10toast / PyInstaller: from dependencies; build is fine.
 # - "Hidden import tzdata not found": optional timezone data; safe to ignore unless you use timezone features.
 
+import glob
 import os
 import sys
 from pathlib import Path
@@ -63,6 +64,11 @@ if os.path.exists(os.path.join(spec_root, 'sff.ico')):
 all_games_txt = os.path.join(spec_root, 'all_games.txt')
 if os.path.exists(all_games_txt):
     datas.append((all_games_txt, '.'))
+
+# Google Drive — JSON OAuth (inclus dans le bundle si présent à la racine SFF au moment du build)
+for _gcs in sorted(glob.glob(os.path.join(spec_root, 'client_secret*.json'))):
+    datas.append((_gcs, '.'))
+    print(f"Including Google OAuth client JSON (datas): {os.path.basename(_gcs)}")
 
 # Add win10toast data
 win10toast_data = get_win10toast_data()

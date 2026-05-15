@@ -3,7 +3,7 @@ echo ========================================
 echo  Installing SteaMidra Requirements
 echo ========================================
 echo.
-echo  Installs all dependencies: CLI, GUI (PyQt6), online-fix
+echo  Installs all dependencies: CLI, GUI (PyQt6), multiplayer fix
 echo  (Selenium/Chrome), and Tor fallback support.
 echo.
 echo  For multiplayer fix: Chrome browser must be installed.

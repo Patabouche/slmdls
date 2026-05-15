@@ -32,6 +32,7 @@ window.Downloads = (function() {
 
     function onPageEnter() {
         init();
+        Bridge.call('sync_launcher_profile');
         _render();
     }
 

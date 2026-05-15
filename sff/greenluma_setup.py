@@ -277,7 +277,7 @@ def auto_gl_setup(method: str, archive_path: str, steam_exe_path: str) -> dict:
     import tempfile
     tmp = Path(tempfile.mkdtemp(prefix="steamidra_gl_"))
     try:
-        logger.info("Extracting %s → %s", archive_path, tmp)
+        logger.info("Extracting %s -> %s", archive_path, tmp)
         extract_archive(archive_path, str(tmp))
 
         # Find DLL and INI

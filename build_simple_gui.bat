@@ -26,6 +26,32 @@ if exist "third_party\SteamAutoCrack\Steam-auto-crack-3.5.0.3\Steam-auto-crack-3
     )
 )
 
+REM ROCKSTAR BYPASS — compile le projet test et copie vers SlimeDealsBPRG\ pour inclusion PyInstaller
+set "SDB_PROJ=%~dp0..\..\test\Nightlight-Game-Launcher\V4\SlimeDealsBPRG\SlimeDealsBPRG.csproj"
+set "SDB_OUT=%~dp0..\..\test\Nightlight-Game-Launcher\V4\SlimeDealsBPRG\bin\Release"
+if exist "%SDB_PROJ%" (
+    where dotnet >nul 2>&1
+    if not errorlevel 1 (
+        echo.
+        echo Building SlimeDealsBPRG ^(ROCKSTAR BYPASS^)...
+        dotnet build "%SDB_PROJ%" -c Release -v minimal
+        if exist "%SDB_OUT%\SlimeDealsBPRG.exe" (
+            if not exist "%~dp0SlimeDealsBPRG" mkdir "%~dp0SlimeDealsBPRG"
+            copy /Y "%SDB_OUT%\SlimeDealsBPRG.exe" "%~dp0SlimeDealsBPRG\" >nul
+            if exist "%SDB_OUT%\Assets" (
+                if not exist "%~dp0SlimeDealsBPRG\Assets" mkdir "%~dp0SlimeDealsBPRG\Assets"
+                xcopy /E /Y /I "%SDB_OUT%\Assets\*" "%~dp0SlimeDealsBPRG\Assets\" >nul
+            )
+            echo SlimeDealsBPRG copie dans launcher\SFF\SlimeDealsBPRG pour le package GUI.
+        ) else (
+            echo WARNING: build SlimeDealsBPRG sans SlimeDealsBPRG.exe dans bin\Release — bouton BYPASS absent du build.
+        )
+        echo.
+    )
+) else (
+    echo Note: projet SlimeDealsBPRG introuvable ^(%SDB_PROJ%^) — placez SlimeDealsBPRG.exe sous SlimeDealsBPRG\ a la main si besoin.
+)
+
 echo.
 echo Building GUI executable...
 echo This may take 5-10 minutes...

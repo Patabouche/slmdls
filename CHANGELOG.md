@@ -348,7 +348,7 @@
 
 ## 4.9.1
 
-### online-fix.me Multiplayer Fix — complete rewrite
+### Multiplayer fix — complete rewrite
 - **SeleniumBase UC mode** — Cloudflare bypass + ad blocking built-in. No more manual Chrome setup.
 - **3-layer ad popup prevention** — extracts the uploads URL directly from the game page before clicking (Layer 1); falls back to smart 15s polling that closes only confirmed ad tabs and preserves the uploads tab (Layer 2); final page-source re-scan fallback (Layer 3).
 - **Smart file server navigation** — automatically enters subfolders (`Fix Repair/`, `Generic/`, `Steam/`, `Patch/`) before scanning for archives.
@@ -371,7 +371,7 @@
 - **Anti-cheat detection**: automatically scans for EasyAntiCheat and BattlEye folders/files; suggests Proxy mode if found.
 - **Linux platform selection**: on Linux, user chooses Proton/Wine (Windows .dll) or Native Linux (.so). ELF bitness is read from the header to select x64 vs x86 `.so` automatically.
 - **Spacewar auto-check**: reads all Steam library ACF files to detect if Spacewar (AppID 480) is already installed. If not, shows a one-time `steam://install/480` prompt and stores a marker file so the user is never prompted again after the first time.
-- **Existing online-fix.me button unchanged** — both methods coexist in the menu.
+- **Existing multiplayer fix entry unchanged** — both methods coexist in the menu.
 - **Version bump**: 4.8.4 → 4.9.0
 
 ---
@@ -472,7 +472,7 @@
 
 ## v4.6.1
 
-### Multiplayer fix (online-fix.me) – Selenium login fix
+### Multiplayer fix – Selenium login fix
 
 - **Login now works:** The multiplayer fix no longer uses HTTP-only login, which often failed with "Login failed (form still visible)". It now uses **Selenium with Chrome**: a headless browser opens the game page, fills in your credentials, clicks the login button, and handles cookies and JavaScript like a real browser. Login and download should work reliably.
 - **What you need:** Chrome browser must be installed. Selenium is in the main requirements: `pip install -r requirements.txt`.
@@ -491,10 +491,10 @@
 
 ## v4.5.3
 
-### Multiplayer fix (online-fix.me) – correct game and better matching
+### Multiplayer fix – correct game and better matching
 
 - **"Game: Unknown" fixed:** The game name is now read from the ACF in the **same Steam library** where the game is installed (e.g. if the game is on `D:\SteamLibrary\...`, we read that library’s manifest, not the first one). If the name is still missing, we fetch the official name from the **Steam Store API** so we never search with "Unknown".
-- **Wrong game match fixed:** Search now uses a stricter minimum match (50%) and prefers results whose link text contains the game name (e.g. "R.E.P.O. по сети" for R.E.P.O.). We also search with "game name online-fix" to narrow results. This avoids picking the wrong game (e.g. "Species Unknown" when you selected R.E.P.O.).
+- **Wrong game match fixed:** Search now uses a stricter minimum match (50%) and prefers results whose link text contains the game name (e.g. "R.E.P.O. по сети" for R.E.P.O.). We also run a narrowed follow-up search to reduce wrong picks. This avoids picking the wrong game (e.g. "Species Unknown" when you selected R.E.P.O.).
 
 ---
 

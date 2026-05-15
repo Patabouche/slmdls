@@ -68,7 +68,16 @@
   }
 
   .logo-wrap { text-align: center; margin-bottom: 28px; }
-  .logo-wrap svg { width: 48px; height: 48px; }
+  .launcher-brand-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+    box-shadow: 0 4px 24px rgba(124,92,191,0.25);
+  }
+  .launcher-brand-logo--loading { margin-bottom: 0; }
   .logo-title {
     font-size: 22px; font-weight: 700; letter-spacing: -0.5px; margin-top: 10px;
     background: linear-gradient(135deg, #a07de0, #7c5cbf);
@@ -133,12 +142,8 @@
 
 <!-- Loading screen (shown while checking saved token) -->
 <div id="loading-screen">
-  <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-    <rect width="48" height="48" rx="12" fill="url(#lg2)"/>
-    <path d="M14 24c0-5.5 4.5-10 10-10s10 4.5 10 10-4.5 10-10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-    <circle cx="24" cy="24" r="4" fill="#fff"/>
-    <defs><linearGradient id="lg2" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#7c5cbf"/><stop offset="1" stop-color="#3a5cbf"/></linearGradient></defs>
-  </svg>
+  <img src="assets/blob.png" alt="" class="launcher-brand-logo launcher-brand-logo--loading" width="48" height="48"
+    onerror="this.style.display='none'" />
   <div class="loading-logo">SlimeDeals</div>
   <div class="loading-spinner"></div>
   <div class="loading-text" id="loading-text">Vérification de la session…</div>
@@ -147,12 +152,8 @@
 <!-- Auth card (hidden until check done) -->
 <div class="card" id="auth-card" style="display:none">
   <div class="logo-wrap">
-    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="48" height="48" rx="12" fill="url(#lg)"/>
-      <path d="M14 24c0-5.5 4.5-10 10-10s10 4.5 10 10-4.5 10-10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-      <circle cx="24" cy="24" r="4" fill="#fff"/>
-      <defs><linearGradient id="lg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#7c5cbf"/><stop offset="1" stop-color="#3a5cbf"/></linearGradient></defs>
-    </svg>
+    <img src="assets/blob.png" alt="SlimeDeals" class="launcher-brand-logo" width="48" height="48"
+      onerror="this.style.display='none'" />
     <div class="logo-title">SlimeDeals</div>
     <div class="logo-sub">Connexion requise pour continuer</div>
   </div>

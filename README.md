@@ -28,7 +28,7 @@ Need help? Chat with us on our Discord server: https://discord.gg/V8aZqnbB84
 
 - Download and use Lua files for games, download manifests, and set up GreenLuma.
 - Write Lua and manifest data into Steam's config.
-- Multiplayer fixes: **online-fix.me** integration and **game fixes/bypasses (Ryuu)**.
+- Multiplayer fixes: **built-in multiplayer fix flow** and **game fixes/bypasses (Ryuu)**.
 - **HyperVisor Cracks (HV Auto)** — download HyperVisor bypasses for Denuvo-protected games. Includes VBS.cmd (v1.6.2) to prepare your system. See the [HyperVisor Guide](docs/HV_GUIDE.md) before use.
 - DLC status check, cracking (gbe_fork), SteamStub DRM removal (Steamless), AppList management, and DLC Unlockers (CreamInstaller-style: SmokeAPI, CreamAPI, Koaloader, Uplay).
 - **Multi-language GUI** — English and Portuguese built-in; add more via `sff/locales/`.
@@ -107,7 +107,7 @@ SteaMidra has a full graphical interface with a **Modern UI (new in 5.5.0, updat
 - **Store browser** — search and browse the Hubcap Manifest library with pagination. Download button opens a version picker with full depot/manifest history (SteamDB + GitHub mirror sources). **Force Refresh** button bypasses cache to re-scrape all historical manifests.
 - **Fix Game pipeline** — automate emulator application (Goldberg, ColdClient, ColdLoader) with SteamStub unpacking.
 - **GBE Token Generator** — generate full Goldberg emulator configs with achievements, DLCs, stats, and icons.
-- **Cloud Saves** — Steam userdata save backup/restore. Scans `Steam/userdata/<steam32id>/` for all games with saves, back up and restore with one click (safety backup created automatically). Supports local folder, **Google Drive** (sign in once), and **rclone** (Dropbox, OneDrive, MEGA, S3, Backblaze B2, SFTP, and 70+ other backends — click a provider shortcut to pre-fill the remote format, then hit Setup in Terminal to configure it without leaving the app). **All Save Locations** scans every known emu save path (CODEX, EMPRESS, RUNE, OnlineFix, Goldberg, GSE, Steam userdata) and backs them all up in one operation.
+- **Cloud Saves** — Steam userdata save backup/restore. Scans `Steam/userdata/<steam32id>/` for all games with saves, back up and restore with one click (safety backup created automatically). Supports local folder, **Google Drive** (sign in once), and **rclone** (Dropbox, OneDrive, MEGA, S3, Backblaze B2, SFTP, and 70+ other backends — click a provider shortcut to pre-fill the remote format, then hit Setup in Terminal to configure it without leaving the app). **All Save Locations** scans every known emu save path (CODEX, EMPRESS, RUNE, public patch-save folders, Goldberg, GSE, Steam userdata) and backs them all up in one operation.
 - **VDF Key Extractor** — extract depot decryption keys from Steam's config.vdf.
 - Lua/manifest processing, AppList management, and library tools all accessible from buttons.
 - Full settings dialog where you can edit, delete, export, and import all settings.
@@ -137,7 +137,7 @@ See [CHANGELOG.md](CHANGELOG.md) for what changed in the latest update.
 
 [Feature Guide](docs/FEATURE_USAGE_GUIDE.md) – Parallel downloads, backups, library scanner, and more.
 
-[Multiplayer Fix](docs/MULTIPLAYER_FIX.md) – Using the online-fix.me multiplayer fix.
+[Multiplayer Fix](docs/MULTIPLAYER_FIX.md) – Using the built-in multiplayer fix.
 
 [Fixes/Bypasses (Ryuu)](docs/RYUU_FIX.md) – Using Ryuu as a free, no-account alternative fix source.
 
@@ -175,7 +175,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common problems and s
 
 **CreamInstaller** – The DLC Unlockers feature is inspired by and compatible with CreamInstaller. SteaMidra does not ship CreamInstaller; it provides its own implementation that follows similar behavior.
 
-**online-fix.me** – The multiplayer fix feature downloads fixes from online-fix.me. SteaMidra is not affiliated with online-fix.me. An account on that site is required.
+**Multiplayer fix** – Downloads and applies third-party multiplayer patches when available. SteaMidra is not affiliated with patch authors or hosts. An account may be required unless your build embeds credentials.
 
 **GBE Token Generator** – Goldberg Emulator configuration generation based on work by **Detanup01** ([gbe_fork](https://github.com/Detanup01/gbe_fork)), **NickAntaris**, and **Oureveryday** ([generate_game_info](https://github.com/oureveryday/Goldberg-generate_game_info)).
 

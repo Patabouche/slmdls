@@ -1,4 +1,4 @@
-﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
+# SlimeDeals - Steam game setup and manifest tool (SFF)
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 #
 # This file is part of SlimeDeals.
@@ -37,6 +37,59 @@ _CREATE_NO_WINDOW = {"creationflags": 0x08000000} if sys.platform == "win32" els
 from sff.utils import root_folder
 
 logger = logging.getLogger(__name__)
+
+# Seuil minimal pour reconnaître un SteamID64 (comptes individuels) collé par erreur
+_STEAM64_INDIVIDUAL_MIN = 76561197960265728
+
+
+def normalize_steam_userdata_folder_id(steam_id: str) -> str:
+    """
+    Le dossier sous ``Steam/userdata/`` est l'**Account ID** (nombre souvent à 8–10 chiffres),
+    pas le SteamID64 complet (7656119…). Si l'utilisateur colle un SteamID64, on le convertit.
+    """
+    s = str(steam_id).strip()
+    if not s.isdigit():
+        return s
+    n = int(s)
+    if n >= _STEAM64_INDIVIDUAL_MIN:
+        converted = n - _STEAM64_INDIVIDUAL_MIN
+        logger.info("steam32_id recu comme SteamID64 -> dossier userdata : %s", converted)
+        return str(converted)
+    return s
+
+
+def _userdata_app_has_listable_saves(app_dir: Path) -> bool:
+    """Jeux listés si dossier Steam Cloud ``remote`` ou cache ``local`` avec au moins un fichier."""
+    if (app_dir / "remote").is_dir():
+        return True
+    loc = app_dir / "local"
+    if not loc.is_dir():
+        return False
+    try:
+        for _root, _dirs, files in os.walk(loc):
+            if files:
+                return True
+    except OSError:
+        pass
+    return False
+
+
+def scan_hint_for_empty_userdata(steam_path: str, account_id: str) -> str:
+    """Message court si aucun jeu détecté (dossier absent ou sans remote/local)."""
+    ud = Path(steam_path) / "userdata" / str(account_id)
+    if not ud.exists():
+        return (
+            "Aucun dossier Steam pour cet ID. Vérifie le chemin Steam (dossier qui contient "
+            "« steam.exe ») et l'identifiant : c'est le **numéro du dossier** dans "
+            "« Steam/userdata/ » (souvent 8–10 chiffres), pas le SteamID64. "
+            "Aide : https://steamid.xyz — colle ton profil ou ton SteamID64 ; le SteamID32 / Account ID correspond au dossier « userdata »."
+        )
+    return (
+        "Aucun jeu avec sauvegardes dans « userdata » pour cet ID (dossiers « remote » ou « local » avec fichiers). "
+        "Les jeux sans Steam Cloud peuvent n'avoir que « local » : ils apparaissent maintenant s'il y a des fichiers. "
+        "Sinon utilise « Tous les emplacements » plus bas pour CODEX / Goldberg / Documents, etc."
+    )
+
 
 # module-level cache for all_games.txt — parsed once per session
 _ALL_GAMES_CACHE = None
@@ -254,7 +307,7 @@ class CloudSaves:
             )
             # save manifest
             self._save_manifest(app_id, game_name, save_path, info)
-            log(f"✓ Backed up {file_count} files ({self._format_size(total_size)})")
+            log(f"[OK] Backed up {file_count} files ({self._format_size(total_size)})")
             return info
         except Exception as e:
             logger.error("Backup failed: %s", e)
@@ -292,7 +345,7 @@ class CloudSaves:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(f, target)
                     restored += 1
-            log(f"✓ Restored {restored} files")
+            log(f"[OK] Restored {restored} files")
             return True
         except Exception as e:
             logger.error("Restore failed: %s", e)
@@ -365,10 +418,11 @@ class CloudSaves:
           2. SlimeDeals fix_game_cache CachedAppInfo (previously fixed games)
           3. Batch Steam Store API call for anything still unresolved (uninstalled games)
         """
-        userdata_dir = Path(steam_path) / "userdata" / str(steam32_id)
+        account_id = normalize_steam_userdata_folder_id(str(steam32_id))
+        userdata_dir = Path(steam_path) / "userdata" / account_id
         if not userdata_dir.exists():
             return []
-        # --- collect all app IDs that have a remote/ folder ---
+        # --- jeux avec remote/ (Steam Cloud) ou local/ contenant des fichiers ---
         app_ids = []
         try:
             for item in userdata_dir.iterdir():
@@ -377,7 +431,7 @@ class CloudSaves:
                 appid = int(item.name)
                 if appid == 0:
                     continue
-                if (item / "remote").exists():
+                if _userdata_app_has_listable_saves(item):
                     app_ids.append(appid)
         except PermissionError:
             return []
@@ -487,7 +541,8 @@ class CloudSaves:
             if log_func:
                 log_func(msg)
             logger.info(msg)
-        src = Path(steam_path) / "userdata" / str(steam32_id) / str(app_id) / "remote"
+        sid = normalize_steam_userdata_folder_id(str(steam32_id))
+        src = Path(steam_path) / "userdata" / sid / str(app_id) / "remote"
         if not src.exists():
             log(f"No remote/ folder found at {src}")
             return None
@@ -505,7 +560,7 @@ class CloudSaves:
                     shutil.copy2(f, target)
                     file_count += 1
                     total_size += f.stat().st_size
-            log(f"✓ Backed up {file_count} file(s) ({self._format_size(total_size)}) → {dest}")
+            log(f"[OK] Backed up {file_count} file(s) ({self._format_size(total_size)}) → {dest}")
             return str(dest.parent)
         except Exception as e:
             log(f"Backup failed: {e}")
@@ -533,7 +588,7 @@ class CloudSaves:
         if not src.exists():
             log(f"Backup remote/ folder not found at {src}")
             return False
-        dest = Path(steam_path) / "userdata" / str(steam32_id) / str(app_id) / "remote"
+        dest = Path(steam_path) / "userdata" / normalize_steam_userdata_folder_id(str(steam32_id)) / str(app_id) / "remote"
         # safety backup of current saves
         if dest.exists():
             safety_ts = time.strftime("%Y%m%d_%H%M%S")
@@ -553,7 +608,7 @@ class CloudSaves:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(f, target)
                     restored += 1
-            log(f"✓ Restored {restored} file(s) to {dest}")
+            log(f"[OK] Restored {restored} file(s) to {dest}")
             return True
         except Exception as e:
             log(f"Restore failed: {e}")
@@ -574,13 +629,13 @@ class CloudSaves:
 
 EMU_SAVE_LOCATIONS = {
     "Public RUNE":            Path("C:/Users/Public/Documents/RUNE"),
-    "Public OnlineFix":       Path("C:/Users/Public/Documents/OnlineFix"),
+    "Public Documents (patchs)": Path("C:/Users/Public/Documents/OnlineFix"),
     "Public Steam EMPRESS":   Path("C:/Users/Public/Documents/Steam/EMPRESS"),
     "Public Steam CODEX":     Path("C:/Users/Public/Documents/Steam/CODEX"),
     "Public CODEX":           Path("C:/Users/Public/Documents/CODEX"),
     "Public EMPRESS":         Path("C:/Users/Public/Documents/EMPRESS"),
     "Public Steam RUNE":      Path("C:/Users/Public/Documents/Steam/RUNE"),
-    "Public Steam OnlineFix": Path("C:/Users/Public/Documents/Steam/OnlineFix"),
+    "Public Steam (patchs)": Path("C:/Users/Public/Documents/Steam/OnlineFix"),
     "GSE Saves":              Path(os.environ.get("APPDATA", "")) / "GSE Saves",
     "Goldberg SteamEmu Saves": Path(os.environ.get("APPDATA", "")) / "Goldberg SteamEmu Saves",
     "Goldberg SocialClub Emu Saves": Path(os.environ.get("APPDATA", "")) / "Goldberg SocialClub Emu Saves",
@@ -628,7 +683,8 @@ def scan_all_save_locations(steam_path=None, steam32_id=None):
 
     # Steam userdata
     if steam_path and steam32_id:
-        userdata_dir = Path(steam_path) / "userdata" / str(steam32_id)
+        acc = normalize_steam_userdata_folder_id(str(steam32_id))
+        userdata_dir = Path(steam_path) / "userdata" / acc
         if userdata_dir.exists():
             try:
                 name_map = {}

@@ -1,27 +1,22 @@
-# Multiplayer Fix
+# Multiplayer fix
 
-SteaMidra's multiplayer fix downloads and applies fixes from online-fix.me for supported games.
+SteaMidra can download and apply multiplayer fixes for supported games using a built-in flow (remote sources). Some builds ship with credentials already configured; otherwise you can enter your own in **Settings**.
 
 ---
 
-## online-fix.me method
+## What you need
 
-SteaMidra can download and apply multiplayer fixes from online-fix.me for supported games.
+- A valid **multiplayer fix** account when the build does not embed credentials (username and password are stored securely after the first use).
+- Optional extra Python packages depending on your install — see the Setup Guide and `requirements.txt` (for example httpx, beautifulsoup4, lxml, Selenium).
 
-**What you need**
+## How to use it
 
-An account on online-fix.me. Create one on their website. You will enter your username and password in SteaMidra the first time you use the feature. SteaMidra stores them securely.
+Run SteaMidra, choose **Apply multiplayer fix** from the menu or the library, pick your Steam library and the game, then follow the prompts.
 
-Depending on the version of SteaMidra, you may need extra Python packages. If the project includes a batch file for online-fix requirements, run it. Otherwise the Setup Guide or project README will say what to install (for example httpx, beautifulsoup4, lxml, or selenium).
+## If something goes wrong
 
-**How to use it**
+If login fails, check your credentials in **Settings**. If the game is not found, try the full official game name. If downloads or extraction fail, check your network and antivirus. See `debug.log` in the SteaMidra folder or ask on Discord.
 
-Run SteaMidra, then choose "Apply multiplayer fix (online-fix.me)" or the equivalent from the menu. Pick your Steam library and the game. SteaMidra will log in, find the fix, download it, and extract it into the game folder. The first time you may need to enter your online-fix.me credentials.
+## Responsibility
 
-**If something goes wrong**
-
-If login fails, check your username and password on the online-fix.me website. If the game is not found, try the full official game name. If downloads or extraction fail, check your internet connection and antivirus. If it still fails, check debug.log in the SteaMidra folder or ask for help on Discord.
-
-**Responsibility**
-
-Use this feature at your own risk. SteaMidra only automates downloading and extracting files from online-fix.me. Respect the site’s rules and the game’s terms.
+Use this feature at your own risk. SteaMidra automates downloading and extracting third-party files into your game folder. Respect each game's terms of service.

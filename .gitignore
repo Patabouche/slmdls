@@ -2,6 +2,11 @@
 settings.bin
 settings_export.json
 credentials.json
+# OAuth Google Drive (ne jamais versionner)
+client_secret*.json
+gdrive_oauth_client.json
+# Identifiants multijoueur locaux (prioritaires sur online_fix_embed.py)
+sff/online_fix_embed_local.py
 debug.log
 crash.log
 recent_files.json
@@ -41,6 +46,12 @@ saved_lua/
 
 # Test / temp folders
 tmp/
+
+# Outil annexe ROCKSTAR BYPASS (exécutable SlimeDealsBPRG ; voir SlimeDealsBPRG/README.txt)
+SlimeDealsBPRG/SlimeDealsBPRG.exe
+SlimeDealsBPRG/*.dll
+SlimeDealsBPRG/*.pdb
+SlimeDealsBPRG/Assets/
 
 # Docs & special files
 docs/REPO_SETTINGS_AND_CONTRIBUTORS*
@@ -98,4 +109,4 @@ GLDLL_Analysis/
 diff_gl.py
 diff_output.txt
 _gc.py
-sff/_gc.py"
+sff/_gc.py

@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QInputDialog,
@@ -254,75 +255,187 @@ class SFFMainWindow(QMainWindow):
         self.setCentralWidget(central)
         root_layout = QVBoxLayout(central)
 
-        # ── Top bar ──
-        toggle_bar = QHBoxLayout()
-        toggle_bar.setContentsMargins(6, 2, 6, 2)
+        # ── Top bar (chrome + liens + carte utilisateur) ──
+        top_wrap = QFrame()
+        top_wrap.setObjectName("topChromeStrip")
+        top_wrap.setStyleSheet(
+            "#topChromeStrip {"
+            "  background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+            "    stop:0 rgba(24,18,34,0.98), stop:1 rgba(14,11,20,0.96));"
+            "  border: none;"
+            "  border-bottom: 1px solid rgba(165, 233, 1, 0.14;"
+            "  border-radius: 0;"
+            "}"
+        )
+        toggle_bar = QHBoxLayout(top_wrap)
+        toggle_bar.setContentsMargins(10, 8, 10, 8)
+        toggle_bar.setSpacing(12)
 
-        site_btn = QPushButton("🌐  slimedeals.fr")
+        site_btn = QPushButton("  SlimeDeals  ")
+        site_btn.setObjectName("topLinkSite")
         site_btn.setToolTip("Ouvrir le site SlimeDeals")
-        site_btn.setFlat(True)
         site_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        site_btn.setStyleSheet("color: #7ec8e3; font-weight: 600; border: none; padding: 2px 8px;")
+        site_btn.setStyleSheet(
+            "#topLinkSite {"
+            "  color: #ecfdf5;"
+            "  font-weight: 800;"
+            "  font-size: 12px;"
+            "  letter-spacing: 0.04em;"
+            "  background: qlineargradient(x1:0,y1:0,x2:1,y2:1,"
+            "    stop:0 rgba(126, 200, 227, 0.42), stop:1 rgba(97, 31, 176, 0.45));"
+            "  border: 1px solid rgba(126, 200, 227, 0.55);"
+            "  border-radius: 10px;"
+            "  padding: 8px 16px;"
+            "}"
+            "#topLinkSite:hover {"
+            "  background: qlineargradient(x1:0,y1:0,x2:1,y2:1,"
+            "    stop:0 rgba(165, 233, 1, 0.45), stop:1 rgba(126, 200, 227, 0.5));"
+            "  border-color: rgba(165, 233, 1, 0.65);"
+            "}"
+            "#topLinkSite:pressed { background: rgba(97, 31, 176, 0.55); }"
+        )
         site_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://slimedeals.fr")))
 
-        discord_btn = QPushButton("💬  Discord")
+        discord_btn = QPushButton("  Discord  ")
+        discord_btn.setObjectName("topLinkDiscord")
         discord_btn.setToolTip("Rejoindre le Discord SlimeDeals")
-        discord_btn.setFlat(True)
         discord_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        discord_btn.setStyleSheet("color: #7289da; font-weight: 600; border: none; padding: 2px 8px;")
+        discord_btn.setStyleSheet(
+            "#topLinkDiscord {"
+            "  color: #eef2ff;"
+            "  font-weight: 800;"
+            "  font-size: 12px;"
+            "  letter-spacing: 0.03em;"
+            "  background: qlineargradient(x1:0,y1:0,x2:1,y2:1,"
+            "    stop:0 rgba(88, 101, 242, 0.65), stop:1 rgba(71, 82, 196, 0.55));"
+            "  border: 1px solid rgba(139, 156, 255, 0.55);"
+            "  border-radius: 10px;"
+            "  padding: 8px 16px;"
+            "}"
+            "#topLinkDiscord:hover {"
+            "  background: qlineargradient(x1:0,y1:0,x2:1,y2:1,"
+            "    stop:0 rgba(129, 142, 255, 0.75), stop:1 rgba(88, 101, 242, 0.65));"
+            "  border-color: rgba(199, 210, 254, 0.65);"
+            "}"
+            "#topLinkDiscord:pressed { background: rgba(67, 76, 180, 0.75); }"
+        )
         discord_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://discord.gg/c2pRJKjvgE")))
 
         # Logout button (hidden until authenticated)
-        self._logout_btn = QPushButton("⎋  Déconnexion")
+        self._logout_btn = QPushButton(" Déconnexion ")
+        self._logout_btn.setObjectName("topLinkLogout")
         self._logout_btn.setToolTip("Se déconnecter du compte SlimeDeals")
-        self._logout_btn.setFlat(True)
         self._logout_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._logout_btn.setStyleSheet(
-            "color: #e05c7c; font-weight: 600; border: none; padding: 2px 8px;"
+            "#topLinkLogout {"
+            "  color: #ffe4e6;"
+            "  font-weight: 700;"
+            "  font-size: 11px;"
+            "  background: rgba(225, 29, 72, 0.2);"
+            "  border: 1px solid rgba(251, 113, 133, 0.45);"
+            "  border-radius: 10px;"
+            "  padding: 8px 12px;"
+            "}"
+            "#topLinkLogout:hover { background: rgba(225, 29, 72, 0.35); border-color: rgba(253, 164, 175, 0.65); }"
+            "#topLinkLogout:pressed { background: rgba(159, 18, 57, 0.45); }"
         )
         self._logout_btn.setVisible(False)
         self._logout_btn.clicked.connect(self._do_logout)
 
-        # Pseudo + rang (widgets séparés : pseudo animé pour TRIPLE MONSTRE)
-        self._user_bar_widget = QWidget()
+        # Carte pseudo + quota + rang
+        self._user_bar_widget = QFrame()
+        self._user_bar_widget.setObjectName("userBarCard")
         self._user_bar_widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._user_bar_widget.setStyleSheet("background: transparent; border: none;")
-        self._user_bar_layout = QHBoxLayout(self._user_bar_widget)
-        self._user_bar_layout.setContentsMargins(0, 0, 0, 0)
-        self._user_bar_layout.setSpacing(6)
+        self._user_bar_widget.setStyleSheet(
+            "#userBarCard {"
+            "  background: rgba(26, 20, 38, 0.88);"
+            "  border: 1px solid rgba(165, 233, 1, 0.22);"
+            "  border-radius: 12px;"
+            "}"
+        )
+        card_outer = QHBoxLayout(self._user_bar_widget)
+        card_outer.setContentsMargins(10, 8, 12, 8)
+        card_outer.setSpacing(10)
 
         self._user_emoji_lbl = QLabel("👤")
+        self._user_emoji_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._user_emoji_lbl.setFixedSize(34, 34)
         self._user_emoji_lbl.setStyleSheet(
-            "font-size: 13px; border: none; background: transparent; padding: 2px 0;"
+            "QLabel {"
+            "  background: rgba(97, 31, 176, 0.4);"
+            "  border: 1px solid rgba(165, 233, 1, 0.28);"
+            "  border-radius: 17px;"
+            "  font-size: 15px;"
+            "}"
         )
+
+        user_text_col = QWidget()
+        user_text_col.setStyleSheet("background: transparent;")
+        ut_lay = QVBoxLayout(user_text_col)
+        ut_lay.setContentsMargins(0, 0, 0, 0)
+        ut_lay.setSpacing(5)
+
         self._user_name_btn = QPushButton()
-        self._user_name_btn.setFlat(True)
         self._user_name_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._user_name_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._user_name_btn.setToolTip("Profil du compte — abonnement Stripe")
         self._user_name_btn.setStyleSheet(
-            "QPushButton { font-size: 13px; font-weight: 700; border: none; background: transparent; "
-            "padding: 2px 2px; color: #e8e8f0; text-align: left; }"
+            "QPushButton {"
+            "  font-size: 14px;"
+            "  font-weight: 800;"
+            "  border: none;"
+            "  background: transparent;"
+            "  padding: 0 2px;"
+            "  color: #f4f4f8;"
+            "  text-align: left;"
+            "}"
             "QPushButton:hover { color: #ffffff; text-decoration: underline; }"
         )
         self._user_name_btn.clicked.connect(self._show_account_profile_dialog)
+
+        badges_row = QHBoxLayout()
+        badges_row.setSpacing(8)
+        badges_row.setContentsMargins(0, 0, 0, 0)
+
         self._user_quota_lbl = QLabel()
         self._user_quota_lbl.setStyleSheet(
-            "font-size: 11px; font-weight: 600; border: none; background: transparent; "
-            "padding: 2px 4px; color: #94a3b8; letter-spacing: 0.02em;"
+            "QLabel {"
+            "  font-size: 10px;"
+            "  font-weight: 700;"
+            "  background: rgba(148, 163, 184, 0.14);"
+            "  color: #e2e8f0;"
+            "  padding: 4px 10px;"
+            "  border-radius: 8px;"
+            "  border: 1px solid rgba(148, 163, 184, 0.28);"
+            "  letter-spacing: 0.03em;"
+            "}"
         )
         self._user_quota_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+
         self._user_rank_lbl = QLabel()
         self._user_rank_lbl.setStyleSheet(
-            "font-size: 11px; font-weight: 800; border: none; background: transparent; "
-            "padding: 2px 0; color: #94a3b8; letter-spacing: 0.06em;"
+            "QLabel {"
+            "  font-size: 10px;"
+            "  font-weight: 800;"
+            "  background: rgba(148, 163, 184, 0.12);"
+            "  color: #cbd5e1;"
+            "  padding: 4px 10px;"
+            "  border-radius: 8px;"
+            "  border: 1px solid rgba(148, 163, 184, 0.25);"
+            "  letter-spacing: 0.06em;"
+            "}"
         )
         self._user_rank_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
 
-        self._user_bar_layout.addWidget(self._user_emoji_lbl)
-        self._user_bar_layout.addWidget(self._user_name_btn)
-        self._user_bar_layout.addWidget(self._user_quota_lbl)
-        self._user_bar_layout.addWidget(self._user_rank_lbl)
+        badges_row.addWidget(self._user_quota_lbl)
+        badges_row.addWidget(self._user_rank_lbl)
+        badges_row.addStretch(1)
+
+        ut_lay.addWidget(self._user_name_btn)
+        ut_lay.addLayout(badges_row)
+
+        card_outer.addWidget(self._user_emoji_lbl, 0, Qt.AlignmentFlag.AlignTop)
+        card_outer.addWidget(user_text_col, 1)
 
         self._user_triple_anim_timer = QTimer(self)
         self._user_triple_anim_timer.timeout.connect(self._tick_user_triple_name_color)
@@ -346,7 +459,7 @@ class SFFMainWindow(QMainWindow):
         toggle_bar.addWidget(self._news_ticker, 1)
         toggle_bar.addWidget(self._user_bar_widget)
         toggle_bar.addWidget(self._logout_btn)
-        root_layout.addLayout(toggle_bar)
+        root_layout.addWidget(top_wrap)
 
         self._launcher_banner_payload.connect(self._apply_launcher_banner_payload)
         self._banner_poll_timer = QTimer(self)
@@ -808,10 +921,10 @@ class SFFMainWindow(QMainWindow):
         """Always show the auth page first; the page JS calls auth_check_saved()."""
         self._load_auth_page()
 
-    def _user_name_btn_style(self, color: str, font_weight: str = "700") -> None:
+    def _user_name_btn_style(self, color: str, font_weight: str = "800") -> None:
         self._user_name_btn.setStyleSheet(
-            "QPushButton { font-size: 13px; font-weight: %s; border: none; background: transparent; "
-            "padding: 2px 2px; color: %s; text-align: left; }"
+            "QPushButton { font-size: 14px; font-weight: %s; border: none; background: transparent; "
+            "padding: 0 2px; color: %s; text-align: left; }"
             "QPushButton:hover { text-decoration: underline; color: #ffffff; }"
             % (font_weight, color)
         )
@@ -824,8 +937,8 @@ class SFFMainWindow(QMainWindow):
         c = colors[self._user_triple_anim_phase % len(colors)]
         self._user_triple_anim_phase += 1
         self._user_name_btn.setStyleSheet(
-            "QPushButton { font-size: 13px; font-weight: 800; border: none; background: transparent; "
-            "padding: 2px 2px; color: %s; text-align: left; }"
+            "QPushButton { font-size: 14px; font-weight: 800; border: none; background: transparent; "
+            "padding: 0 2px; color: %s; text-align: left; }"
             "QPushButton:hover { text-decoration: underline; }"
             % (c,)
         )
@@ -858,6 +971,12 @@ class SFFMainWindow(QMainWindow):
         quota_txt = self._user_bar_quota_text(rank)
         self._user_quota_lbl.setText(quota_txt)
         self._user_quota_lbl.setVisible(bool(quota_txt))
+        if quota_txt:
+            self._user_quota_lbl.setStyleSheet(
+                "QLabel { font-size: 10px; font-weight: 700; background: rgba(148, 163, 184, 0.14); "
+                "color: #e2e8f0; padding: 4px 10px; border-radius: 8px; "
+                "border: 1px solid rgba(148, 163, 184, 0.28); letter-spacing: 0.03em; }"
+            )
 
         if bucket == "free":
             self._user_bar_widget.setToolTip(
@@ -866,8 +985,9 @@ class SFFMainWindow(QMainWindow):
             self._user_name_btn_style("#4ade80")
             self._user_rank_lbl.setText("FREE")
             self._user_rank_lbl.setStyleSheet(
-                "font-size: 11px; font-weight: 600; border: none; background: transparent; "
-                "padding: 2px 0; color: #94a3b8; letter-spacing: 0.04em;"
+                "QLabel { font-size: 10px; font-weight: 800; background: rgba(74, 222, 128, 0.18); "
+                "color: #bbf7d0; padding: 4px 10px; border-radius: 8px; "
+                "border: 1px solid rgba(74, 222, 128, 0.4); letter-spacing: 0.06em; }"
             )
         elif bucket == "triple":
             self._user_bar_widget.setToolTip(
@@ -879,8 +999,9 @@ class SFFMainWindow(QMainWindow):
             self._user_triple_anim_timer.start(420)
             self._user_rank_lbl.setText("TRIPLE MONSTRE")
             self._user_rank_lbl.setStyleSheet(
-                "font-size: 10px; font-weight: 800; border: none; background: transparent; "
-                "padding: 2px 0; color: #e9d5ff; letter-spacing: 0.1em;"
+                "QLabel { font-size: 10px; font-weight: 800; background: rgba(196, 181, 253, 0.22); "
+                "color: #ede9fe; padding: 4px 10px; border-radius: 8px; "
+                "border: 1px solid rgba(167, 139, 250, 0.5); letter-spacing: 0.1em; }"
             )
         elif bucket == "pass24h":
             self._user_bar_widget.setToolTip(
@@ -891,8 +1012,9 @@ class SFFMainWindow(QMainWindow):
             self._user_name_btn_style("#5eead4")
             self._user_rank_lbl.setText("24H PASS")
             self._user_rank_lbl.setStyleSheet(
-                "font-size: 10px; font-weight: 800; border: none; background: transparent; "
-                "padding: 2px 0; color: #2dd4bf; letter-spacing: 0.08em;"
+                "QLabel { font-size: 10px; font-weight: 800; background: rgba(45, 212, 191, 0.2); "
+                "color: #99f6e4; padding: 4px 10px; border-radius: 8px; "
+                "border: 1px solid rgba(45, 212, 191, 0.45); letter-spacing: 0.08em; }"
             )
         else:
             # bucket == "monstre" (ou rang payant non reconnu, traite comme Monstre)
@@ -904,8 +1026,9 @@ class SFFMainWindow(QMainWindow):
             self._user_name_btn_style("#fdba74")
             self._user_rank_lbl.setText("MONSTRE")
             self._user_rank_lbl.setStyleSheet(
-                "font-size: 11px; font-weight: 700; border: none; background: transparent; "
-                "padding: 2px 0; color: #fb923c; letter-spacing: 0.06em;"
+                "QLabel { font-size: 10px; font-weight: 800; background: rgba(251, 146, 60, 0.2); "
+                "color: #fed7aa; padding: 4px 10px; border-radius: 8px; "
+                "border: 1px solid rgba(251, 146, 60, 0.45); letter-spacing: 0.06em; }"
             )
 
     def _on_auth_success(self, username: str, rank: str = "free"):

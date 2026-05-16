@@ -46,6 +46,15 @@ else:
 logger = logging.getLogger(__name__)
 
 
+def _is_github_url(url: str) -> bool:
+    return "github.com" in (url or "").lower()
+
+
+def _log_url_no_github(url: str) -> str:
+    """N’affiche pas l’URL complète des appels GitHub dans les logs."""
+    return "<URL GitHub masquée>" if _is_github_url(url) else url
+
+
 @overload
 async def get_request(
     url: str,
@@ -72,19 +81,31 @@ async def get_request(
 ):
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            logger.debug(f"Making request to {url}")
+            logger.debug("Making request to %s", _log_url_no_github(url))
             response = await client.get(url, headers=headers)
         if response.status_code == 200:
             try:
-                logger.debug(f"Received {response.content}")
+                if _is_github_url(url):
+                    logger.debug(
+                        "Received OK (%d bytes) — corps non journalisé (GitHub).",
+                        len(response.content or b""),
+                    )
+                else:
+                    logger.debug(f"Received {response.content}")
                 return response.text if type == "text" else response.json()
             except ValueError:
                 return
         else:
-            logger.debug(f"Error {response.status_code}: {response.text[:200]}")
+            err_snip = (response.text or "")[:200]
+            if _is_github_url(url):
+                err_snip = "<réponse non journalisée (GitHub)>"
+            logger.debug("Error %s: %s", response.status_code, err_snip)
 
     except httpx.RequestError as e:
-        logger.debug(f"Request error: {repr(e)}")
+        detail = repr(e)
+        if "github.com" in detail.lower():
+            detail = "<erreur réseau — détail masqué (GitHub)>"
+        logger.debug("Request error: %s", detail)
 
 
 def get_request_raw(url):
@@ -272,5 +293,8 @@ def download_to_path(
                     pbar.update(len(chunk))
         return True
     except httpx.HTTPError as e:
-        print(f"Download error: {repr(e)}")
+        d = repr(e)
+        if "github.com" in d.lower():
+            d = "<erreur téléchargement — détail masqué (GitHub)>"
+        print(f"Download error: {d}")
         return False

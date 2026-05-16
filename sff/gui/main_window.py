@@ -23,7 +23,7 @@ from pathlib import Path
 from PyQt6.QtCore import QObject, QPoint, QThread, QTimer, QUrl, pyqtSignal, Qt
 from PyQt6.QtGui import QDesktopServices, QTextCursor, QColor, QFont, QFontMetrics, QPainter
 from PyQt6.QtWebChannel import QWebChannel
-from PyQt6.QtWebEngineCore import QWebEngineSettings
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
     QApplication,
@@ -54,6 +54,10 @@ from PyQt6.QtWidgets import (
 from sff.gui.log_window import GlobalLogWindow, QtLogHandler
 from sff.gui.themes import THEMES
 from sff.i18n import T
+from sff.mandatory_update_gui import (
+    MANDATORY_UPDATE_FIRST_POLL_MS,
+    MANDATORY_UPDATE_POLL_INTERVAL_MS,
+)
 from sff.structs import MainMenu, MainReturnCode
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -214,6 +218,8 @@ def _launcher_auth_strictly_free() -> bool:
 
 
 class SFFMainWindow(QMainWindow):
+    _launcher_banner_payload = pyqtSignal(object)
+
     def __init__(self, ui, steam_path):
         super().__init__()
         self.ui = ui
@@ -341,11 +347,19 @@ class SFFMainWindow(QMainWindow):
         toggle_bar.addWidget(self._logout_btn)
         root_layout.addLayout(toggle_bar)
 
+        self._launcher_banner_payload.connect(self._apply_launcher_banner_payload)
         self._banner_poll_timer = QTimer(self)
         self._banner_poll_timer.setInterval(1100)
         self._banner_poll_timer.timeout.connect(self._poll_launcher_banner_tick)
         self._banner_poll_timer.start()
         QTimer.singleShot(350, self._poll_launcher_banner_tick)
+
+        self._mandatory_update_poll_busy = False
+        self._mandatory_update_timer = QTimer(self)
+        self._mandatory_update_timer.setInterval(MANDATORY_UPDATE_POLL_INTERVAL_MS)
+        self._mandatory_update_timer.timeout.connect(self._on_mandatory_update_poll)
+        QTimer.singleShot(MANDATORY_UPDATE_FIRST_POLL_MS, self._on_mandatory_update_poll)
+        self._mandatory_update_timer.start()
 
         # ── Classic tab UI (hidden by default — new UI is primary) ──
         self.tabs = QTabWidget()
@@ -354,6 +368,13 @@ class SFFMainWindow(QMainWindow):
 
         # ── New Web UI (visible by default) ──
         self._web_view = QWebEngineView()
+        # Évite une ancienne version de index.html / CSS servie depuis le cache WebEngine après mise à jour des fichiers locaux.
+        try:
+            self._web_view.page().profile().setHttpCacheType(
+                QWebEngineProfile.HttpCacheType.NoCache
+            )
+        except Exception:
+            pass
         root_layout.addWidget(self._web_view)
         self._web_channel = QWebChannel()
         from sff.gui.web_bridge import WebBridge
@@ -743,16 +764,26 @@ class SFFMainWindow(QMainWindow):
             self._web_view.setVisible(False)
             self.menuBar().setVisible(True)
 
-    def _get_webui_dir(self):
-        if getattr(sys, 'frozen', False):
+    def _get_webui_dir(self) -> Path:
+        if getattr(sys, "frozen", False):
             return Path(sys._MEIPASS) / "sff" / "webui"
-        return Path(__file__).resolve().parent.parent / "webui"
+        # Même dossier que le paquet `sff` réellement importé (évite une autre copie du dépôt sur le PATH).
+        import sff as _sff_pkg
+
+        return Path(_sff_pkg.__file__).resolve().parent / "webui"
 
     def _load_web_ui(self):
         """Load index.html into the QWebEngineView."""
         index_path = self._get_webui_dir() / "index.html"
         if index_path.exists():
-            self._web_view.setUrl(QUrl.fromLocalFile(str(index_path)))
+            try:
+                ver = int(index_path.stat().st_mtime)
+            except OSError:
+                ver = 0
+            resolved = str(index_path.resolve())
+            url = QUrl.fromLocalFile(resolved)
+            url.setQuery(f"v={ver}")
+            self._web_view.setUrl(url)
         else:
             import logging
             logging.getLogger(__name__).error("Web UI not found at %s", index_path)
@@ -761,7 +792,13 @@ class SFFMainWindow(QMainWindow):
         """Show the login/register page."""
         auth_path = self._get_webui_dir() / "auth.html"
         if auth_path.exists():
-            self._web_view.setUrl(QUrl.fromLocalFile(str(auth_path)))
+            try:
+                ver = int(auth_path.stat().st_mtime)
+            except OSError:
+                ver = 0
+            url = QUrl.fromLocalFile(str(auth_path.resolve()))
+            url.setQuery(f"v={ver}")
+            self._web_view.setUrl(url)
         else:
             import logging
             logging.getLogger(__name__).error("Auth page not found at %s", auth_path)
@@ -1014,6 +1051,24 @@ class SFFMainWindow(QMainWindow):
         dlg.resize(440, 360)
         dlg.exec()
 
+    def _on_mandatory_update_poll(self):
+        """Vérifie toutes les ~10 min (et une première fois après 45 s) si une release GitHub impose une mise à jour."""
+        from sff.mandatory_update_gui import (
+            is_frozen_windows,
+            run_mandatory_version_gate_if_outdated,
+            update_disabled_by_env,
+        )
+
+        if not is_frozen_windows() or update_disabled_by_env():
+            return
+        if self._mandatory_update_poll_busy:
+            return
+        self._mandatory_update_poll_busy = True
+        try:
+            run_mandatory_version_gate_if_outdated(self)
+        finally:
+            self._mandatory_update_poll_busy = False
+
     def _poll_launcher_banner_tick(self):
         import threading
 
@@ -1024,16 +1079,16 @@ class SFFMainWindow(QMainWindow):
                 data = fetch_launcher_banner()
             except Exception:
                 data = None
-
-            def apply():
-                self._apply_launcher_banner_payload(data)
-
-            QTimer.singleShot(0, apply)
+            self._launcher_banner_payload.emit(data)
 
         threading.Thread(target=work, daemon=True).start()
 
     def _apply_launcher_banner_payload(self, d):
-        if not isinstance(d, dict) or d.get("rev") is None:
+        if d is None:
+            return
+        if not isinstance(d, dict):
+            return
+        if d.get("rev") is None:
             return
         try:
             rev = int(d["rev"])

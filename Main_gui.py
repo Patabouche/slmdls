@@ -124,6 +124,11 @@ def main():
 
     maybe_auto_update_frozen_windows()
 
+    from sff.mandatory_update_gui import is_frozen_windows, run_mandatory_version_gate
+
+    if is_frozen_windows():
+        run_mandatory_version_gate(None)
+
     _app_icon = QIcon()
     for _path in iter_application_icon_files():
         _candidate = QIcon(str(_path))

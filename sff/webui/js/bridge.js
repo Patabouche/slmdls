@@ -26,10 +26,27 @@ window.Bridge = (function() {
             }
             _ready = true;
             _connectSignals();
+            _applyAppVersionToUI();
             _readyCallbacks.forEach(function(cb) { cb(_py); });
             _readyCallbacks.length = 0;
             console.log('[Bridge] Connected to Python backend');
         });
+    }
+
+    function _applyAppVersionToUI() {
+        if (!_py || typeof _py.get_app_version !== 'function') return;
+        try {
+            _py.get_app_version(function(ver) {
+                if (!ver) return;
+                var el = document.getElementById('sidebar-app-version');
+                if (el) el.textContent = ver;
+                try {
+                    document.title = 'SlimeDeals ' + ver;
+                } catch (e2) {}
+            });
+        } catch (e) {
+            console.warn('[Bridge] get_app_version:', e);
+        }
     }
 
     function _connectSignals() {
@@ -210,10 +227,12 @@ window.Bridge = (function() {
             sync_launcher_profile: function() {},
             record_free_claim: function(app_id, cb) { if (cb) cb(JSON.stringify({ok:false,error:'simulation'})); },
             notify_gen_activity: function() {},
+            get_app_version: function(cb) { if (cb) cb('dev'); },
             discord_avis_url: function(cb) { if (cb) cb('https://discord.gg/c2pRJKjvgE'); },
             discord_free_subscribe_url: function(cb) { if (cb) cb('https://discord.gg/c2pRJKjvgE'); },
         };
         _ready = true;
+        _applyAppVersionToUI();
         _readyCallbacks.forEach(function(cb) { cb(_py); });
         _readyCallbacks.length = 0;
     }

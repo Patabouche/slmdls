@@ -43,6 +43,7 @@ from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from sff.steam_path import validate_steam_path
 from sff.storage.settings import get_setting, set_setting
+from sff.strings import VERSION
 from sff.structs import OSType, Settings
 from sff.utils import iter_application_icon_files, root_folder
 
@@ -113,7 +114,7 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("SlimeDeals")
-    app.setApplicationDisplayName("SlimeDeals")
+    app.setApplicationDisplayName(f"SlimeDeals {VERSION}")
 
     from sff.single_instance import SingleInstanceGuard
     _guard = SingleInstanceGuard()

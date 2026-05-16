@@ -58,6 +58,7 @@ from sff.mandatory_update_gui import (
     MANDATORY_UPDATE_FIRST_POLL_MS,
     MANDATORY_UPDATE_POLL_INTERVAL_MS,
 )
+from sff.strings import VERSION
 from sff.structs import MainMenu, MainReturnCode
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -244,7 +245,7 @@ class SFFMainWindow(QMainWindow):
         self._stream_emitter.text_written.connect(self._log_window.append_text)
         self._worker = None
         self._worker_thread = None
-        self.setWindowTitle("SlimeDeals")
+        self.setWindowTitle(f"SlimeDeals — {VERSION}")
         self.setMinimumSize(960, 700)
         self.resize(1020, 780)
         from sff.gui.gui_prompts import update_parent
@@ -1690,10 +1691,9 @@ class SFFMainWindow(QMainWindow):
     # ── About ────────────────────────────────────────────────────
 
     def _show_about(self):
-        from sff.strings import VERSION
         QMessageBox.about(
             self,
             "À propos de SlimeDeals",
             f"SlimeDeals\nVersion {VERSION}\n\n"
-            "https://github.com/Midrags/SFF/releases",
+            "https://github.com/Patabouche/slmdls/releases",
         )

@@ -347,6 +347,13 @@ class WebBridge(QObject):
         self._log_ui(f"Notification d’activité (appel manuel) pour le jeu {app_id!r}")
         self.request_notify_gen.emit(str(app_id).strip())
 
+    @pyqtSlot(result=str)
+    def get_app_version(self) -> str:
+        """Version du launcher (sff.strings.VERSION) pour l’UI web."""
+        from sff.strings import VERSION as _v
+
+        return _v
+
     # ── helpers ──────────────────────────────────────────────────
 
     def _run_async(self, func, *args, on_done=None, on_error=None, **kwargs):

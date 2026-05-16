@@ -1053,7 +1053,7 @@ class SFFMainWindow(QMainWindow):
         dlg.exec()
 
     def _on_mandatory_update_poll(self):
-        """Vérifie toutes les ~10 min (et une première fois après 45 s) si une release GitHub impose une mise à jour."""
+        """Revérifie GitHub toutes les 5 min (premier passage ~10 s après ouverture de la fenêtre)."""
         from sff.mandatory_update_gui import (
             is_frozen_windows,
             run_mandatory_version_gate_if_outdated,

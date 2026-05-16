@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with SlimeDeals.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Mise à jour automatique au démarrage (exe Windows gelé par PyInstaller)."""
+"""Mise à jour au démarrage (exe Windows PyInstaller) + journalisation claire."""
 
 from __future__ import annotations
 
@@ -29,28 +29,47 @@ logger = logging.getLogger("sff")
 
 def maybe_auto_update_frozen_windows() -> None:
     """
-    Compare la version locale à la dernière release GitHub (slmdls) ; si plus récente,
-    télécharge le zip, lance le script de mise à jour et quitte (redémarrage de l'exe).
+    Conservé pour compatibilité : délègue au flux unifié (log + auto + porte obligatoire).
+    Préférer ``run_frozen_windows_startup_updates`` depuis Main_gui.
+    """
+    run_frozen_windows_startup_updates()
 
-    Désactiver : variable d'environnement SLIMEDEALS_NO_AUTO_UPDATE=1 (ou true / yes).
+
+def run_frozen_windows_startup_updates() -> None:
+    """
+    Exe Windows uniquement : interroge GitHub (slmdls), écrit une ligne [Mise à jour] en INFO,
+    tente une mise à jour silencieuse si nécessaire, puis dialogue bloquant si toujours obsolète.
+
+    Désactiver : SLIMEDEALS_NO_AUTO_UPDATE=1
     """
     v = os.environ.get("SLIMEDEALS_NO_AUTO_UPDATE", "").strip().lower()
     if v in ("1", "true", "yes", "on"):
+        logger.info("[Mise à jour] Vérifications désactivées (SLIMEDEALS_NO_AUTO_UPDATE).")
         return
     if sys.platform != "win32" or not getattr(sys, "frozen", False):
         return
     try:
-        from sff.strings import VERSION
-        from sff.updater import Updater
         from sff.github_release_apply import apply_windows_frozen_update
+        from sff.mandatory_update_gui import MandatoryUpdateDialog
+        from sff.updater import Updater
 
         is_newer, release = Updater.update_available()
-        if not is_newer or not release:
-            return
-        tag = (release.get("tag_name") or "").strip()
-        logger.info("Mise à jour auto : release %s > version locale %s", tag, VERSION)
-        if apply_windows_frozen_update(release, announce=lambda m: logger.info("%s", m)):
-            logger.info("Mise à jour : installation lancée ; fermeture du processus.")
-            os._exit(0)
+        Updater.log_version_compare(release, is_newer, context="au lancement")
+
+        if is_newer and release:
+            logger.info("[Mise à jour] Tentative de mise à jour automatique avant l'interface…")
+            if apply_windows_frozen_update(
+                release,
+                announce=lambda m: logger.info("%s", m),
+            ):
+                logger.info("[Mise à jour] Script d'installation lancé — fermeture du processus.")
+                os._exit(0)
+
+        while True:
+            is_newer, release = Updater.update_available()
+            Updater.log_version_compare(release, is_newer, context="porte obligatoire")
+            if not is_newer or release is None:
+                return
+            MandatoryUpdateDialog(None, release).exec()
     except Exception:
-        logger.exception("Mise à jour automatique au démarrage échouée — lancement normal.")
+        logger.exception("[Mise à jour] Erreur au démarrage — poursuite du lancement.")

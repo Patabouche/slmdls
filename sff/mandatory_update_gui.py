@@ -40,8 +40,8 @@ from sff.updater import Updater
 log = logging.getLogger("sff")
 
 # Vérification pendant que le launcher est ouvert (ms)
-MANDATORY_UPDATE_POLL_INTERVAL_MS = 10 * 60 * 1000
-MANDATORY_UPDATE_FIRST_POLL_MS = 45_000
+MANDATORY_UPDATE_POLL_INTERVAL_MS = 5 * 60 * 1000
+MANDATORY_UPDATE_FIRST_POLL_MS = 10_000
 
 
 def is_frozen_windows() -> bool:
@@ -140,10 +140,15 @@ def run_mandatory_version_gate(parent) -> None:
 
 
 def run_mandatory_version_gate_if_outdated(parent) -> None:
-    """Une seule ouverture du dialogue si obsolète (pour le timer périodique)."""
+    """Timer : revérifie GitHub toutes les 5 min (premier passage ~10 s après l'ouverture)."""
     if not is_frozen_windows():
         return
-    outdated, release = check_outdated_vs_github()
-    if not outdated or release is None:
+    if update_disabled_by_env():
+        return
+    from sff.updater import Updater
+
+    is_newer, release = Updater.update_available()
+    Updater.log_version_compare(release, is_newer, context="périodique (5 min)")
+    if not is_newer or release is None:
         return
     MandatoryUpdateDialog(parent, release).exec()

@@ -102,6 +102,45 @@ class Updater:
         return None
 
     @staticmethod
+    def log_version_compare(
+        release: dict | None,
+        is_outdated: bool,
+        *,
+        context: str = "vérification",
+    ) -> None:
+        """Log INFO lisible pour debug.log / traçabilité des mises à jour."""
+        import logging
+
+        log = logging.getLogger("sff")
+        if not release:
+            log.info(
+                "[Mise à jour] (%s) Impossible de lire la dernière release GitHub "
+                "(%s/%s) — réseau, API ou aucune release publiée.",
+                context,
+                GITHUB_RELEASE_OWNER,
+                GITHUB_RELEASE_REPO,
+            )
+            return
+        tag = (release.get("tag_name") or "").strip()
+        name = (release.get("name") or "").strip()
+        if is_outdated:
+            log.info(
+                "[Mise à jour] (%s) Mise à jour disponible : GitHub %s (%s) > version locale %s.",
+                context,
+                tag,
+                name or "—",
+                VERSION,
+            )
+        else:
+            log.info(
+                "[Mise à jour] (%s) À jour — version locale %s | dernière release GitHub %s (%s).",
+                context,
+                VERSION,
+                tag,
+                name or "—",
+            )
+
+    @staticmethod
     def update_available():
         release = Updater.get_latest_stable()
         if not release:

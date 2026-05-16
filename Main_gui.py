@@ -121,14 +121,9 @@ def main():
     if _guard.try_activate_existing():
         sys.exit(0)
 
-    from sff.startup_update import maybe_auto_update_frozen_windows
+    from sff.startup_update import run_frozen_windows_startup_updates
 
-    maybe_auto_update_frozen_windows()
-
-    from sff.mandatory_update_gui import is_frozen_windows, run_mandatory_version_gate
-
-    if is_frozen_windows():
-        run_mandatory_version_gate(None)
+    run_frozen_windows_startup_updates()
 
     _app_icon = QIcon()
     for _path in iter_application_icon_files():

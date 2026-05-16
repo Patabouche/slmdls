@@ -120,6 +120,10 @@ def main():
     if _guard.try_activate_existing():
         sys.exit(0)
 
+    from sff.startup_update import maybe_auto_update_frozen_windows
+
+    maybe_auto_update_frozen_windows()
+
     _app_icon = QIcon()
     for _path in iter_application_icon_files():
         _candidate = QIcon(str(_path))

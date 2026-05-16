@@ -1,4 +1,4 @@
-﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
+# SlimeDeals - Steam game setup and manifest tool (SFF)
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 #
 # This file is part of SlimeDeals.
@@ -22,9 +22,7 @@ import httpx
 import json
 
 from sff.http_utils import get_request
-from sff.strings import VERSION
-
-# Hardcoded to ensure updates always fetch from https://github.com/Midrags/SFF/releases
+from sff.strings import GITHUB_RELEASE_OWNER, GITHUB_RELEASE_REPO, VERSION
 
 
 def _parse_version(tag):
@@ -52,8 +50,12 @@ def is_newer_version(remote_tag, current):
 
 class Updater:
 
-    _LATEST_URL = "https://api.github.com/repos/Midrags/SFF/releases/latest"
-    _RELEASES_URL = "https://api.github.com/repos/Midrags/SFF/releases"
+    _LATEST_URL = (
+        f"https://api.github.com/repos/{GITHUB_RELEASE_OWNER}/{GITHUB_RELEASE_REPO}/releases/latest"
+    )
+    _RELEASES_URL = (
+        f"https://api.github.com/repos/{GITHUB_RELEASE_OWNER}/{GITHUB_RELEASE_REPO}/releases"
+    )
     _HEADERS = {"Accept": "application/vnd.github.v3+json", "User-Agent": "SlimeDeals-Updater"}
 
     @staticmethod

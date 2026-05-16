@@ -22,9 +22,9 @@ VERSION = "6.0.5"
 STEAM_WEB_API_KEY = "1DD0450A99F573693CD031EBB160907D"
 GITHUB_USERNAME = "Midrags"
 REPO_NAME = "sff"
-# Update check source: https://github.com/Midrags/SFF/releases/
-GITHUB_UPDATE_USERNAME = "Midrags"
-REPO_UPDATE_NAME = "SteaMidra"
-RELEASE_PAGE_URL = "https://github.com/Midrags/SFF/releases/"
+# Mises à jour : dépôt public (API GitHub sans token) — zip attaché à chaque release
+GITHUB_RELEASE_OWNER = "Patabouche"
+GITHUB_RELEASE_REPO = "slmdls"
+RELEASE_PAGE_URL = f"https://github.com/{GITHUB_RELEASE_OWNER}/{GITHUB_RELEASE_REPO}/releases/"
 WINDOWS_RELEASE_PREFIX = "0_windows_x86-64"
 LINUX_RELEASE_PREFIX = "1_linux_x86-64"

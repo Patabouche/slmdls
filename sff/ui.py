@@ -83,8 +83,9 @@ from sff.structs import (
     Settings,
     SettingsManagementOptions,
 )
+from sff.github_release_apply import apply_windows_frozen_update
 from sff.updater import Updater, is_newer_version
-from sff.utils import enter_path, root_folder
+from sff.utils import enter_path, launcher_manifests_dir, launcher_saved_lua_dir, root_folder
 from sff.zip import zip_folder
 
 logger = logging.getLogger(__name__)
@@ -122,7 +123,7 @@ def music_toggle_decorator(func):  # type: ignore
 def _cleanup_stale_manifests(steam_path, manifest_override: dict) -> None:
     """Delete depotcache/staging manifests that don't match the selected version."""
     depotcache = steam_path / "depotcache"
-    staging = Path.cwd() / "manifests"
+    staging = launcher_manifests_dir()
     removed = 0
     for depot_id, correct_manifest_id in manifest_override.items():
         for directory in (depotcache, staging):
@@ -964,8 +965,8 @@ class UI:
         app_id = str(app_id)
         if (lib_path := self.select_steam_library()) is None:
             return MainReturnCode.LOOP_NO_PROMPT
-        saved_lua = Path.cwd() / "saved_lua"
-        saved_lua.mkdir(exist_ok=True)
+        saved_lua = launcher_saved_lua_dir()
+        saved_lua.mkdir(parents=True, exist_ok=True)
         source = LuaEndpoint.HUBCAP if use_hubcap else LuaEndpoint.OUREVERYDAY
         print(
             Fore.CYAN
@@ -1266,54 +1267,17 @@ class UI:
             print(Fore.GREEN + "Update will apply and the app will restart. Exiting..." + Style.RESET_ALL, flush=True)
             os._exit(0)
         def _do_windows_frozen_update():
-            if not download_url or not asset_name:
-                return False
-            print(f"Downloading {asset_name}...")
-            if not download_to_path(download_url, update_zip):
-                print(Fore.RED + "Download failed." + Style.RESET_ALL)
-                return False
-            print("Extracting update...")
-            if tmp_update.exists():
-                shutil.rmtree(tmp_update, ignore_errors=True)
-            tmp_update.mkdir(parents=True, exist_ok=True)
-            with zipfile.ZipFile(update_zip) as zf:
-                zf.extractall(tmp_update)
-            entries = list(tmp_update.iterdir())
-            if len(entries) == 1 and entries[0].is_dir():
-                inner = entries[0]
-                for p in inner.iterdir():
-                    shutil.move(str(p), str(tmp_update / p.name))
-                inner.rmdir()
-            exe_name = Path(sys.executable).name
-            convert = subprocess.list2cmdline
-            internal_dir = str(app_dir / "_internal")
-            updater_bat = app_dir / "tmp_updater.bat"
-            updater_bat.write_text(
-                "@echo off\n"
-                "timeout /t 3 /nobreak >nul\n"
-                f"taskkill /F /PID {os.getpid()} >nul 2>&1\n"
-                "rmdir /s /q " + convert([internal_dir]) + " >nul 2>&1\n"
-                "robocopy " + convert([str(tmp_update), str(app_dir)]) + " /E /IS /IT >nul 2>&1\n"
-                "if %errorlevel% GEQ 8 (\n"
-                "  echo Robocopy error! Update may be incomplete. Check your SlimeDeals folder.\n"
-                "  pause\n"
-                "  goto :end\n"
-                ")\n"
-                "rmdir /s /q " + convert([str(tmp_update)]) + " >nul 2>&1\n"
-                "del /q " + convert([str(update_zip)]) + " >nul 2>&1\n"
-                "start \"\" " + convert([str(app_dir / exe_name)]) + "\n"
-                ":end\n"
-                "(goto) 2>nul & del \"%~f0\"\n",
-                encoding="utf-8",
-            )
-            _BREAKAWAY = 0x01000000
-            subprocess.Popen(
-                ["cmd", "/c", str(updater_bat)],
-                creationflags=subprocess.DETACHED_PROCESS | _BREAKAWAY,
-                cwd=str(app_dir),
-            )
-            print(Fore.GREEN + "Update started. SlimeDeals will restart automatically." + Style.RESET_ALL, flush=True)
-            os._exit(0)
+            def _announce(msg: str) -> None:
+                if "Download failed" in msg:
+                    print(Fore.RED + msg + Style.RESET_ALL, flush=True)
+                elif "Update started" in msg:
+                    print(Fore.GREEN + msg + Style.RESET_ALL, flush=True)
+                else:
+                    print(msg, flush=True)
+
+            if apply_windows_frozen_update(resp, announce=_announce):
+                os._exit(0)
+            return False
 
         def _do_linux_frozen_update():
             if not download_url or not asset_name:
@@ -1385,7 +1349,7 @@ class UI:
             if prompt_confirm("Open the release page in your browser?"):
                 webbrowser.open(release_url)
             return MainReturnCode.LOOP_NO_PROMPT
-        if not download_url or not _do_windows_frozen_update():
+        if not _do_windows_frozen_update():
             if prompt_confirm("Open the release page in your browser?"):
                 webbrowser.open(release_url)
         return MainReturnCode.LOOP_NO_PROMPT

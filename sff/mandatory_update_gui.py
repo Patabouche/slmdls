@@ -141,14 +141,22 @@ def run_mandatory_version_gate(parent) -> None:
 
 def run_mandatory_version_gate_if_outdated(parent) -> None:
     """Timer : revérifie GitHub toutes les 5 min (premier passage ~10 s après l'ouverture)."""
-    if not is_frozen_windows():
+    if sys.platform != "win32":
         return
     if update_disabled_by_env():
         return
     from sff.updater import Updater
 
+    frozen = getattr(sys, "frozen", False)
     is_newer, release = Updater.update_available()
-    Updater.log_version_compare(release, is_newer, context="périodique (5 min)")
+    ctx = (
+        "périodique (5 min)"
+        if frozen
+        else "périodique (5 min, Python — log seulement, pas d'install exe)"
+    )
+    Updater.log_version_compare(release, is_newer, context=ctx)
+    if not frozen:
+        return
     if not is_newer or release is None:
         return
     MandatoryUpdateDialog(parent, release).exec()

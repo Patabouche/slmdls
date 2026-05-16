@@ -41,19 +41,31 @@ def run_frozen_windows_startup_updates() -> None:
     tente une mise à jour silencieuse si nécessaire, puis dialogue bloquant si toujours obsolète.
 
     Désactiver : SLIMEDEALS_NO_AUTO_UPDATE=1
+
+    Mode ``launch_gui.bat`` / Python : même appel à GitHub et logs **[Mise à jour]**,
+    mais **pas** d'installation auto (réservé à l'exe PyInstaller).
     """
     v = os.environ.get("SLIMEDEALS_NO_AUTO_UPDATE", "").strip().lower()
     if v in ("1", "true", "yes", "on"):
         logger.info("[Mise à jour] Vérifications désactivées (SLIMEDEALS_NO_AUTO_UPDATE).")
         return
-    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+    if sys.platform != "win32":
         return
+    frozen = getattr(sys, "frozen", False)
     try:
         from sff.github_release_apply import apply_windows_frozen_update
         from sff.mandatory_update_gui import MandatoryUpdateDialog
         from sff.updater import Updater
 
         is_newer, release = Updater.update_available()
+        if not frozen:
+            Updater.log_version_compare(
+                release,
+                is_newer,
+                context="au lancement (Python / launch_gui.bat — pas d'exe PyInstaller, vérif. seulement)",
+            )
+            return
+
         Updater.log_version_compare(release, is_newer, context="au lancement")
 
         if is_newer and release:

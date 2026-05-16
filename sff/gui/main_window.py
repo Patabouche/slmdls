@@ -1054,13 +1054,14 @@ class SFFMainWindow(QMainWindow):
 
     def _on_mandatory_update_poll(self):
         """Revérifie GitHub toutes les 5 min (premier passage ~10 s après ouverture de la fenêtre)."""
+        import sys
+
         from sff.mandatory_update_gui import (
-            is_frozen_windows,
             run_mandatory_version_gate_if_outdated,
             update_disabled_by_env,
         )
 
-        if not is_frozen_windows() or update_disabled_by_env():
+        if sys.platform != "win32" or update_disabled_by_env():
             return
         if self._mandatory_update_poll_busy:
             return

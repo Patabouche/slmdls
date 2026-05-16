@@ -52,6 +52,7 @@ from sff.structs import (  # type: ignore
 )
 from sff.zip import read_nth_file_from_zip_bytes, extract_manifests_from_zip_bytes
 from sff.steam_tools_compat import sync_manifest_to_config_depotcache
+from sff.utils import launcher_manifests_dir
 from typing import cast
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ class ManifestDownloader:
     def _preseed_depotcache(self):
         # Copy everything from ./manifests/ into depotcache now so Steam
         # finds them locally and never needs a network call.
-        manifests_dir = Path.cwd() / "manifests"
+        manifests_dir = launcher_manifests_dir()
         if not manifests_dir.exists():
             return 0
         depotcache = self.steam_path / "depotcache"
@@ -493,7 +494,7 @@ class ManifestDownloader:
             depotcache = self.steam_path / "depotcache"
             depotcache.mkdir(exist_ok=True)
             final_manifest_loc = depotcache / f"{depot_id}_{manifest_id}.manifest"
-            possible_saved_manifest = Path.cwd() / f"manifests/{depot_id}_{manifest_id}.manifest"
+            possible_saved_manifest = launcher_manifests_dir() / f"{depot_id}_{manifest_id}.manifest"
             # If saved manifest exists (from Morrenus ZIP), refresh depotcache
             if possible_saved_manifest.exists():
                 shutil.copy2(str(possible_saved_manifest), final_manifest_loc)
@@ -610,7 +611,7 @@ class ManifestDownloader:
             try:
                 final_manifest_loc = depotcache / f"{depot_id}_{manifest_id}.manifest"
                 # Prefer saved manifest (from Morrenus ZIP) over stale depotcache
-                possible_saved_manifest = Path.cwd() / f"manifests/{depot_id}_{manifest_id}.manifest"
+                possible_saved_manifest = launcher_manifests_dir() / f"{depot_id}_{manifest_id}.manifest"
                 if possible_saved_manifest.exists():
                     shutil.copy2(possible_saved_manifest, final_manifest_loc)
                     sync_manifest_to_config_depotcache(self.steam_path, final_manifest_loc)

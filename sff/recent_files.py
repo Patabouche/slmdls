@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Recent Files Management for SteaMidra"""
+"""Recent Files Management for SlimeDeals"""
 
 import json
 import logging

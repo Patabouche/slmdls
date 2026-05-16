@@ -105,7 +105,7 @@ def set_stats_and_achievements(app_id):
             )
         )
         if prompt_confirm(
-            "Would you like SteaMidra to remember this setting? "
+            "Would you like SlimeDeals to remember this setting? "
             "(You can change this in Settings)",
             default=False,
         ):
@@ -141,18 +141,18 @@ def install_context_menu():
         mode = "Executable"
         icon = exe_path
 
-    sff_path = r"SOFTWARE\Classes\*\shell\SteaMidra"
-    command_path = r"SOFTWARE\Classes\*\shell\SteaMidra\command"
+    sff_path = r"SOFTWARE\Classes\*\shell\SlimeDeals"
+    command_path = r"SOFTWARE\Classes\*\shell\SlimeDeals\command"
 
     try:
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, sff_path) as key:
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Add to SteaMidra")
+            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "Add to SlimeDeals")
             winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon)
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, command_path) as key:
             winreg.SetValueEx(key, "", 0, winreg.REG_SZ, command_val)
         print(
             Fore.GREEN + f"Success! Context menu added via {mode}.\n"
-            'You can now right click .lua/.zip files and click "Add to SteaMidra"'
+            'You can now right click .lua/.zip files and click "Add to SlimeDeals"'
             + Style.RESET_ALL
         )
 
@@ -162,6 +162,8 @@ def install_context_menu():
 
 def uninstall_context_menu():
     keys_to_delete = [
+        r"SOFTWARE\Classes\*\shell\SlimeDeals\command",
+        r"SOFTWARE\Classes\*\shell\SlimeDeals",
         r"SOFTWARE\Classes\*\shell\SteaMidra\command",
         r"SOFTWARE\Classes\*\shell\SteaMidra",
         r"SOFTWARE\Classes\*\shell\SFF\command",

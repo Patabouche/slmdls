@@ -23,6 +23,8 @@ from pathlib import Path
 from colorama import Fore, Style
 from typing import Literal, Union, overload
 
+from sff.utils import launcher_manifests_dir
+
 
 @overload
 def read_lua_from_zip(path): ...
@@ -60,8 +62,8 @@ def read_lua_from_zip(
                 elif file.filename.endswith(".manifest"):
                     filename = Path(file.filename).name
                     data = f.read(file)
-                    # Always save to ./manifests/ as staging area
-                    manifests_dir = Path.cwd() / "manifests"
+                    # Staging sous ~/.slimedeals/work/manifests
+                    manifests_dir = launcher_manifests_dir()
                     manifests_dir.mkdir(exist_ok=True)
                     (manifests_dir / filename).write_bytes(data)
                     # Always write to depotcache — fresh ZIP data wins over

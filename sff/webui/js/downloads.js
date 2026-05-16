@@ -1,5 +1,5 @@
 /**
- * SteaMidra — Downloads Page
+ * SlimeDeals — Downloads Page
  * Active downloads with progress bars + download history.
  */
 

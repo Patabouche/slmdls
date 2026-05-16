@@ -28,7 +28,7 @@ from typing import Tuple
 from colorama import Fore, Style
 
 from sff.dotnet_utils import get_dotnet_path
-from sff.utils import root_folder
+from sff.utils import launcher_manifests_dir, root_folder
 
 KEYS_TMP = Path(tempfile.gettempdir()) / "mistwalker_keys.vdf"
 MANIFESTS_TMP = Path(tempfile.gettempdir()) / "mistwalker_manifests"
@@ -53,7 +53,7 @@ def _copy_manifests_to_temp(steam_path: Path, manifests: dict) -> None:
             dst = MANIFESTS_TMP / src.name
             shutil.copy2(src, dst)
 
-    staging = Path.cwd() / "manifests"
+    staging = launcher_manifests_dir()
     if staging.exists():
         for depot_id, manifest_id in manifests.items():
             src = staging / f"{depot_id}_{manifest_id}.manifest"
@@ -261,7 +261,7 @@ def move_manifests_to_depotcache(dest_path: Path, manifests_dict: dict, print_fn
         except Exception:
             pass
 
-    staging = Path.cwd() / "manifests"
+    staging = launcher_manifests_dir()
     if staging.exists():
         for f in staging.glob("*.manifest"):
             dst = depotcache / f.name

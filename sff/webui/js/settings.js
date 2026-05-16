@@ -1,5 +1,5 @@
 /**
- * SteaMidra — Settings Page
+ * SlimeDeals — Settings Page
  * Theme picker, paths, API keys, AppList profiles, preferences.
  */
 
@@ -55,7 +55,6 @@ window.Settings = (function() {
         _initProfileControls();
         _initPreferenceControls();
         _initAutoBackupControls();
-        _initAboutLinks();
         _initAppListActions();
         _initAvatarControls();
     }
@@ -293,25 +292,6 @@ window.Settings = (function() {
             saveBtn.addEventListener('click', function() {
                 Bridge.call('set_setting', 'last_backup_provider_config', JSON.stringify({ provider: 'gdrive_api' }));
                 Components.showToast('success', 'Sauvegarde auto : Google Drive enregistré (vérifie l’intervalle ci-dessus)');
-            });
-        }
-    }
-
-    function _initAboutLinks() {
-        var githubLink = document.getElementById('about-github');
-        var updateLink = document.getElementById('about-update');
-
-        if (githubLink) {
-            githubLink.addEventListener('click', function(e) {
-                e.preventDefault();
-                Bridge.call('open_url', 'https://github.com/Midrags/SFF');
-            });
-        }
-
-        if (updateLink) {
-            updateLink.addEventListener('click', function(e) {
-                e.preventDefault();
-                Bridge.call('run_game_action', '', 'check_updates');
             });
         }
     }

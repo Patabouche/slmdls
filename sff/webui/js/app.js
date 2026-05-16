@@ -1,5 +1,5 @@
 /**
- * SteaMidra — Main App Router & Sidebar Navigation
+ * SlimeDeals — Main App Router & Sidebar Navigation
  * Handles page switching, platform detection, and global initialization.
  */
 
@@ -142,6 +142,29 @@ window.App = (function() {
         });
     }
 
+    function _bindSubscriptionsPage() {
+        var btnT = document.getElementById('subscriptions-open-tarifs');
+        var btnD = document.getElementById('subscriptions-open-discord');
+        if (btnT) {
+            btnT.addEventListener('click', function() {
+                Bridge.call('open_url', 'https://slimedeals.fr/#tarifs');
+            });
+        }
+        if (btnD) {
+            btnD.addEventListener('click', function() {
+                Bridge.onReady(function(py) {
+                    if (typeof py.discord_avis_url !== 'function') {
+                        Bridge.call('open_url', 'https://discord.gg/c2pRJKjvgE');
+                        return;
+                    }
+                    py.discord_avis_url(function(url) {
+                        Bridge.call('open_url', url && url.indexOf('http') === 0 ? url : 'https://discord.gg/c2pRJKjvgE');
+                    });
+                });
+            });
+        }
+    }
+
     function _applyHomeLuaSectionForRank(rank) {
         var sec = document.getElementById('section-lua-manifest');
         if (!sec) return;
@@ -159,6 +182,7 @@ window.App = (function() {
         Tooltips.init();
         _bindBprgFreeUpsellModal();
         _bindCloudSavesFreeUpsellModal();
+        _bindSubscriptionsPage();
         _initSidebar();
         _initLogPanel();
         _initGlobalListeners();

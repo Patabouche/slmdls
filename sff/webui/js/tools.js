@@ -1,5 +1,5 @@
-﻿/**
- * SteaMidra — Tools Page
+/**
+ * SlimeDeals — Tools Page
  * GBE Token Generator, VDF Key Extractor, Workshop Browser
  */
 

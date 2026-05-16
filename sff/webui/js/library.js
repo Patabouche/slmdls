@@ -1,5 +1,5 @@
 /**
- * SteaMidra — Library Page
+ * SlimeDeals — Library Page
  * Shows installed/downloaded games from AppList + Steam libraries.
  */
 
@@ -155,6 +155,25 @@ window.Library = (function() {
                         btn.textContent = 'Patching...';
                         btn.dataset.lurefixing = appId;
                         Bridge.call('lure_fix_acf', appId);
+                    } else if (action === 'launch_admin') {
+                        var gpath = (btn.dataset.gamepath || '').trim();
+                        if (!gpath) {
+                            Components.showToast('error', 'Chemin du jeu manquant — rafraîchis la bibliothèque.');
+                            return;
+                        }
+                        Bridge.callWithCallback('launch_game_as_admin', gpath, function(raw) {
+                            var o;
+                            try {
+                                o = JSON.parse(raw || '{}');
+                            } catch (e1) {
+                                o = {};
+                            }
+                            if (o.ok) {
+                                Components.showToast('success', (o.message || 'OK') + (o.exe ? '\n' + o.exe : ''));
+                            } else {
+                                Components.showToast('error', o.message || 'Lancement impossible');
+                            }
+                        });
                     } else if (action === 'multiplayer') {
                         Bridge.onReady(function(py) {
                             py.get_user_rank(function(jsonStr) {
@@ -332,6 +351,7 @@ window.Library = (function() {
             var actions = card.querySelector('.game-card-actions');
             if (actions) {
                 actions.innerHTML =
+                    '<button type="button" class="btn btn-sm" data-action="launch_admin" data-gamepath="' + safePath + '" data-tooltip="Lance l’exécutable principal depuis le dossier d’installation (Windows : avec élévation administrateur via UAC si tu acceptes la fenêtre)">Lancer</button>' +
                     '<button class="btn btn-sm" data-action="fix" data-appid="' + game.app_id + '" data-tooltip="Fix this game">Fix</button>' +
                     '<button class="btn btn-sm" data-action="multiplayer" data-appid="' + game.app_id + '" data-tooltip="Applique les patches multijoueur en ligne — compte préconfiguré dans le launcher, aucune saisie">ONLINE FIX</button>' +
                     '<button class="btn btn-sm" data-action="dlc_check" data-appid="' + game.app_id + '" data-tooltip="Check DLCs">DLC</button>' +

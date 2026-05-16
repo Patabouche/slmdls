@@ -443,7 +443,7 @@ Default Goldberg port: 47584 — make sure it is open in your firewall.
         1. sys._MEIPASS (frozen single-file EXE — bundled data lives here,
            NOT in Path(sys.executable).parent which is the EXE's own folder)
         2. Next to the EXE / project root (dev mode or one-folder distribution)
-        3. %APPDATA%/SteaMidra/gse_tool/ (previously staged persistent copy)
+        3. %APPDATA%/SlimeDeals/gse_tool/ (previously staged persistent copy; legacy %APPDATA%/SteaMidra/gse_tool/ also checked)
         Returns None on Linux (binary is Windows-only).
         """
         if sys.platform != "win32":
@@ -466,9 +466,10 @@ Default Goldberg port: 47584 — make sure it is open in your firewall.
             pass
         # 3. Persistent APPDATA staged copy (written on first successful run)
         appdata = Path(os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming"))
-        p = appdata / "SteaMidra" / "gse_tool" / "generate_emu_config.exe"
-        if p.exists():
-            return p
+        for _brand in ("SlimeDeals", "SteaMidra"):
+            p = appdata / _brand / "gse_tool" / "generate_emu_config.exe"
+            if p.exists():
+                return p
         return None
 
     def _run_gse_config(
@@ -484,7 +485,7 @@ Default Goldberg port: 47584 — make sure it is open in your firewall.
         Run generate_emu_config.exe (GSE Fork) to build steam_settings.
         Locates the tool via _find_gse_exe() (checks sys._MEIPASS first so the
         bundled version inside the frozen EXE is found correctly).
-        Copies the tool to %APPDATA%/SteaMidra/gse_tool/ before running so it
+        Copies the tool to %APPDATA%/SlimeDeals/gse_tool/ before running so it
         has a writable persistent directory for output and its own state files.
         auth_mode: "anonymous" or "login" (username + password via env vars).
         Runs with CREATE_NO_WINDOW + stdin=DEVNULL so no console ever appears.
@@ -493,14 +494,14 @@ Default Goldberg port: 47584 — make sure it is open in your firewall.
         config_exe = self._find_gse_exe()
         if not config_exe:
             log("generate_emu_config.exe not found in any search location")
-            log("  Searched: sys._MEIPASS, project root, %APPDATA%/SteaMidra/gse_tool/")
+            log("  Searched: sys._MEIPASS, project root, %APPDATA%/SlimeDeals|SteaMidra/gse_tool/")
             return False
         log(f"GSE tool found: {config_exe}")
         # Copy the entire tool folder to a persistent writable APPDATA location.
         # This ensures the tool can write output/ and keep its own state files,
         # and avoids issues with sys._MEIPASS being a read-constrained temp dir.
         appdata = Path(os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming"))
-        run_dir = appdata / "SteaMidra" / "gse_tool"
+        run_dir = appdata / "SlimeDeals" / "gse_tool"
         run_exe = run_dir / "generate_emu_config.exe"
         try:
             src_dir = config_exe.parent

@@ -81,7 +81,7 @@ class StoreApiClient:
                 base_url=BASE_URL,
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
-                    "User-Agent": "SteaMidra/1.0",
+                    "User-Agent": "SlimeDeals/1.0",
                 },
                 timeout=self.timeout,
             )

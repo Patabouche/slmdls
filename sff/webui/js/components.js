@@ -1,5 +1,5 @@
 /**
- * SteaMidra — Shared UI Components
+ * SlimeDeals — Shared UI Components
  * Game cards, modals, tooltips, toasts
  */
 

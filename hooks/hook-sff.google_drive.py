@@ -16,14 +16,26 @@
 # You should have received a copy of the GNU General Public License
 # along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
 
-"""
-SlimeDeals integrated tools.
+# PyInstaller hook — sous-modules souvent omis par l’analyse statique (googleapiclient, etc.)
 
-GBE Token Generator, VDF Key Extractor, Capcom Save Fix.
-"""
+from PyInstaller.utils.hooks import collect_submodules
 
-from sff.tools.gbe_token_generator import GBETokenGenerator
-from sff.tools.vdf_key_extractor import VdfKeyExtractor
-from sff.tools.capcom_save_fix import CapcomSaveFix
+_pkgs = (
+    "google.auth",
+    "google.oauth2",
+    "google_auth_oauthlib",
+    "google_auth_httplib2",
+    "googleapiclient",
+    "google.api_core",
+    "httplib2",
+    "uritemplate",
+)
 
-__all__ = ["GBETokenGenerator", "VdfKeyExtractor", "CapcomSaveFix"]
+hiddenimports = []
+for _p in _pkgs:
+    try:
+        hiddenimports.extend(collect_submodules(_p))
+    except Exception:
+        pass
+
+hiddenimports = sorted(set(hiddenimports))

@@ -1,6 +1,6 @@
 /**
 
- * SteaMidra — Sauvegardes cloud (Google Drive uniquement sur cette page).
+ * SlimeDeals — Sauvegardes cloud (Google Drive uniquement sur cette page).
 
  */
 
@@ -934,6 +934,18 @@ window.CloudSaves = (function() {
 
                 lines.push('OAuth Google configuré : ' + (r.gdrive_oauth_available ? 'oui' : 'non'));
 
+                if (typeof r.gdrive_deps_installed === 'boolean') {
+
+                    lines.push('Bibliothèques OAuth (paquets Google) dans l’app : ' + (r.gdrive_deps_installed ? 'oui' : 'non'));
+
+                }
+
+                if (typeof r.gdrive_credentials_configured === 'boolean') {
+
+                    lines.push('Identifiants client OAuth résolus : ' + (r.gdrive_credentials_configured ? 'oui' : 'non'));
+
+                }
+
                 lines.push('Google Drive connecté : ' + (r.gdrive_connected ? 'oui' : 'non'));
 
                 lines.push('Racine des sauvegardes sur Drive : ' + (r.gdrive_backup_root_ok ? 'OK' : 'non'));
@@ -1116,7 +1128,7 @@ window.CloudSaves = (function() {
 
                 if (status.available === false) {
 
-                    _setGdriveUnavailable();
+                    _setGdriveUnavailable(status);
 
                     return;
 
@@ -1132,7 +1144,7 @@ window.CloudSaves = (function() {
 
 
 
-    function _setGdriveUnavailable() {
+    function _setGdriveUnavailable(status) {
 
         var statusText = document.getElementById('gdrive-status-text');
 
@@ -1140,11 +1152,25 @@ window.CloudSaves = (function() {
 
         var disconnectBtn = document.getElementById('gdrive-disconnect-btn');
 
+        var msg;
+
+        if (status && status.deps_installed === false) {
+
+            msg = 'Bibliothèques Google (OAuth) absentes de cette build — l’empaquetage PyInstaller n’a pas inclus les dépendances. Réessaie une build officielle ou signale le bug ; ce n’est pas un problème de fichier JSON utilisateur.';
+
+        } else if (status && status.credentials_configured === false) {
+
+            msg = 'OAuth non configuré — ajoute gdrive_oauth_client.json dans le dossier SlimeDeals (%APPDATA%) ou les variables SLIMEDEALS_GDRIVE_CLIENT_* (ou STEAMIDRA_* en compatibilité). Pour une build publique : embarque les identifiants avant PyInstaller (write_gdrive_gc_secrets.py ou JSON dans sff/).';
+
+        } else {
+
+            msg = 'Google Drive indisponible — identifiants OAuth ou bibliothèques manquants (voir message détaillé après prochain build) ou ajoute gdrive_oauth_client.json / variables SLIMEDEALS_GDRIVE_CLIENT_*.';
+
+        }
+
         if (statusText) {
 
-            statusText.textContent =
-
-                'OAuth non configuré — ajoute gdrive_oauth_client.json dans le dossier SlimeDeals ou les variables STEAMIDRA_GDRIVE_CLIENT_*';
+            statusText.textContent = msg;
 
         }
 
@@ -1154,7 +1180,7 @@ window.CloudSaves = (function() {
 
             connectBtn.disabled = true;
 
-            connectBtn.textContent = 'Configurer OAuth';
+            connectBtn.textContent = (status && status.deps_installed === false) ? 'Indisponible (build)' : 'Configurer OAuth';
 
         }
 

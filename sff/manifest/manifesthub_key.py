@@ -16,67 +16,55 @@
 # You should have received a copy of the GNU General Public License
 # along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
 
-"""ManifestHub API key cache with auto-renewal (24 h validity)."""
+"""Clé API ManifestHub (optionnelle) — uniquement depuis les réglages, sans invite CLI."""
 
 import logging
-import threading
 import time
-import webbrowser
-
-from sff.prompts import prompt_text
 
 logger = logging.getLogger(__name__)
 
-_KEY_URL = "https://manifesthub1.filegear-sg.me"
-_EXPIRY_SECONDS = 86_400  # 24 h
-_renewal_lock = threading.Lock()
 
-
-def _key_is_valid():
+def _key_usable() -> bool:
+    """True si une clé est enregistrée et, si une date d’expiration est connue, qu’elle n’est pas dépassée."""
     from sff.storage.settings import get_setting
     from sff.structs import Settings
 
-    key = get_setting(Settings.MANIFESTHUB_API_KEY)
-    expiry_str = get_setting(Settings.MANIFESTHUB_KEY_EXPIRY)
-    if not key or not expiry_str:
+    key = (get_setting(Settings.MANIFESTHUB_API_KEY) or "").strip()
+    if not key:
         return False
+    expiry_str = get_setting(Settings.MANIFESTHUB_KEY_EXPIRY)
+    if not expiry_str:
+        return True
     try:
         return time.time() < float(expiry_str)
     except (ValueError, TypeError):
-        return False
-
-
-def _save_key(key):
-    from sff.storage.settings import set_setting
-    from sff.structs import Settings
-
-    set_setting(Settings.MANIFESTHUB_API_KEY, key)
-    set_setting(Settings.MANIFESTHUB_KEY_EXPIRY, str(time.time() + _EXPIRY_SECONDS))
+        return True
 
 
 def get_manifesthub_api_key():
-    """Get a valid key; opens the generator page in the user's browser if renewal needed."""
+    """
+    Renvoie la clé ManifestHub si configurée et utilisable, sinon None.
+
+    Pas de navigateur ni de saisie interactive : les flux catalogue / CDN
+    (ex. twentytwocloud) n’en dépendent pas ; pour ManifestHub uniquement,
+    renseigner la clé dans les paramètres du launcher.
+    """
     from sff.storage.settings import get_setting
     from sff.structs import Settings
 
-    if _key_is_valid():
-        return get_setting(Settings.MANIFESTHUB_API_KEY)
-
-    with _renewal_lock:
-        # Re-check inside lock — another parallel thread may have already renewed.
-        if _key_is_valid():
-            return get_setting(Settings.MANIFESTHUB_API_KEY)
-        had_key = get_setting(Settings.MANIFESTHUB_API_KEY) is not None
-        if had_key:
-            print(f"ManifestHub API key expired. Opening renewal page: {_KEY_URL}")
-        else:
-            print(f"ManifestHub API key needed. Opening key generator: {_KEY_URL}")
-        # Opens URL in the user's default/active browser — one tab, no flicker.
-        webbrowser.open(_KEY_URL)
-        pasted = prompt_text(
-            "Paste your ManifestHub API key (leave blank to skip): "
-        ).strip()
-        if pasted:
-            _save_key(pasted)
-            return pasted
+    if not _key_usable():
+        logger.debug("ManifestHub: pas de clé API valide — ignoré (voir Paramètres si besoin)")
         return None
+    return (get_setting(Settings.MANIFESTHUB_API_KEY) or "").strip()
+
+
+def save_manifesthub_key_with_expiry(key: str) -> None:
+    """Enregistre une clé et sa date d’expiration (+24 h), ex. après saisie dans l’UI."""
+    from sff.storage.settings import set_setting
+    from sff.structs import Settings
+
+    k = (key or "").strip()
+    if not k:
+        return
+    set_setting(Settings.MANIFESTHUB_API_KEY, k)
+    set_setting(Settings.MANIFESTHUB_KEY_EXPIRY, str(time.time() + 86_400))

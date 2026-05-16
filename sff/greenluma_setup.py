@@ -19,7 +19,7 @@
 """
 Auto GreenLuma Setup — extracts a GL archive (ZIP/RAR/7z) and patches DLLInjector.ini.
 
-Method A: GreenLuma folder placed next to SteaMidra.exe.
+Method A: GreenLuma folder placed next to the SlimeDeals launcher (.exe).
 Method B: GreenLuma files placed inside Steam's installation folder.
 """
 
@@ -248,7 +248,7 @@ def auto_gl_setup(method: str, archive_path: str, steam_exe_path: str) -> dict:
     """
     Extract and configure GreenLuma.
 
-    method='A': install next to SteaMidra.exe in a GreenLuma/ subfolder.
+    method='A': install next to the SlimeDeals launcher in a GreenLuma/ subfolder.
     method='B': install directly into Steam's installation directory.
 
     Returns {'ok': bool, 'message': str, 'applist_path': str}.
@@ -267,7 +267,7 @@ def auto_gl_setup(method: str, archive_path: str, steam_exe_path: str) -> dict:
     if method == "B":
         dest_dir = steam_exe.parent if steam_exe.exists() else Path(r"C:\Program Files (x86)\Steam")
     else:
-        # Method A: GreenLuma subfolder next to SteaMidra.exe
+        # Method A: GreenLuma subfolder next to the launcher .exe
         app_dir = root_folder()
         dest_dir = Path(app_dir) / "GreenLuma"
 
@@ -275,7 +275,7 @@ def auto_gl_setup(method: str, archive_path: str, steam_exe_path: str) -> dict:
 
     # Extract archive into a temp folder, then copy into dest_dir
     import tempfile
-    tmp = Path(tempfile.mkdtemp(prefix="steamidra_gl_"))
+    tmp = Path(tempfile.mkdtemp(prefix="slimedeals_gl_"))
     try:
         logger.info("Extracting %s -> %s", archive_path, tmp)
         extract_archive(archive_path, str(tmp))

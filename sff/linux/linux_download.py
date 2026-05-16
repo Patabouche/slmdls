@@ -31,6 +31,7 @@ from sff.prompts import prompt_confirm, prompt_dir, prompt_select
 from sff.steam_store import get_app_name_from_store
 from sff.storage.vdf import ensure_library_has_app, get_steam_libs
 from sff.structs import OSType
+from sff.utils import launcher_manifests_dir
 
 
 _MANIFEST_ID_RE = re.compile(
@@ -43,7 +44,7 @@ def _parse_manifest_ids(lua_text: str) -> dict:
 
 
 def _get_manifests_from_staging() -> dict:
-    staging = Path.cwd() / "manifests"
+    staging = launcher_manifests_dir()
     result = {}
     if not staging.exists():
         return result
@@ -129,7 +130,7 @@ def _move_manifests_to_depotcache(dest_path: Path, print_fn=print) -> None:
         except Exception:
             pass
 
-    staging = Path.cwd() / "manifests"
+    staging = launcher_manifests_dir()
     if staging.exists():
         for f in staging.glob("*.manifest"):
             try:

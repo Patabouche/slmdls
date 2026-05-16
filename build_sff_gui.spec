@@ -25,10 +25,27 @@ datas = [
     ('static', 'static'),
 ]
 
-# Include third_party tools if present
+# Include third_party tools if present.
+# Windows GUI : ne pas empaqueter les arbres Linux-only — surtout gbe_fork_tools_linux
+# (PyInstaller Linux imbriqué, chemins > MAX_PATH, .so inutiles) provoque FileNotFoundError au COLLECT.
 third_party_dir = os.path.join(spec_root, 'third_party')
 if os.path.exists(third_party_dir):
-    datas.append((third_party_dir, 'third_party'))
+    if sys.platform == 'win32':
+        _third_party_skip_win = frozenset({'gbe_fork_tools_linux', 'linux'})
+        for _tp_entry in sorted(os.listdir(third_party_dir)):
+            if _tp_entry in _third_party_skip_win:
+                print(
+                    f"Note: third_party/{_tp_entry} exclu du build Windows GUI (outil Linux uniquement)."
+                )
+                continue
+            _tp_src = os.path.join(third_party_dir, _tp_entry)
+            _tp_dest = os.path.join('third_party', _tp_entry)
+            if os.path.isdir(_tp_src):
+                datas.append((_tp_src, _tp_dest))
+            elif os.path.isfile(_tp_src):
+                datas.append((_tp_src, 'third_party'))
+    else:
+        datas.append((third_party_dir, 'third_party'))
 
 # DLC unlocker bundled resources (CreamAPI, SmokeAPI, Koaloader, UplayR1/R2 DLLs)
 dlc_resources_dir = os.path.join(spec_root, 'sff', 'dlc_unlockers', 'resources')
@@ -78,6 +95,21 @@ for _gcs in sorted(glob.glob(os.path.join(spec_root, 'client_secret*.json'))):
     datas.append((_gcs, '.'))
     print(f"Including Google OAuth client JSON (datas): {os.path.basename(_gcs)}")
 
+_gdrive_oauth_root = os.path.join(spec_root, 'gdrive_oauth_client.json')
+if os.path.exists(_gdrive_oauth_root):
+    datas.append((_gdrive_oauth_root, '.'))
+    print(f"Including Google OAuth: {os.path.basename(_gdrive_oauth_root)} → bundle racine (_MEIPASS)")
+
+_gdrive_oauth_sff = os.path.join(spec_root, 'sff', 'gdrive_oauth_client.json')
+if os.path.exists(_gdrive_oauth_sff):
+    datas.append((_gdrive_oauth_sff, 'sff'))
+    print("Including Google OAuth: sff/gdrive_oauth_client.json → PyInstaller datas")
+
+_hidden_gc_secrets = []
+if os.path.isfile(os.path.join(spec_root, 'sff', '_gc_secrets.py')):
+    _hidden_gc_secrets.append('sff._gc_secrets')
+    print("PyInstaller: hiddenimport sff._gc_secrets (OAuth embarqué généré par write_gdrive_gc_secrets.py)")
+
 # ROCKSTAR BYPASS — tout le dossier SlimeDealsBPRG (exe + Assets) si présent avant PyInstaller
 _sdb_dir = os.path.join(spec_root, 'SlimeDealsBPRG')
 _sdb_exe = os.path.join(_sdb_dir, 'SlimeDealsBPRG.exe')
@@ -95,10 +127,35 @@ if win10toast_data:
     datas.append(win10toast_data)
     print(f"Including win10toast data from: {win10toast_data[0]}")
 
+# Google OAuth — collect_all : fichiers de données + binaires parfois requis (évite ImportError en exe)
+_gd_oauth_d, _gd_oauth_b, _gd_oauth_h = [], [], []
+try:
+    from PyInstaller.utils.hooks import collect_all
+
+    for _pkg in (
+        "google_auth_oauthlib",
+        "googleapiclient",
+        "google_auth_httplib2",
+        "httplib2",
+        "uritemplate",
+        "google.api_core",
+    ):
+        try:
+            _d, _b, _h = collect_all(_pkg)
+            _gd_oauth_d += _d
+            _gd_oauth_b += _b
+            _gd_oauth_h += _h
+        except Exception as _ex:
+            print(f"Note: collect_all({_pkg}): {_ex}")
+except Exception as _ex:
+    print(f"Note: Google OAuth collect_all skipped: {_ex}")
+
+datas = datas + _gd_oauth_d
+
 a = Analysis(
     ['Main_gui.py'],
     pathex=[spec_root],
-    binaries=[],
+    binaries=_gd_oauth_b,
     datas=datas,
     hiddenimports=[
         'PyQt6',
@@ -151,6 +208,9 @@ a = Analysis(
         'sff.cloud_saves',
         'sff.google_drive',
         'sff._gc',
+    ]
+    + _hidden_gc_secrets
+    + [
         'google.auth',
         'google.auth.transport.requests',
         'google.oauth2.credentials',
@@ -169,6 +229,7 @@ a = Analysis(
         'sff.fix_game.steamstub_unpacker',
         'sff.fix_game.goldberg_applier',
         'sff.fix_game.online_fix_applier',
+        'sff.online_fix_embed',
         'sff.fix_game.gse_tool_updater',
         'sff.linux.steam_process',
         'sff.tools',
@@ -185,7 +246,8 @@ a = Analysis(
         'bs4.builder._html5lib',
         'bs4.builder._lxml',
         'bs4.builder._htmlparser',
-    ],
+    ]
+    + _gd_oauth_h,
     hookspath=['hooks'],
     hooksconfig={},
     runtime_hooks=[],

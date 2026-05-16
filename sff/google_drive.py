@@ -31,8 +31,8 @@ _AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
 _TOKEN_URI = "https://oauth2.googleapis.com/token"
 
 
-def _steamidra_config_dir() -> Path:
-    """Dossier de configuration persistant (jeton OAuth, fichier client JSON)."""
+def _legacy_steamidra_config_dir() -> Path:
+    """Ancien dossier config OAuth (%APPDATA%/SteaMidra, etc.) — compatibilité jetons existants."""
     if sys.platform == "win32":
         ap = (os.environ.get("APPDATA") or "").strip()
         if ap:
@@ -43,15 +43,50 @@ def _steamidra_config_dir() -> Path:
     return Path.home() / ".config" / "SteaMidra"
 
 
-_TOKEN_PATH = _steamidra_config_dir() / "gdrive_token.json"
-_OAUTH_CLIENT_JSON = _steamidra_config_dir() / "gdrive_oauth_client.json"
+def _slimedeals_gdrive_config_dir() -> Path:
+    """Dossier de configuration persistant (jeton OAuth, fichier client JSON) — marque SlimeDeals."""
+    if sys.platform == "win32":
+        ap = (os.environ.get("APPDATA") or "").strip()
+        if ap:
+            return Path(ap) / "SlimeDeals"
+    xdg = (os.environ.get("XDG_CONFIG_HOME") or "").strip()
+    if xdg:
+        return Path(xdg) / "SlimeDeals"
+    return Path.home() / ".config" / "SlimeDeals"
+
+
+def _gdrive_oauth_client_json_paths() -> tuple[Path, Path]:
+    return (
+        _slimedeals_gdrive_config_dir() / "gdrive_oauth_client.json",
+        _legacy_steamidra_config_dir() / "gdrive_oauth_client.json",
+    )
+
+
+def _resolved_gdrive_token_path() -> Path:
+    primary = _slimedeals_gdrive_config_dir() / "gdrive_token.json"
+    legacy = _legacy_steamidra_config_dir() / "gdrive_token.json"
+    if primary.exists():
+        return primary
+    if legacy.exists():
+        return legacy
+    return primary
+
+
+def _gdrive_token_path_write() -> Path:
+    """Fichier jeton pour nouvelles écritures (toujours sous SlimeDeals)."""
+    return _slimedeals_gdrive_config_dir() / "gdrive_token.json"
 
 
 def _sff_install_root() -> Path:
-    """Répertoire du bundle launcher (parent du package ``sff``).
+    """Racine où PyInstaller extrait les ``datas`` (fichiers à la racine du bundle).
 
-    En dev : ``.../launcher/SFF``. Sous PyInstaller : ``sys._MEIPASS`` (racine du bundle extrait).
+    En dev : parent du package ``sff`` (dossier ``launcher/SFF``).
+    En exe PyInstaller : ``sys._MEIPASS`` (fiable ; ``parent.parent`` depuis ``sff/`` peut diverger selon versions).
     """
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return Path(meipass)
     return Path(__file__).resolve().parent.parent
 
 
@@ -93,12 +128,14 @@ def _load_client_id_secret() -> Tuple[str, str]:
 
     Ordre :
 
-    1. Module optionnel ``sff._gc`` (get_ci / get_cs).
-    2. Variables d'environnement ``STEAMIDRA_GDRIVE_CLIENT_*`` / ``GOOGLE_OAUTH_*``.
-    3. ``%APPDATA%/SteaMidra/gdrive_oauth_client.json`` (ou équivalent Linux).
-    4. Racine bundle / dossier SFF : ``gdrive_oauth_client.json``, puis ``client_secret*.json``
-       (dev : ``launcher/SFF`` ; exe PyInstaller : fichiers ajoutés au ``datas`` à la racine ``_MEIPASS``).
-    5. **À côté de l'exe** (build figé) : mêmes noms de fichiers — pratique pour un zip portable sans
+    1. Module ``sff._gc`` (get_ci / get_cs), en pratique via ``sff._gc_secrets`` si généré par
+       ``write_gdrive_gc_secrets.py`` (identifiants encodés base64, non versionné).
+    2. Variables d'environnement ``SLIMEDEALS_GDRIVE_CLIENT_*`` / ``STEAMIDRA_GDRIVE_CLIENT_*`` (compat.) / ``GOOGLE_OAUTH_*``.
+    3. ``%APPDATA%/SlimeDeals/gdrive_oauth_client.json`` puis ancien ``.../SteaMidra/...`` si présent.
+    4. ``sff/gdrive_oauth_client.json`` à côté de ce module (PyInstaller : fichier dans les datas ``sff/``).
+    5. Racine bundle : ``gdrive_oauth_client.json``, puis ``client_secret*.json``
+       (dev : ``launcher/SFF`` ; exe PyInstaller : fichiers à la racine ``_MEIPASS``).
+    6. **À côté de l'exe** (build figé) : mêmes noms de fichiers — pratique pour un zip portable sans
        embarquer le secret dans l'exe.
 
     Formats acceptés : JSON minimal ou clé ``installed`` comme celui fourni par Google.
@@ -115,15 +152,25 @@ def _load_client_id_secret() -> Tuple[str, str]:
         logger.debug("sff._gc credentials: %s", e)
     if not cid or not csec:
         cid = (
-            os.environ.get("STEAMIDRA_GDRIVE_CLIENT_ID", "")
+            os.environ.get("SLIMEDEALS_GDRIVE_CLIENT_ID", "")
+            or os.environ.get("STEAMIDRA_GDRIVE_CLIENT_ID", "")
             or os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
         ).strip()
         csec = (
-            os.environ.get("STEAMIDRA_GDRIVE_CLIENT_SECRET", "")
+            os.environ.get("SLIMEDEALS_GDRIVE_CLIENT_SECRET", "")
+            or os.environ.get("STEAMIDRA_GDRIVE_CLIENT_SECRET", "")
             or os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
         ).strip()
     if not cid or not csec:
-        cid, csec = _try_load_oauth_json_file(_OAUTH_CLIENT_JSON)
+        for oauth_path in _gdrive_oauth_client_json_paths():
+            cid, csec = _try_load_oauth_json_file(oauth_path)
+            if cid and csec:
+                break
+    # JSON livré à côté de google_drive.py (ex. ``sff/gdrive_oauth_client.json`` embarqué via PyInstaller datas -> ``sff/``)
+    if not cid or not csec:
+        cid, csec = _try_load_oauth_json_file(
+            Path(__file__).resolve().parent / "gdrive_oauth_client.json"
+        )
     if not cid or not csec:
         root = _sff_install_root()
         cid, csec = _try_load_oauth_json_file(root / "gdrive_oauth_client.json")
@@ -167,29 +214,45 @@ def _client_config():
 
 def clear_saved_token() -> None:
     """Supprime le jeton OAuth local (déconnexion Google Drive)."""
-    try:
-        if _TOKEN_PATH.exists():
-            _TOKEN_PATH.unlink()
-    except OSError as e:
-        logger.warning("clear_saved_token: %s", e)
+    for p in (
+        _gdrive_token_path_write(),
+        _legacy_steamidra_config_dir() / "gdrive_token.json",
+    ):
+        try:
+            if p.exists():
+                p.unlink()
+        except OSError as e:
+            logger.warning("clear_saved_token: %s", e)
 
 
-def is_available():
+def oauth_deps_installed() -> bool:
+    """True si les paquets Google (auth, oauthlib, API client) sont importables."""
     try:
         import google.auth  # noqa: F401
         import google_auth_oauthlib  # noqa: F401
         import googleapiclient  # noqa: F401
-        return _client_config() is not None
+        return True
     except ImportError:
         return False
 
 
+def oauth_credentials_configured() -> bool:
+    """True si client_id / client_secret sont résolus (fichiers, env ou module embarqué)."""
+    return _client_config() is not None
+
+
+def is_available():
+    """Drive OAuth utilisable : dépendances Python OK **et** identifiants OAuth présents."""
+    return oauth_deps_installed() and oauth_credentials_configured()
+
+
 def is_authenticated():
-    if not _TOKEN_PATH.exists():
+    tok = _resolved_gdrive_token_path()
+    if not tok.exists():
         return False
     try:
         from google.oauth2.credentials import Credentials
-        creds = Credentials.from_authorized_user_file(str(_TOKEN_PATH), _SCOPES)
+        creds = Credentials.from_authorized_user_file(str(tok), _SCOPES)
         return creds is not None and creds.refresh_token is not None
     except Exception:
         return False
@@ -214,16 +277,18 @@ def authorize(log_func=None):
             log_func(
                 "[!] Client OAuth Google Drive introuvable. Installe les paquets "
                 "google-auth, google-auth-oauthlib, google-api-python-client, puis "
-                f"crée le fichier « {_OAUTH_CLIENT_JSON} » (client_id + client_secret) "
-                "ou définis STEAMIDRA_GDRIVE_CLIENT_ID / STEAMIDRA_GDRIVE_CLIENT_SECRET."
+                f"crée le fichier « {_gdrive_oauth_client_json_paths()[0]} » (client_id + client_secret) "
+                "ou définis SLIMEDEALS_GDRIVE_CLIENT_ID / SLIMEDEALS_GDRIVE_CLIENT_SECRET "
+                "(ou STEAMIDRA_* pour compatibilité)."
             )
         return False
     try:
         from google_auth_oauthlib.flow import InstalledAppFlow
         flow = InstalledAppFlow.from_client_config(cfg, _SCOPES)
         creds = flow.run_local_server(port=0, open_browser=True, prompt="consent")
-        _TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
+        tw = _gdrive_token_path_write()
+        tw.parent.mkdir(parents=True, exist_ok=True)
+        tw.write_text(creds.to_json(), encoding="utf-8")
         if log_func:
             log_func("[OK] Google Drive connected.")
         return True
@@ -242,14 +307,17 @@ def get_service():
         from google.auth.transport.requests import Request
         from googleapiclient.discovery import build
 
-        if not _TOKEN_PATH.exists():
+        tok = _resolved_gdrive_token_path()
+        if not tok.exists():
             return None
 
-        creds = Credentials.from_authorized_user_file(str(_TOKEN_PATH), _SCOPES)
+        creds = Credentials.from_authorized_user_file(str(tok), _SCOPES)
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
-                _TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
+                tw = _gdrive_token_path_write()
+                tw.parent.mkdir(parents=True, exist_ok=True)
+                tw.write_text(creds.to_json(), encoding="utf-8")
             else:
                 return None
 
@@ -562,7 +630,7 @@ def list_backup_locations(service):
 
 def _fetch_meta_from_folder(service, folder_id):
     items = list_folder(service, folder_id)
-    for meta_name in ("SlimeDeals_meta.json", "steamidra_meta.json"):
+    for meta_name in ("SlimeDeals_meta.json", "slimedeals_meta.json", "steamidra_meta.json"):
         for item in items:
             if item["name"] == meta_name:
                 try:

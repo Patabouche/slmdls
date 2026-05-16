@@ -1,5 +1,5 @@
 /**
- * SteaMidra — QWebChannel Python↔JS Bridge
+ * SlimeDeals — QWebChannel Python↔JS Bridge
  * Connects to the Python WebBridge QObject via QWebChannel.
  * All slot calls are async in Qt6 — use callbacks or signals.
  */
@@ -165,11 +165,24 @@ window.Bridge = (function() {
             get_fix_game_list: function(cb) { if (cb) cb('[]'); },
             get_applist_games: function(cb) { if (cb) cb('[]'); },
             browse_game_folder: function(cb) { if (cb) cb(''); },
-            run_game_action_outside: function() {},
+            launch_game_as_admin: function(folder, cb) {
+                if (cb) {
+                    cb(JSON.stringify({
+                        ok: false,
+                        message: 'Mode simulation : lance depuis le launcher Windows pour un vrai test.'
+                    }));
+                }
+            },
             open_url: function() {},
             launch_slimedeals_bprg: function() {},
             gdrive_status: function(cb) {
-                if (cb) cb(JSON.stringify({ available: true, connected: false, email: '' }));
+                if (cb) cb(JSON.stringify({
+                    available: true,
+                    connected: false,
+                    email: '',
+                    deps_installed: true,
+                    credentials_configured: true
+                }));
             },
             cloud_saves_self_test: function(steamPath, steam32, cb) {
                 if (cb) {
@@ -182,6 +195,8 @@ window.Bridge = (function() {
                         account_id: steam32 || '',
                         userdata_folder_ok: false,
                         gdrive_oauth_available: true,
+                        gdrive_deps_installed: true,
+                        gdrive_credentials_configured: true,
                         gdrive_connected: false,
                         gdrive_backup_root_ok: false,
                         messages: [

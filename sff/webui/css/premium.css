@@ -1,4 +1,4 @@
-/* SteaMidra — Premium Layer v3 */
+/* SlimeDeals — Premium Layer v3 */
 /* Soft ambient sections, no cards, just content + glow */
 
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap');
@@ -498,48 +498,7 @@ input:focus, select:focus {
   padding: 4px;
 }
 
-/* ── Tool Cards — No Card Look ─────────────────────── */
-
-.tool-card {
-  padding: 0;
-  border: none;
-  background: none;
-  margin-bottom: 28px;
-}
-
-.tool-card h2 {
-  font-size: 16px;
-  margin-bottom: 8px;
-}
-
-.tool-desc {
-  font-size: 13px;
-  opacity: 0.5;
-  margin-bottom: 16px;
-}
-
-/* ── Fix Game — Sections Without Boxes ─────────────── */
-
-.fixgame-layout {
-  max-width: 700px;
-}
-
-.fixgame-step {
-  padding: 0;
-  margin-bottom: 24px;
-  border: none;
-  background: none;
-}
-
-.fixgame-step .section-title {
-  margin-bottom: 12px;
-}
-
-.fixgame-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-}
+/* ── Fix Game / Tools : mise en page principale dans main.css (.page-fixgame, .page-tools) ── */
 
 /* ── Settings — Sections Without Boxes ────────────── */
 

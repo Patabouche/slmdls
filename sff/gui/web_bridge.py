@@ -46,6 +46,7 @@ from sff.launcher_ranks import (
     norm_launcher_rank as _norm_saved_launcher_rank,
     triple_exclusive_tools_allowed_for_rank,
 )
+from sff.utils import launcher_manifests_dir, launcher_saved_lua_dir
 
 from PyQt6.QtCore import QObject, QThread, Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QFileDialog
@@ -73,9 +74,17 @@ def _log_download_source(source: str) -> str:
 def _get_hwid() -> str:
     """Return a stable hardware fingerprint for this machine (SHA-256, 32 hex chars)."""
     try:
+        _run_kw: dict = dict(
+            capture_output=True,
+            text=True,
+            timeout=8,
+            stdin=subprocess.DEVNULL,
+        )
+        if sys.platform == "win32" and hasattr(subprocess, "CREATE_NO_WINDOW"):
+            _run_kw["creationflags"] = subprocess.CREATE_NO_WINDOW
         raw = subprocess.run(
             ["wmic", "csproduct", "get", "uuid"],
-            capture_output=True, text=True, timeout=8
+            **_run_kw,
         )
         lines = [l.strip() for l in raw.stdout.strip().splitlines() if l.strip() and l.strip() != "UUID"]
         uuid = lines[0] if lines else "unknown"
@@ -107,7 +116,11 @@ def _api_post(path: str, payload: dict) -> dict:
         return {"ok": False, "error": "Serveur injoignable"}
 
 
-def _notify_launcher_gen_activity(app_id: str, ui_log: Optional[Callable[[str], None]] = None) -> None:
+def _notify_launcher_gen_activity(
+    app_id: str,
+    ui_log: Optional[Callable[[str], None]] = None,
+    steam_path: Optional[Path] = None,
+) -> None:
     """Notifie Discord (salon activité) après une installation — FREE, Monstre ou Triple Monstre uniquement."""
 
     def _u(msg: str) -> None:
@@ -128,9 +141,17 @@ def _notify_launcher_gen_activity(app_id: str, ui_log: Optional[Callable[[str], 
         _u("Notification d’activité ignorée : connecte-toi dans le launcher pour activer les annonces.")
         return
     _u("Envoi de la notification d’activité sur Discord…")
+    payload: dict = {"token": token, "hwid": _get_hwid(), "app_id": aid}
+    if steam_path is not None:
+        try:
+            from sff.premium_manifest_lock import paid_distinct_game_count_for_steam
+
+            payload["paid_slots_used"] = int(paid_distinct_game_count_for_steam(steam_path))
+        except Exception:
+            logger.debug("notify-gen: paid_slots_used indisponible", exc_info=True)
     out = _api_post(
         "/api/launcher/notify-gen",
-        {"token": token, "hwid": _get_hwid(), "app_id": aid},
+        payload,
     )
     if not out.get("ok") or not out.get("sent"):
         http_st = out.get("http_status")
@@ -318,7 +339,7 @@ class WebBridge(QObject):
     @pyqtSlot(str)
     def _deliver_notify_gen(self, app_id: str) -> None:
         self._log_ui("Préparation de la notification d’activité sur Discord…")
-        _notify_launcher_gen_activity(app_id, ui_log=self._log_ui)
+        _notify_launcher_gen_activity(app_id, ui_log=self._log_ui, steam_path=self._steam_path)
 
     @pyqtSlot(str)
     def notify_gen_activity(self, app_id: str) -> None:
@@ -1030,8 +1051,8 @@ class WebBridge(QObject):
                 return False
 
             self._log_ui(f"Lua obtenu : {lua_path}")
-            saved_lua = Path.cwd() / "saved_lua"
-            saved_lua.mkdir(exist_ok=True)
+            saved_lua = launcher_saved_lua_dir()
+            saved_lua.mkdir(parents=True, exist_ok=True)
             backup_target = saved_lua / f"{app_id}.lua"
             try:
                 if lua_path != backup_target:
@@ -1711,7 +1732,7 @@ class WebBridge(QObject):
                 return (False, "", f"rclone executable not found: {rclone_exe}")
             from sff.cloud_saves import CloudSaves
             log_lines = []
-            tmp = Path(tempfile.mkdtemp(prefix="steamidra_rclone_"))
+            tmp = Path(tempfile.mkdtemp(prefix="slimedeals_rclone_"))
             try:
                 result = CloudSaves().backup_steam_save(
                     steam_path, steam32_id, int(app_id), game_name, str(tmp),
@@ -1983,7 +2004,7 @@ class WebBridge(QObject):
 
                 os_type = OSType.WINDOWS if sys.platform == "win32" else OSType.LINUX
                 lua_manager = LuaManager(os_type)
-                saved_lua_path = _Path.cwd() / "saved_lua" / f"{app_id}.lua"
+                saved_lua_path = launcher_saved_lua_dir() / f"{app_id}.lua"
                 if not saved_lua_path.exists():
                     return {
                         "found": True,
@@ -2361,8 +2382,7 @@ class WebBridge(QObject):
     def get_applist_games(self):
         """Returns JSON list of {app_id, name} for installed Steam games with saved .lua files."""
         try:
-            from pathlib import Path as _Path
-            saved_lua = _Path().cwd() / "saved_lua"
+            saved_lua = launcher_saved_lua_dir()
             saved_ids = {p.stem for p in saved_lua.glob("*.lua")} if saved_lua.exists() else set()
             installed = json.loads(self.get_installed_games())
             games = [
@@ -2842,8 +2862,8 @@ class WebBridge(QObject):
 
                 _depot_ids_set = set(depots_dict.keys())
 
-                # Step 1: scan ./manifests/ staging for pre-extracted manifest files
-                _staging = _Path.cwd() / "manifests"
+                # Step 1: scan staging manifests (ZIP Morrenus / ~/.slimedeals/work/manifests)
+                _staging = launcher_manifests_dir()
                 if _staging.exists():
                     for _mf in _staging.glob("*.manifest"):
                         _parts = _mf.stem.split("_", 1)
@@ -3226,6 +3246,84 @@ class WebBridge(QObject):
 
         self._run_async(_do, on_done=_on_done)
 
+    @pyqtSlot(str, result=str)
+    def launch_game_as_admin(self, game_folder: str) -> str:
+        """Lance l'exécutable principal détecté dans le dossier d'installation.
+
+        Windows : ``ShellExecuteW`` avec verbe ``runas`` (UAC). Linux : ``Popen`` sans élévation.
+        Le chemin doit être celui du dossier ``steamapps/common/<installdir>`` (comme dans la bibliothèque).
+        """
+        def _fail(msg: str) -> str:
+            return json.dumps({"ok": False, "message": msg})
+
+        folder = (game_folder or "").strip()
+        if not folder:
+            return _fail("Dossier du jeu inconnu.")
+        try:
+            game_r = Path(folder).resolve()
+        except OSError:
+            return _fail("Chemin du jeu invalide.")
+        if not game_r.is_dir():
+            return _fail("Le dossier d'installation du jeu est introuvable.")
+
+        try:
+            from sff.fix_game.goldberg_applier import GoldbergApplier
+        except Exception as exc:
+            logger.warning("launch_game_as_admin: GoldbergApplier — %s", exc)
+            return _fail("Module de détection d'exécutable indisponible.")
+
+        if sys.platform == "win32":
+            main_exe = GoldbergApplier.find_main_exe(str(game_r))
+            if not main_exe:
+                return _fail("Aucun .exe utilisable trouvé dans le dossier du jeu.")
+            exe_p = Path(main_exe)
+            if not exe_p.is_file():
+                return _fail("Fichier exécutable introuvable.")
+            workdir = str(exe_p.parent)
+            try:
+                import ctypes
+
+                ret = ctypes.windll.shell32.ShellExecuteW(
+                    None,
+                    "runas",
+                    str(exe_p),
+                    None,
+                    workdir,
+                    1,
+                )
+                if ret <= 32:
+                    return _fail(
+                        "Élévation refusée ou échec du lancement (UAC). "
+                        f"Code Windows : {int(ret)}."
+                    )
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "exe": str(exe_p),
+                        "message": "Lancement avec droits administrateur demandé.",
+                    }
+                )
+            except Exception as e:
+                logger.exception("launch_game_as_admin Windows")
+                return _fail(str(e))
+
+        if sys.platform == "linux":
+            main_bin = GoldbergApplier.find_main_binary_linux(str(game_r))
+            if not main_bin:
+                return _fail("Aucun binaire Linux trouvé dans le dossier du jeu.")
+            bpath = Path(main_bin)
+            if not bpath.is_file():
+                return _fail("Binaire introuvable.")
+            try:
+                subprocess.Popen([str(bpath)], cwd=str(bpath.parent))
+            except Exception as e:
+                return _fail(str(e))
+            return json.dumps(
+                {"ok": True, "exe": str(bpath), "message": "Jeu lancé (Linux, sans élévation)."}
+            )
+
+        return _fail("Plateforme non supportée pour ce lancement.")
+
     @pyqtSlot(str, str, str)
     def delete_game(self, app_id, game_path, mode):
         """Remove a game from the AppList and optionally delete its files.
@@ -3325,13 +3423,27 @@ class WebBridge(QObject):
             return
 
         def _do():
-            from sff.google_drive import authorize, is_available
-            if not is_available():
+            from sff.google_drive import (
+                authorize,
+                oauth_credentials_configured,
+                oauth_deps_installed,
+            )
+
+            if not oauth_deps_installed():
                 return (
                     False,
-                    "Google Drive indisponible : paquets Python manquants ou identifiants OAuth "
-                    "non configurés (fichier gdrive_oauth_client.json dans le dossier SteaMidra "
-                    "ou variables STEAMIDRA_GDRIVE_CLIENT_ID / STEAMIDRA_GDRIVE_CLIENT_SECRET).",
+                    "Google Drive indisponible : les bibliothèques OAuth Google ne sont pas "
+                    "correctement incluses dans cette application (build PyInstaller incomplète). "
+                    "Réinstalle la build officielle ou signale le problème.",
+                )
+            if not oauth_credentials_configured():
+                return (
+                    False,
+                    "Identifiants OAuth Google non configurés : place « gdrive_oauth_client.json » "
+                    "à la racine SFF ou dans sff/ avant le build PyInstaller, ou lance "
+                    "« python write_gdrive_gc_secrets.py », ou définis "
+                    "SLIMEDEALS_GDRIVE_CLIENT_ID / SLIMEDEALS_GDRIVE_CLIENT_SECRET "
+                    "(fichier possible aussi sous %APPDATA%\\SlimeDeals).",
                 )
             log_lines = []
             ok = authorize(log_func=log_lines.append)
@@ -3366,9 +3478,25 @@ class WebBridge(QObject):
     @pyqtSlot(result=str)
     def gdrive_status(self):
         """Return GDrive connection status as JSON (synchronous)."""
-        from sff.google_drive import is_available, is_authenticated, get_service, get_user_email
+        from sff.google_drive import (
+            get_service,
+            get_user_email,
+            is_authenticated,
+            is_available,
+            oauth_credentials_configured,
+            oauth_deps_installed,
+        )
+
         if not is_available():
-            return json.dumps({"available": False, "connected": False, "email": ""})
+            return json.dumps(
+                {
+                    "available": False,
+                    "connected": False,
+                    "email": "",
+                    "deps_installed": oauth_deps_installed(),
+                    "credentials_configured": oauth_credentials_configured(),
+                }
+            )
         if not is_authenticated():
             return json.dumps({"available": True, "connected": False, "email": ""})
         svc = get_service()
@@ -3395,6 +3523,8 @@ class WebBridge(QObject):
             "account_id": "",
             "userdata_folder_ok": False,
             "gdrive_oauth_available": False,
+            "gdrive_deps_installed": True,
+            "gdrive_credentials_configured": False,
             "gdrive_connected": False,
             "gdrive_backup_root_ok": False,
             "messages": msgs,
@@ -3441,10 +3571,24 @@ class WebBridge(QObject):
             msgs.append("ID userdata vide — le numéro du dossier sous Steam/userdata/.")
 
         try:
-            from sff.google_drive import get_backup_root, get_service, is_authenticated, is_available
+            from sff.google_drive import (
+                get_backup_root,
+                get_service,
+                is_authenticated,
+                is_available,
+                oauth_credentials_configured,
+                oauth_deps_installed,
+            )
 
+            out["gdrive_deps_installed"] = bool(oauth_deps_installed())
+            out["gdrive_credentials_configured"] = bool(oauth_credentials_configured())
             out["gdrive_oauth_available"] = bool(is_available())
-            if not out["gdrive_oauth_available"]:
+            if not out["gdrive_deps_installed"]:
+                msgs.append(
+                    "Bibliothèques Google (OAuth) absentes de cette build — problème d’empaquetage, "
+                    "pas de configuration utilisateur."
+                )
+            elif not out["gdrive_credentials_configured"]:
                 msgs.append("OAuth Google non configuré (client JSON / variables d’environnement).")
             elif not is_authenticated():
                 msgs.append("Google Drive non connecté — clique sur « Se connecter à Google Drive ».")
@@ -3584,7 +3728,7 @@ class WebBridge(QObject):
                 for _loc in unique_locations:
                     subprocess.run(
                         [_rclone_exe, "mkdir",
-                         _remote_dest.rstrip("/") + f"/SteaMidraAllSaves/{_loc}"],
+                         _remote_dest.rstrip("/") + f"/SlimeDealsAllSaves/{_loc}"],
                         capture_output=True, stdin=subprocess.DEVNULL, timeout=30, **_no_window,
                     )
 
@@ -3617,7 +3761,7 @@ class WebBridge(QObject):
 
                 subprocess.run(
                     [_rclone_exe, "dedupe", "--dedupe-mode", "newest",
-                     _remote_dest.rstrip("/") + "/SteaMidraAllSaves"],
+                     _remote_dest.rstrip("/") + "/SlimeDealsAllSaves"],
                     capture_output=True, stdin=subprocess.DEVNULL, timeout=180, **_no_window,
                 )
 
@@ -3829,7 +3973,7 @@ def _fetch_steam_image_urls(app_ids):
             "https://api.steampowered.com/IStoreBrowseService/GetItems/v1?input_json="
             + _urlparse.quote(_json.dumps(payload, separators=(",", ":")))
         )
-        request = _req.Request(url, headers={"User-Agent": "SteaMidra/5.4.0"})
+        request = _req.Request(url, headers={"User-Agent": "SlimeDeals/5.4.0"})
         with _req.urlopen(request, timeout=5) as resp:
             data = _json.loads(resp.read())
         for item in data.get("response", {}).get("store_items", []):
@@ -3865,7 +4009,7 @@ def _load_steam_applist():
         return _STEAM_APPLIST_CACHE
     try:
         url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/?format=json"
-        req = _req.Request(url, headers={"User-Agent": "SteaMidra/5.4.0"})
+        req = _req.Request(url, headers={"User-Agent": "SlimeDeals/5.4.0"})
         with _req.urlopen(req, timeout=15) as resp:
             data = _json.loads(resp.read())
         apps = data.get("applist", {}).get("apps", [])

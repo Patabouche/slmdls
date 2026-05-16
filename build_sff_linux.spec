@@ -85,6 +85,40 @@ for _gcs in sorted(_glob.glob(os.path.join(spec_root, 'client_secret*.json'))):
     datas.append((_gcs, '.'))
     print(f"Including Google OAuth client JSON (datas): {os.path.basename(_gcs)}")
 
+_gdrive_oauth_root = os.path.join(spec_root, 'gdrive_oauth_client.json')
+if os.path.exists(_gdrive_oauth_root):
+    datas.append((_gdrive_oauth_root, '.'))
+    print(f"Including Google OAuth: {os.path.basename(_gdrive_oauth_root)} → bundle racine")
+
+_gdrive_oauth_sff = os.path.join(spec_root, 'sff', 'gdrive_oauth_client.json')
+if os.path.exists(_gdrive_oauth_sff):
+    datas.append((_gdrive_oauth_sff, 'sff'))
+    print("Including Google OAuth: sff/gdrive_oauth_client.json")
+
+_hidden_gc_secrets = []
+if os.path.isfile(os.path.join(spec_root, 'sff', '_gc_secrets.py')):
+    _hidden_gc_secrets.append('sff._gc_secrets')
+    print("PyInstaller: hiddenimport sff._gc_secrets (OAuth embarqué)")
+
+_gd_oauth_d, _gd_oauth_b, _gd_oauth_h = [], [], []
+for _pkg in (
+    "google_auth_oauthlib",
+    "googleapiclient",
+    "google_auth_httplib2",
+    "httplib2",
+    "uritemplate",
+    "google.api_core",
+):
+    try:
+        _d, _b, _h = collect_all(_pkg)
+        _gd_oauth_d += _d
+        _gd_oauth_b += _b
+        _gd_oauth_h += _h
+    except Exception as _ex:
+        print(f"Note: collect_all({_pkg}): {_ex}")
+
+datas = datas + _gd_oauth_d
+
 # ── Bundle system libs required by Qt6WebEngine ──────────────────────────────
 # pyqt6-webengine-qt6 (PyPI) links against these system libs at compile time
 # but does NOT ship them. Bundle them here so the AppImage is self-contained
@@ -153,7 +187,7 @@ if _missing:
 a = Analysis(
     ['Main_gui.py'],
     pathex=[spec_root],
-    binaries=_qt_binaries + _syslib_binaries,
+    binaries=_qt_binaries + _syslib_binaries + _gd_oauth_b,
     datas=datas,
     hiddenimports=_qt_hidden + [
         # Prompts / CLI utils (used in sff modules)
@@ -205,6 +239,9 @@ a = Analysis(
         'sff.cloud_saves',
         'sff.google_drive',
         'sff._gc',
+    ]
+    + _hidden_gc_secrets
+    + [
         'google.auth',
         'google.auth.transport.requests',
         'google.oauth2.credentials',
@@ -248,7 +285,8 @@ a = Analysis(
         'tqdm',
         'pathvalidate',
         'configupdater',
-    ],
+    ]
+    + _gd_oauth_h,
     hookspath=['hooks'],
     hooksconfig={},
     runtime_hooks=[],

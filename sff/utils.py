@@ -68,6 +68,24 @@ def root_folder(outside_internal = False):
         return root
 
 
+def slimedeals_work_dir() -> Path:
+    """
+    Cache stable du launcher (manifests intermédiaires, .lua sauvegardés).
+    Toujours sous %USERPROFILE%/.slimedeals/work — indépendant du CWD et du dossier de l'exe.
+    """
+    return Path.home() / ".slimedeals" / "work"
+
+
+def launcher_manifests_dir() -> Path:
+    """Dossier de staging `manifests` (ZIP Morrenus, pré-depotcache)."""
+    return slimedeals_work_dir() / "manifests"
+
+
+def launcher_saved_lua_dir() -> Path:
+    """Dossier des .lua enregistrés pour réutilisation."""
+    return slimedeals_work_dir() / "saved_lua"
+
+
 def iter_application_icon_files():
     """
     Chemins vers une icône applicative (barre de titre / barre des tâches / zone de notification).

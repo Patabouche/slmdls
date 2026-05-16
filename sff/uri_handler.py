@@ -38,7 +38,7 @@ from urllib.parse import urlparse
 logger = logging.getLogger(__name__)
 
 PROTOCOL_NAME = "midra"
-PROTOCOL_DESCRIPTION = "SteaMidra Protocol"
+PROTOCOL_DESCRIPTION = "SlimeDeals Protocol"
 
 # regex for valid URIs
 URI_REGEX = re.compile(
@@ -59,7 +59,7 @@ class UriHandler:
     Handles midra:// protocol registration and URI parsing.
 
     Registration puts a key in HKCU\\Software\\Classes\\midra
-    that points to the running SteaMidra executable.
+    that points to the running SlimeDeals executable.
     """
 
     @staticmethod

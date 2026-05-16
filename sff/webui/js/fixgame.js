@@ -1,5 +1,5 @@
 /**
- * SteaMidra — Fix Game Page
+ * SlimeDeals — Fix Game Page
  * Emulator mode picker, options, and game fixing workflow.
  */
 

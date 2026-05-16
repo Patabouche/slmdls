@@ -34,6 +34,7 @@ from sff.structs import (
     RawLua,
 )
 from sff.lua.parse_lua import GENERAL_ADDAPPID_REGEX, parse_lua_contents
+from sff.utils import launcher_saved_lua_dir
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,8 @@ class LuaManager:
         self, os_type: OSType
     ):
         """Might need refactor. Does I/O on init"""
-        self.saved_lua = Path().cwd() / "saved_lua"
+        self.saved_lua = launcher_saved_lua_dir()
+        self.saved_lua.mkdir(parents=True, exist_ok=True)
         self.named_ids = get_named_ids(self.saved_lua)
         self.os_type = os_type
         self.last_endpoint: Optional[LuaEndpoint] = None

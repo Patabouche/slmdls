@@ -1,5 +1,5 @@
 /**
- * SteaMidra — Hover Tooltip System
+ * SlimeDeals — Hover Tooltip System
  * Attaches tooltips to any element with data-tooltip attribute.
  */
 

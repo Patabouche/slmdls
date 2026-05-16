@@ -44,6 +44,14 @@
                 <svg class="nav-icon" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg>
                 <span class="nav-label" data-i18n="Cloud Saves">Sauvegardes Cloud</span>
             </button>
+            <button class="nav-item" data-page="gamefixes" data-tooltip="Jeux avec fix et multijoueur — bientôt pour Triple Monstre">
+                <span class="nav-icon nav-icon-emoji" aria-hidden="true">🔥</span>
+                <span class="nav-label" data-i18n="Fixed Games">Jeux fixed</span>
+            </button>
+            <button class="nav-item" data-page="subscriptions" data-tooltip="Offres, tarifs et parrainage Discord (abonnement gratuit possible)">
+                <span class="nav-icon nav-icon-emoji" aria-hidden="true">💎</span>
+                <span class="nav-label" data-i18n="Subscriptions Nav">Abonnement</span>
+            </button>
             <div class="nav-separator"></div>
             <button class="nav-item" data-page="settings" data-tooltip="Thèmes, chemin Steam, clés API, profils AppList">
                 <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -65,16 +73,26 @@
     <!-- Main Content Area -->
     <main id="content" class="content">
         <!-- Page: Home -->
-        <section id="page-home" class="page active">
+        <section id="page-home" class="page active page-home">
             <div class="home-layout">
             <div class="home-actions">
-            <div class="page-header">
-                <h1 data-i18n="Welcome to SteaMidra">Bienvenue sur SlimeDeals</h1>
-                <p class="page-subtitle" data-i18n="Steam game setup and manifest tool">Outil de configuration et gestion de jeux Steam</p>
-            </div>
+            <header class="home-hero">
+                <div class="home-hero-inner">
+                    <div class="home-hero-text">
+                        <p class="home-hero-kicker">SlimeDeals</p>
+                        <h1 data-i18n="Welcome to SlimeDeals">Bienvenue sur SlimeDeals</h1>
+                        <p class="page-subtitle home-hero-sub" data-i18n="Steam game setup and manifest tool">Outil de configuration et gestion de jeux Steam</p>
+                    </div>
+                    <div class="home-hero-decoration" aria-hidden="true"></div>
+                </div>
+            </header>
 
-            <div class="section-group">
-                <h2 class="section-title">Sélectionner un jeu</h2>
+            <div class="home-panels">
+            <section class="home-panel home-panel--game" aria-labelledby="home-panel-game-title">
+            <div class="home-panel-head">
+                <h2 id="home-panel-game-title" class="home-panel-title">Sélectionner un jeu</h2>
+            </div>
+            <div class="home-panel-body">
                 <input type="text" id="home-game-search" class="home-game-search" placeholder="Filtrer les jeux..." autocomplete="off">
                 <div class="game-source-row">
                     <label class="game-source-label">
@@ -86,7 +104,7 @@
                         <span>Jeux hors Steam</span>
                     </label>
                 </div>
-                <div id="steam-mode-row" class="input-group" style="max-width:500px;margin-top:8px;display:flex;gap:8px;align-items:center;">
+                <div id="steam-mode-row" class="input-group home-steam-row">
                     <select id="home-game-select" style="display:none" data-tooltip="Sélectionne un jeu de tes bibliothèques Steam pour les actions rapides">
                         <option value="">-- Sélectionner un jeu --</option>
                     </select>
@@ -97,9 +115,9 @@
                         </div>
                         <div class="custom-select-dropdown hidden"></div>
                     </div>
-                    <button id="home-game-refresh" class="btn" style="flex-shrink:0;" data-tooltip="Rescanner les jeux installés">↻</button>
+                    <button type="button" id="home-game-refresh" class="btn btn-icon home-refresh-btn" data-tooltip="Rescanner les jeux installés" aria-label="Actualiser la liste des jeux">↻</button>
                 </div>
-                <div id="outside-mode-row" class="outside-game-row" style="display:none;margin-top:8px">
+                <div id="outside-mode-row" class="outside-game-row home-outside-row" style="display:none">
                     <input type="text" id="outside-path-display" class="outside-path-input" readonly placeholder="Aucun dossier sélectionné" data-tooltip="Chemin du dossier du jeu">
                     <button id="outside-path-browse" class="btn" data-tooltip="Parcourir pour sélectionner le dossier du jeu">Parcourir</button>
                     <label class="outside-appid-label" data-tooltip="Optionnel — laisser vide si inconnu">App ID:
@@ -107,9 +125,13 @@
                     </label>
                 </div>
             </div>
+            </section>
 
-            <div class="section-group">
-                <h2 class="section-title">Démarrage rapide</h2>
+            <section class="home-panel" aria-labelledby="home-panel-quick-title">
+            <div class="home-panel-head">
+                <h2 id="home-panel-quick-title" class="home-panel-title">Démarrage rapide</h2>
+            </div>
+            <div class="home-panel-body">
                 <div class="action-grid">
                     <button class="action-card" data-action="crack" data-tooltip="Remplace les DLLs steam_api par l'émulateur Goldberg pour que le jeu fonctionne sans posséder Steam">
                         <svg class="action-icon" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="6" y2="12"/><line x1="10" y1="12" x2="10" y2="12"/></svg>
@@ -143,9 +165,13 @@
                     </button>
                 </div>
             </div>
+            </section>
 
-            <div class="section-group" id="section-lua-manifest">
-                <h2 class="section-title">Traitement Lua / Manifest</h2>
+            <section class="home-panel" id="section-lua-manifest" aria-labelledby="home-panel-lua-title">
+            <div class="home-panel-head">
+                <h2 id="home-panel-lua-title" class="home-panel-title">Traitement Lua / Manifest</h2>
+            </div>
+            <div class="home-panel-body">
                 <div class="action-grid">
                     <button class="action-card" data-action="download_games" data-tooltip="Télécharge un jeu via les fichiers Lua — récupère les manifests et les clés pour que Steam installe le jeu">
                         <svg class="action-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -164,9 +190,13 @@
                     </button>
                 </div>
             </div>
+            </section>
 
-            <div class="section-group">
-                <h2 class="section-title">Outils rapides</h2>
+            <section class="home-panel home-panel--tools" aria-labelledby="home-panel-tools-title">
+            <div class="home-panel-head">
+                <h2 id="home-panel-tools-title" class="home-panel-title">Outils rapides</h2>
+            </div>
+            <div class="home-panel-body">
                 <div class="action-grid small">
                     <button class="action-card compact" data-action="workshop" data-tooltip="Télécharge un mod Steam Workshop en entrant son ID — récupère le fichier directement">
                         <svg class="action-icon" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
@@ -218,6 +248,8 @@
                     </button>
                 </div>
             </div>
+            </section>
+            </div><!-- /.home-panels -->
             </div><!-- /.home-actions -->
 
             <!-- Mini live log panel (top-right) -->
@@ -387,96 +419,143 @@
         </section>
 
         <!-- Page: Library -->
-        <section id="page-library" class="page">
-            <div class="page-header">
-                <h1 data-i18n="Library">Bibliothèque</h1>
-                <p class="page-subtitle" data-i18n="Your downloaded and installed games">Tes jeux téléchargés et installés</p>
-            </div>
-            <div class="library-controls">
-                <button id="library-refresh" class="btn" data-tooltip="Scan Steam libraries for installed games">Refresh</button>
-                <input type="text" id="library-search" class="library-search" placeholder="Rechercher dans la bibliothèque..." autocomplete="off">
-                <span class="disk-info-wrap">
-                    <svg class="disk-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-                        <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"></path>
-                        <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"></path>
-                    </svg>
-                    <select id="library-drive-select" style="display:none"></select>
-                    <div id="library-drive-select-ui" class="custom-select disk-drive-custom hidden">
-                        <div class="custom-select-display" tabindex="0">
-                            <span class="custom-select-text"></span>
-                            <span class="custom-select-arrow">&#9662;</span>
-                        </div>
-                        <div class="custom-select-dropdown hidden"></div>
+        <section id="page-library" class="page page-library">
+            <header class="library-hero">
+                <div class="library-hero-inner">
+                    <div class="library-hero-text">
+                        <p class="library-hero-kicker">Collection locale</p>
+                        <h1 data-i18n="Library">Bibliothèque</h1>
+                        <p class="page-subtitle library-hero-sub" data-i18n="Your downloaded and installed games">Tes jeux téléchargés et installés</p>
                     </div>
-                    <span id="library-disk-info" class="disk-info-text"></span>
-                </span>
-            </div>
-            <div class="info-callout" id="library-lure-info">
-                <strong>Lure Fix</strong> — updates the ACF file of a game to match the latest manifest IDs on Steam CM. No game files are downloaded or changed. Steam stops showing the update prompt because the ACF now reports the current manifests as installed. Use this after Steam shows an update for a game you downloaded with an older version.
-            </div>
-            <div id="library-grid" class="game-grid"></div>
-            <div id="library-empty" class="empty-state">
-                <span class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></span>
-                <p>No games found. Download games from the Store page.</p>
+                    <div class="library-hero-decoration" aria-hidden="true"></div>
+                </div>
+            </header>
+
+            <div class="library-stack">
+                <section class="library-panel library-panel--toolbar" aria-labelledby="library-toolbar-heading">
+                    <div class="library-panel-head">
+                        <h2 id="library-toolbar-heading" class="library-panel-title">Recherche et emplacements</h2>
+                    </div>
+                    <div class="library-panel-body">
+                        <div class="library-controls">
+                            <button type="button" id="library-refresh" class="btn btn-primary library-refresh-btn" data-tooltip="Scan Steam libraries for installed games">Actualiser</button>
+                            <input type="text" id="library-search" class="library-search" placeholder="Rechercher dans la bibliothèque..." autocomplete="off">
+                            <span class="disk-info-wrap">
+                                <svg class="disk-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                    <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"></path>
+                                    <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"></path>
+                                </svg>
+                                <select id="library-drive-select" style="display:none"></select>
+                                <div id="library-drive-select-ui" class="custom-select disk-drive-custom hidden">
+                                    <div class="custom-select-display" tabindex="0">
+                                        <span class="custom-select-text"></span>
+                                        <span class="custom-select-arrow">&#9662;</span>
+                                    </div>
+                                    <div class="custom-select-dropdown hidden"></div>
+                                </div>
+                                <span id="library-disk-info" class="disk-info-text"></span>
+                            </span>
+                        </div>
+                    </div>
+                </section>
+
+                <details class="library-lure" id="library-lure-info">
+                    <summary class="library-lure-summary"><strong>Lure Fix</strong> — quand l’utiliser ?</summary>
+                    <div class="library-lure-body">
+                        <p>Le Lure Fix met à jour le fichier <strong>ACF</strong> du jeu pour qu’il reflète les derniers IDs de manifests sur les serveurs Steam (CM). <strong>Aucun fichier du jeu n’est téléchargé ni modifié.</strong> Steam arrête d’afficher la demande de mise à jour, car l’ACF indique désormais les manifests actuels comme déjà installés. Utile après une notif de mise à jour pour un jeu installé à partir d’une version plus ancienne.</p>
+                    </div>
+                </details>
+
+                <section class="library-panel library-panel--collection" aria-labelledby="library-collection-heading">
+                    <div class="library-panel-head library-panel-head--row">
+                        <h2 id="library-collection-heading" class="library-panel-title">Jeux installés</h2>
+                        <span class="library-panel-hint">Passe la souris sur une carte pour les actions (patch, DLC, Lure Fix…)</span>
+                    </div>
+                    <div class="library-panel-body library-panel-body--grid">
+                        <div id="library-grid" class="game-grid library-game-grid"></div>
+                        <div id="library-empty" class="empty-state library-empty-state">
+                            <span class="empty-icon" aria-hidden="true"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></span>
+                            <p>Aucun jeu trouvé. Télécharge des jeux depuis l’onglet <strong>Télécharger</strong>.</p>
+                        </div>
+                    </div>
+                </section>
             </div>
         </section>
 
         <!-- Page: Fix Game -->
-        <section id="page-fixgame" class="page">
-            <div class="page-header">
-                <h1 data-i18n="Fix Game">Patcher un jeu</h1>
-                <p class="page-subtitle" data-i18n="Apply emulators, remove DRM, manage DLC">Appliquer des émulateurs, supprimer le DRM, gérer les DLC</p>
-            </div>
-            <div class="fixgame-layout">
-                <div class="fixgame-step">
-                    <h2 class="section-title">1. Sélectionner un jeu</h2>
-                    <p class="step-desc">Choisissez un jeu installé dans le menu déroulant, ou parcourez manuellement son dossier. L App ID est détecté automatiquement depuis le manifeste ACF.</p>
-                    <div class="input-group" style="display:flex;gap:8px;align-items:center;">
-                        <select id="fixgame-game-select" style="display:none" data-tooltip="Sélectionner un jeu installé à patcher">
-                            <option value="">-- Sélectionner un jeu --</option>
-                        </select>
-                        <div class="custom-select" id="fixgame-game-select-ui">
-                            <div class="custom-select-display">
-                                <span class="custom-select-text">-- Sélectionner un jeu --</span>
-                                <span class="custom-select-arrow">▾</span>
+        <section id="page-fixgame" class="page page-fixgame">
+            <header class="fixgame-hero">
+                <div class="fixgame-hero-inner">
+                    <div class="fixgame-hero-text">
+                        <p class="fixgame-hero-kicker">Goldberg · ColdClient</p>
+                        <h1 data-i18n="Fix Game">Patcher un jeu</h1>
+                        <p class="page-subtitle fixgame-hero-sub" data-i18n="Apply emulators, remove DRM, manage DLC">Appliquer des émulateurs, supprimer le DRM, gérer les DLC</p>
+                    </div>
+                    <div class="fixgame-hero-decoration" aria-hidden="true"></div>
+                </div>
+            </header>
+
+            <div class="fixgame-stack">
+                <section class="fixgame-panel" aria-labelledby="fixgame-h-step1">
+                    <div class="fixgame-panel-head">
+                        <h2 id="fixgame-h-step1" class="fixgame-panel-title">1. Sélectionner un jeu</h2>
+                    </div>
+                    <div class="fixgame-panel-body">
+                        <p class="step-desc">Choisis un jeu installé dans la liste, ou parcours son dossier à la main. L’App ID est détecté automatiquement via le manifeste ACF.</p>
+                        <div class="input-group fixgame-select-row">
+                            <select id="fixgame-game-select" style="display:none" data-tooltip="Sélectionner un jeu installé à patcher">
+                                <option value="">-- Sélectionner un jeu --</option>
+                            </select>
+                            <div class="custom-select" id="fixgame-game-select-ui">
+                                <div class="custom-select-display">
+                                    <span class="custom-select-text">-- Sélectionner un jeu --</span>
+                                    <span class="custom-select-arrow">▾</span>
+                                </div>
+                                <div class="custom-select-dropdown hidden"></div>
                             </div>
-                            <div class="custom-select-dropdown hidden"></div>
+                            <button type="button" id="fixgame-browse" class="btn fixgame-btn-side" data-tooltip="Parcourir manuellement un dossier de jeu">Parcourir</button>
+                            <button type="button" id="fixgame-refresh" class="btn btn-icon fixgame-refresh-btn" data-tooltip="Rescanner les jeux installés" aria-label="Actualiser la liste">↻</button>
                         </div>
-                        <button id="fixgame-browse" class="btn" style="flex-shrink:0;" data-tooltip="Parcourir manuellement un dossier de jeu">Parcourir</button>
-                        <button id="fixgame-refresh" class="btn" style="flex-shrink:0;" data-tooltip="Rescanner les jeux installés">↻</button>
+                        <div class="input-group" id="fixgame-folder-row" style="display:none;">
+                            <label>Dossier du jeu :</label>
+                            <input type="text" id="fixgame-game-folder" readonly>
+                        </div>
+                        <div class="input-group">
+                            <label>App ID :</label>
+                            <input type="text" id="fixgame-appid" placeholder="Détection automatique" data-tooltip="Steam App ID of the game">
+                        </div>
                     </div>
-                    <div class="input-group" id="fixgame-folder-row" style="display:none;">
-                        <label>Dossier du jeu :</label>
-                        <input type="text" id="fixgame-game-folder" readonly>
-                    </div>
-                    <div class="input-group">
-                        <label>App ID :</label>
-                        <input type="text" id="fixgame-appid" placeholder="Détection automatique" data-tooltip="Steam App ID of the game">
-                    </div>
-                </div>
+                </section>
 
-                <div class="fixgame-step">
-                    <h2 class="section-title">2. Identité utilisateur</h2>
-                    <p class="step-desc">Le pseudo et le Steam ID affichés en jeu. Utilisés pour les sauvegardes, succès et classements. Les valeurs par défaut sont correctes.</p>
-                    <div class="input-group">
-                        <label>Pseudo :</label>
-                        <input type="text" id="fixgame-username" placeholder="Joueur" data-tooltip="Username shown in-game">
+                <section class="fixgame-panel" aria-labelledby="fixgame-h-step2">
+                    <div class="fixgame-panel-head">
+                        <h2 id="fixgame-h-step2" class="fixgame-panel-title">2. Identité utilisateur</h2>
                     </div>
-                    <div class="input-group">
-                        <label>Steam ID :</label>
-                        <input type="text" id="fixgame-steamid" placeholder="76561198000000000" data-tooltip="Ton Steam64 ID pour les succès">
+                    <div class="fixgame-panel-body">
+                        <p class="step-desc">Pseudo et Steam ID affichés en jeu (sauvegardes, succès, classements). Les valeurs par défaut conviennent en général.</p>
+                        <div class="input-group">
+                            <label>Pseudo :</label>
+                            <input type="text" id="fixgame-username" placeholder="Joueur" data-tooltip="Username shown in-game">
+                        </div>
+                        <div class="input-group">
+                            <label>Steam ID :</label>
+                            <input type="text" id="fixgame-steamid" placeholder="76561198000000000" data-tooltip="Ton Steam64 ID pour les succès">
+                        </div>
+                        <div class="input-group fixgame-avatar-row">
+                            <label class="fixgame-avatar-label">Avatar :</label>
+                            <input type="text" id="fixgame-avatar" placeholder="Optionnel — .png / .jpg / .jpeg" class="fixgame-avatar-input" readonly data-tooltip="Avatar de profil utilisé par Goldberg Emulator en jeu">
+                            <button type="button" id="fixgame-avatar-browse" class="btn fixgame-btn-side" data-tooltip="Choisir une image avatar PNG ou JPG">Parcourir</button>
+                        </div>
                     </div>
-                    <div class="input-group" style="display:flex;gap:8px;align-items:center;">
-                        <label style="flex-shrink:0;font-size:12px;font-weight:600;opacity:0.8;min-width:88px;">Avatar :</label>
-                        <input type="text" id="fixgame-avatar" placeholder="Optionnel — .png / .jpg / .jpeg" style="flex:1;font-size:12px;" readonly data-tooltip="Avatar de profil utilisé par Goldberg Emulator en jeu">
-                        <button id="fixgame-avatar-browse" class="btn" style="flex-shrink:0;" data-tooltip="Choisir une image avatar PNG ou JPG">Parcourir</button>
-                    </div>
-                </div>
+                </section>
 
-                <div class="fixgame-step">
-                    <h2 class="section-title">3. Mode émulateur</h2>
-                    <p class="step-desc">Choisissez comment contourner l authentification Steam. <strong>Régulier</strong> est recommandé pour la plupart des jeux.</p>
+                <section class="fixgame-panel" aria-labelledby="fixgame-h-step3">
+                    <div class="fixgame-panel-head">
+                        <h2 id="fixgame-h-step3" class="fixgame-panel-title">3. Mode émulateur</h2>
+                    </div>
+                    <div class="fixgame-panel-body">
+                        <p class="step-desc">Choisis comment contourner l’authentification Steam. <strong>Régulier</strong> est recommandé pour la plupart des jeux.</p>
                     <div class="radio-group">
                         <label class="radio-option" data-tooltip="Simplest mode — replaces steam_api.dll with Goldberg Emulator. Works for most games.">
                             <input type="radio" name="emu-mode" value="regular" checked>
@@ -499,10 +578,14 @@
                             <span class="option-hint">Injection via proxy DLL. À utiliser si le jeu vérifie activement le remplacement de DLL.</span>
                         </label>
                     </div>
-                </div>
+                    </div>
+                </section>
 
-                <div class="fixgame-step" id="gse-options" style="display:none;">
-                    <h2 class="section-title">Options GSE Fork</h2>
+                <section class="fixgame-panel" id="gse-options" style="display:none;">
+                    <div class="fixgame-panel-head">
+                        <h2 class="fixgame-panel-title">Options GSE Fork</h2>
+                    </div>
+                    <div class="fixgame-panel-body">
                     <div class="radio-group">
                         <label class="radio-option">
                             <input type="radio" name="gse-auth" value="anonymous" checked>
@@ -523,11 +606,15 @@
                             <input type="password" id="gse-password" placeholder="Mot de passe Steam">
                         </div>
                     </div>
-                </div>
+                    </div>
+                </section>
 
-                <div class="fixgame-step">
-                    <h2 class="section-title">4. Options</h2>
-                    <p class="step-desc">Options supplémentaires appliquées lors du clic sur Appliquer.</p>
+                <section class="fixgame-panel" aria-labelledby="fixgame-h-step4">
+                    <div class="fixgame-panel-head">
+                        <h2 id="fixgame-h-step4" class="fixgame-panel-title">4. Options</h2>
+                    </div>
+                    <div class="fixgame-panel-body">
+                    <p class="step-desc">Options supplémentaires appliquées lors du clic sur <strong>Appliquer</strong>.</p>
                     <div class="checkbox-group">
                         <label class="checkbox-option" data-tooltip="Supprime automatiquement la protection DRM SteamStub avant d appliquer l émulateur">
                             <input type="checkbox" id="fix-steamstub" checked>
@@ -564,224 +651,339 @@
                             <span class="option-hint">Récupère les DLC, dépôts, langues et succès. Plus lent mais recommandé pour une compatibilité totale.</span>
                         </label>
                     </div>
-                </div>
+                    </div>
+                </section>
 
                 <div class="fixgame-actions">
-                    <button id="fixgame-apply" class="btn btn-primary btn-lg" data-tooltip="Applique l émulateur et les paramètres sélectionnés au jeu">Appliquer</button>
-                    <button id="fixgame-revert" class="btn btn-danger" data-tooltip="Restaure les DLLs originales et supprime steam_settings">Annuler les modifications</button>
+                    <button type="button" id="fixgame-apply" class="btn btn-primary btn-lg" data-tooltip="Applique l émulateur et les paramètres sélectionnés au jeu">Appliquer</button>
+                    <button type="button" id="fixgame-revert" class="btn btn-danger" data-tooltip="Restaure les DLLs originales et supprime steam_settings">Annuler les modifications</button>
                 </div>
 
-                <div id="fixgame-log" class="log-output hidden">
-                    <h3>Journal</h3>
-                    <pre id="fixgame-log-content"></pre>
+                <div id="fixgame-log" class="fixgame-panel fixgame-panel--log log-output hidden">
+                    <div class="fixgame-panel-head">
+                        <h3 class="fixgame-panel-title fixgame-panel-title--sm">Journal</h3>
+                    </div>
+                    <div class="fixgame-panel-body fixgame-log-pre-wrap">
+                        <pre id="fixgame-log-content"></pre>
+                    </div>
                 </div>
             </div>
         </section>
 
         <!-- Page: Tools -->
-        <section id="page-tools" class="page">
+        <section id="page-tools" class="page page-tools">
+            <header class="tools-hero">
+                <div class="tools-hero-inner">
+                    <div class="tools-hero-text">
+                        <p class="tools-hero-kicker">Utilitaires</p>
+                        <h1 data-i18n="Tools">Outils</h1>
+                        <p class="page-subtitle tools-hero-sub">GBE, clés VDF, Workshop — outils complémentaires au launcher.</p>
+                    </div>
+                    <div class="tools-hero-decoration" aria-hidden="true"></div>
+                </div>
+            </header>
+
+            <div class="tools-stack">
+                <section class="tools-panel" aria-labelledby="tools-h-gbe">
+                    <div class="tools-panel-head">
+                        <h2 id="tools-h-gbe" class="tools-panel-title">Générateur de token GBE</h2>
+                    </div>
+                    <div class="tools-panel-body">
+                        <p class="tool-desc">Génère les fichiers de configuration Goldberg Emulator pour tes jeux Steam.</p>
+                        <div class="input-group">
+                            <label>Clé API Web Steam :</label>
+                            <input type="password" id="tool-gbe-apikey" placeholder="Entrer la clé API Web Steam" data-tooltip="Get your key at steamcommunity.com/dev/apikey">
+                        </div>
+                        <div class="input-group">
+                            <label>App ID :</label>
+                            <input type="text" id="tool-gbe-appid" placeholder="Entrer l App ID" data-tooltip="Steam App ID of the game">
+                        </div>
+                        <div class="input-group">
+                            <label>Dossier de sortie :</label>
+                            <div class="input-with-btn">
+                                <input type="text" id="tool-gbe-outdir" placeholder="Sélectionner le dossier de sortie">
+                                <button type="button" id="tool-gbe-browse" class="btn" data-tooltip="Parcourir pour choisir le dossier de sortie">Parcourir</button>
+                            </div>
+                        </div>
+                        <button type="button" id="tool-gbe-generate" class="btn btn-primary" data-tooltip="Génère le token et les fichiers de config Goldberg Emulator">Générer le token</button>
+                        <div id="tool-gbe-log" class="tools-log log-output hidden">
+                            <pre id="tool-gbe-log-content"></pre>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="tools-panel" aria-labelledby="tools-h-vdf">
+                    <div class="tools-panel-head">
+                        <h2 id="tools-h-vdf" class="tools-panel-title">Extracteur de clés VDF</h2>
+                    </div>
+                    <div class="tools-panel-body">
+                        <p class="tool-desc">Lit les clés de déchiffrement depuis ton fichier Steam <code>config.vdf</code>.</p>
+                        <div class="input-group">
+                            <label>Chemin config.vdf :</label>
+                            <div class="input-with-btn">
+                                <input type="text" id="tool-vdf-path" placeholder="Détection automatique" data-tooltip="Path to Steam config.vdf file">
+                                <button type="button" id="tool-vdf-browse" class="btn" data-tooltip="Parcourir pour trouver config.vdf">Parcourir</button>
+                            </div>
+                        </div>
+                        <button type="button" id="tool-vdf-extract" class="btn btn-primary" data-tooltip="Extraire les clés de déchiffrement depuis config.vdf">Extraire les clés</button>
+                        <div id="tool-vdf-table" class="data-table hidden">
+                            <table>
+                                <thead><tr><th>App ID</th><th>Depot ID</th><th>Clé de déchiffrement</th></tr></thead>
+                                <tbody id="tool-vdf-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="tools-panel" aria-labelledby="tools-h-ws">
+                    <div class="tools-panel-head">
+                        <h2 id="tools-h-ws" class="tools-panel-title">Navigateur Workshop</h2>
+                    </div>
+                    <div class="tools-panel-body">
+                        <p class="tool-desc">Parcourir et télécharger des éléments du Steam Workshop pour un jeu donné.</p>
+                        <div class="input-group">
+                            <label>App ID :</label>
+                            <div class="input-with-btn">
+                                <input type="text" id="tool-workshop-appid" placeholder="Entrer l App ID" data-tooltip="App ID Steam pour la navigation Workshop">
+                                <button type="button" id="tool-workshop-open" class="btn btn-primary" data-tooltip="Open the Workshop browser for this game">Ouvrir le Workshop</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <!-- Page: Cloud Saves -->
+        <section id="page-cloudsaves" class="page page-cloudsaves">
             <div class="page-header">
-                <h1 data-i18n="Tools">Outils</h1>
-                <p class="page-subtitle">Utilitaires et générateurs supplémentaires</p>
+                <h1 data-i18n="Cloud Saves">Sauvegardes cloud</h1>
+                <p class="page-subtitle">Google Drive après connexion — pas de dossier local ni rclone sur cette page.</p>
             </div>
 
-            <div class="tool-card">
-                <h2 class="section-title">Générateur de token GBE</h2>
-                <p class="tool-desc">Génère les fichiers de configuration Goldberg Emulator pour tes jeux Steam.</p>
-                <div class="input-group">
-                    <label>Clé API Web Steam :</label>
-                    <input type="password" id="tool-gbe-apikey" placeholder="Entrer la clé API Web Steam" data-tooltip="Get your key at steamcommunity.com/dev/apikey">
+            <div class="cloudsaves-stack">
+                <div class="cloudsaves-card">
+                    <div class="cloudsaves-card-head">
+                        <span class="cloudsaves-step-num" aria-hidden="true">1</span>
+                        <div class="cloudsaves-step-heading">
+                            <h2>Connecter Google Drive</h2>
+                            <p class="cloudsaves-step-lead">Connexion obligatoire avant d’envoyer des sauvegardes.</p>
+                        </div>
+                    </div>
+                    <div class="gdrive-status-row cloudsaves-actions-row">
+                        <span id="gdrive-status-text" style="min-width:12rem;">Non connecté</span>
+                        <button id="gdrive-connect-btn" type="button" class="btn btn-primary">Se connecter à Google Drive</button>
+                        <button id="gdrive-disconnect-btn" type="button" class="btn" style="display:none">Déconnecter</button>
+                    </div>
+                    <details class="cloudsaves-details">
+                        <summary>Dossier sur Drive, changer de compte Google…</summary>
+                        <div class="cloudsaves-details-body">
+                            <p>Les sauvegardes sont rangées à la racine de ton Drive dans le dossier <strong>SLIMEDEALS BACKUP</strong>.</p>
+                            <p>Si tu utilises <strong>un autre compte</strong> Google sur ce PC : <strong>Déconnecter</strong>, puis reconnecte-toi — le launcher utilise le Drive de <em>ce</em> compte. Le chemin Steam et l’ID userdata sur le PC ne changent pas automatiquement.</p>
+                        </div>
+                    </details>
                 </div>
-                <div class="input-group">
-                    <label>App ID :</label>
-                    <input type="text" id="tool-gbe-appid" placeholder="Entrer l App ID" data-tooltip="Steam App ID of the game">
-                </div>
-                <div class="input-group">
-                    <label>Dossier de sortie :</label>
-                    <div class="input-with-btn">
-                        <input type="text" id="tool-gbe-outdir" placeholder="Sélectionner le dossier de sortie">
-                        <button id="tool-gbe-browse" class="btn" data-tooltip="Parcourir pour choisir le dossier de sortie">Parcourir</button>
+
+                <div class="cloudsaves-card cloudsaves-card--accent">
+                    <div class="cloudsaves-card-head">
+                        <span class="cloudsaves-step-num" aria-hidden="true">2</span>
+                        <div class="cloudsaves-step-heading">
+                            <h2>Sauvegarde automatique</h2>
+                            <p class="cloudsaves-step-lead">Envoie toutes les sauvegardes détectées tant que le launcher reste ouvert.</p>
+                        </div>
+                    </div>
+                    <details class="cloudsaves-details">
+                        <summary>Prérequis (étape 3) et persistance des réglages</summary>
+                        <div class="cloudsaves-details-body">
+                            <p>Connecter Drive ne suffit pas : renseigne aussi le <strong>dossier Steam</strong> et l’<strong>ID userdata</strong> (étape 3 ou <strong>Paramètres</strong>), sinon l’auto ne peut pas lire les fichiers.</p>
+                            <p>Intervalle, chemins et compte Drive sont <strong>enregistrés sur le disque</strong> : au prochain lancement du launcher, tout est conservé.</p>
+                        </div>
+                    </details>
+                    <div class="cloudsaves-inline-row">
+                        <div class="input-group" style="margin:0;">
+                            <label>Minutes entre chaque envoi <span style="opacity:0.75;font-weight:500;">(0 = désactivé)</span></label>
+                            <input type="number" id="cloud-auto-interval" value="15" min="0" max="1440" style="max-width:8rem;">
+                        </div>
+                    </div>
+                    <p class="cloudsaves-field-hint" style="margin-top:8px;">La valeur est enregistrée tout de suite ; active ou désactive l’auto avec les boutons ci‑dessous.</p>
+                    <div class="cloudsaves-btn-group">
+                        <button type="button" id="cloud-auto-enable-btn" class="btn btn-primary btn-lg">Activer la sauvegarde auto sur Google Drive</button>
+                        <button type="button" id="cloud-auto-disable-btn" class="btn btn-lg">Désactiver l’auto</button>
                     </div>
                 </div>
-                <button id="tool-gbe-generate" class="btn btn-primary" data-tooltip="Génère le token et les fichiers de config Goldberg Emulator">Générer le token</button>
-                <div id="tool-gbe-log" class="log-output hidden">
-                    <pre id="tool-gbe-log-content"></pre>
-                </div>
-            </div>
 
-            <div class="tool-card">
-                <h2 class="section-title">Extracteur de clés VDF</h2>
-                <p class="tool-desc">Lit les clés de déchiffrement depuis ton fichier Steam config.vdf.</p>
-                <div class="input-group">
-                    <label>Chemin config.vdf :</label>
-                    <div class="input-with-btn">
-                        <input type="text" id="tool-vdf-path" placeholder="Détection automatique" data-tooltip="Path to Steam config.vdf file">
-                        <button id="tool-vdf-browse" class="btn" data-tooltip="Parcourir pour trouver config.vdf">Parcourir</button>
+                <div class="cloudsaves-card cloudsaves-setup">
+                    <div class="cloudsaves-card-head">
+                        <span class="cloudsaves-step-num" aria-hidden="true">3</span>
+                        <div class="cloudsaves-step-heading">
+                            <h2>Emplacement des sauvegardes Steam <span class="cloudsaves-badge-req">Obligatoire</span></h2>
+                            <p class="cloudsaves-step-lead">Sans le dossier Steam et l’ID <code>userdata</code>, pas de scan ni de sauvegarde. Les valeurs viennent des paramètres et survivent au redémarrage.</p>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Dossier d’installation Steam <span style="color:var(--warning,#d97706);">*</span> <small style="font-weight:normal;opacity:0.85;">(contient <code>steam.exe</code>)</small></label>
+                        <p class="cloudsaves-field-hint"><strong>Parcourir</strong> ou colle le chemin puis clique ailleurs — enregistrement automatique dans les paramètres.</p>
+                        <div class="input-with-btn">
+                            <input type="text" id="cloud-steam-path" placeholder="Ex. C:\Program Files (x86)\Steam" autocomplete="off" data-tooltip="Chemin complet vers le dossier Steam (steam.exe dedans)">
+                            <button id="cloud-steam-browse" type="button" class="btn" data-tooltip="Choisir le dossier Steam">Parcourir</button>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Numéro du dossier <code>userdata</code> <span style="color:var(--warning,#d97706);">*</span> <small style="font-weight:normal;opacity:0.85;">(pas ton pseudo)</small></label>
+                        <p class="cloudsaves-field-hint">Sous <code>Steam\userdata\</code>, choisis le dossier <strong>uniquement chiffres</strong> qui t’appartient. Aide : <a href="https://steamid.xyz" target="_blank" rel="noopener">steamid.xyz</a>.</p>
+                        <div class="input-with-btn">
+                            <input type="text" id="cloud-steam32" inputmode="numeric" pattern="[0-9]*" placeholder="Ex. 123456789" autocomplete="off" data-tooltip="Nom du dossier chiffres sous Steam/userdata/">
+                            <button id="cloud-save-id" type="button" class="btn" data-tooltip="Enregistrer tout de suite dans les paramètres">Enregistrer l’ID</button>
+                        </div>
+                    </div>
+                    <div class="cloudsaves-selftest">
+                        <button id="cloud-self-test-btn" type="button" class="btn btn-secondary" data-tooltip="Vérifie Steam, userdata et Google Drive">Tester la configuration</button>
+                        <p class="cloudsaves-selftest-hint">À faire une fois Drive + champs remplis, avant scan ou sauvegarde.</p>
+                    </div>
+                    <div class="cloudsaves-scan-actions">
+                        <button id="cloud-scan" type="button" class="btn btn-primary" data-tooltip="Liste les jeux avec sauvegardes détectées">Scanner les jeux</button>
+                        <p id="cloud-scan-hint" class="section-desc hidden" style="margin:0;color:var(--warning,#d97706);max-width:52rem;"></p>
+                        <div id="cloud-games" class="data-table hidden" style="margin-top:4px;">
+                            <table>
+                                <thead><tr><th>App ID</th><th>Nom du jeu</th><th>Taille</th></tr></thead>
+                                <tbody id="cloud-games-tbody"></tbody>
+                            </table>
+                        </div>
+                        <button id="cloud-backup-btn" type="button" class="btn btn-primary btn-lg" style="max-width:32rem;">Sauvegarder ce jeu sur Google Drive</button>
                     </div>
                 </div>
-                <button id="tool-vdf-extract" class="btn btn-primary" data-tooltip="Extraire les clés de déchiffrement depuis config.vdf">Extraire les clés</button>
-                <div id="tool-vdf-table" class="data-table hidden">
-                    <table>
-                        <thead><tr><th>App ID</th><th>Depot ID</th><th>Clé de déchiffrement</th></tr></thead>
-                        <tbody id="tool-vdf-tbody"></tbody>
-                    </table>
-                </div>
-            </div>
 
-            <div class="tool-card">
-                <h2 class="section-title">Navigateur Workshop</h2>
-                <p class="tool-desc">Browse and download Steam Workshop items for any game.</p>
-                <div class="input-group">
-                    <label>App ID :</label>
-                    <div class="input-with-btn">
-                        <input type="text" id="tool-workshop-appid" placeholder="Entrer l App ID" data-tooltip="App ID Steam pour la navigation Workshop">
-                        <button id="tool-workshop-open" class="btn btn-primary" data-tooltip="Open the Workshop browser for this game">Open Workshop</button>
+                <div class="cloudsaves-card">
+                    <div class="cloudsaves-card-head">
+                        <span class="cloudsaves-step-num" aria-hidden="true">4</span>
+                        <div class="cloudsaves-step-heading">
+                            <h2>Restaurer dans Steam</h2>
+                            <p class="cloudsaves-step-lead">Après le scan, sélectionne un jeu dans le tableau puis le dossier de sauvegarde à réinjecter.</p>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Dossier de la sauvegarde (contient souvent <code>remote/</code>) :</label>
+                        <div class="input-with-btn">
+                            <input type="text" id="cloud-import-path" placeholder="Dossier contenant remote/ ..." data-tooltip="Dossier de backup du jeu">
+                            <button id="cloud-import-browse" type="button" class="btn">Parcourir</button>
+                        </div>
+                    </div>
+                    <button id="cloud-import-btn" type="button" class="btn btn-primary btn-lg" style="margin-top:10px;">Restaurer ce jeu dans Steam</button>
+                </div>
+
+                <div id="cloud-log" class="log-output hidden">
+                    <h3>Log</h3>
+                    <pre id="cloud-log-content"></pre>
+                </div>
+
+                <div class="cloudsaves-card cloudsaves-allsaves" id="all-saves-section">
+                    <div class="cloudsaves-card-head">
+                        <span class="cloudsaves-step-num" aria-hidden="true">5</span>
+                        <div class="cloudsaves-step-heading">
+                            <h2>Tout envoyer sur Google Drive</h2>
+                            <p class="cloudsaves-step-lead">Même chemin Steam qu’à l’étape 3 — scan large (Steam, Goldberg, etc.).</p>
+                        </div>
+                    </div>
+                    <div class="all-saves-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+                        <button id="all-saves-scan-btn" type="button" class="btn btn-primary">Scanner tout</button>
+                        <button id="all-saves-backup-btn" type="button" class="btn btn-primary btn-lg" style="display:none">Tout envoyer sur Google Drive</button>
+                    </div>
+                    <div id="all-saves-progress" class="backup-progress hidden">
+                        <div class="backup-progress-header">
+                            <span id="all-saves-progress-label">Sauvegarde en cours...</span>
+                            <span id="all-saves-progress-count">0 / 0</span>
+                        </div>
+                        <div class="backup-progress-track">
+                            <div id="all-saves-progress-fill"></div>
+                        </div>
+                        <div class="backup-progress-stats">
+                            <span id="all-saves-progress-ok">&#10003; 0 terminé</span>
+                            <span id="all-saves-progress-fail">&#10007; 0 échoué</span>
+                        </div>
+                    </div>
+                    <div id="all-saves-results" class="hidden">
+                        <h3 style="margin:12px 0 10px;font-size:0.95rem;font-weight:650;">Dossiers trouvés</h3>
+                        <table class="all-saves-table">
+                            <thead><tr><th><input type="checkbox" id="all-saves-select-all" checked title="Select all"></th><th>Emplacement</th><th>Jeu</th><th>Fichiers</th></tr></thead>
+                            <tbody id="all-saves-tbody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="restore-panel cloudsaves-subcard">
+                        <div class="cloudsaves-card-head" style="margin-bottom:10px;">
+                            <span class="cloudsaves-step-num" aria-hidden="true">6</span>
+                            <div class="cloudsaves-step-heading">
+                                <h2 style="font-size:1.02rem;">Restaurer depuis Google Drive</h2>
+                                <p class="cloudsaves-step-lead">Lit la copie déjà sur ton Drive (pas de dossier local requis ici).</p>
+                            </div>
+                        </div>
+                        <div id="restore-source-row" class="input-group">
+                            <label id="restore-source-label">Source</label>
+                            <div class="input-with-btn" id="restore-folder-input-row">
+                                <input type="text" id="restore-backup-root" placeholder="(non utilisé pour Drive)">
+                                <button id="restore-backup-browse" type="button" class="btn">Parcourir</button>
+                            </div>
+                        </div>
+                        <button id="restore-scan-btn" type="button" class="btn btn-primary">Lire les jeux sauvegardés sur Drive</button>
+                        <div id="restore-results" class="hidden">
+                            <div class="input-group">
+                                <label>Emplacement :</label>
+                                <select id="restore-location-select"><option value="">Sélectionner un emplacement...</option></select>
+                            </div>
+                            <div id="restore-games-list" class="hidden">
+                                <label>Jeu :</label>
+                                <select id="restore-game-select"><option value="">Sélectionner un jeu...</option></select>
+                                <div id="restore-game-info" class="restore-game-info hidden"></div>
+                                <button id="restore-selected-btn" class="btn btn-primary">Restaurer la sélection</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="all-saves-log" class="log-output hidden">
+                        <h3>Log</h3>
+                        <pre id="all-saves-log-content"></pre>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Page: Cloud Saves -->
-        <section id="page-cloudsaves" class="page">
+        <!-- Page: Jeux fixed (teaser Triple Monstre) -->
+        <section id="page-gamefixes" class="page page-gamefixes">
             <div class="page-header">
-                <h1 data-i18n="Cloud Saves">Sauvegardes cloud</h1>
-                <p class="page-subtitle">Tout part sur <strong>Google Drive</strong> après connexion. Pas de dossier local ni rclone sur cette page.</p>
+                <h1 data-i18n="Fixed Games Page Title">🔥 Jeux fixed</h1>
+                <p class="page-subtitle" data-i18n="Fixed Games Page Subtitle">Une section dédiée aux titres avec correctifs prêts à l’emploi et au multijoueur — ça arrive très bientôt.</p>
             </div>
-
-            <div class="tool-card" style="margin-bottom:16px;">
-                <h2 class="section-title" style="margin-top:0;">1. Connecter Google Drive</h2>
-                <p class="section-desc" style="margin-bottom:10px;">Obligatoire avant d’envoyer quoi que ce soit.</p>
-                <div class="gdrive-status-row" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
-                    <span id="gdrive-status-text" style="min-width:12rem;">Non connecté</span>
-                    <button id="gdrive-connect-btn" type="button" class="btn btn-primary">Se connecter à Google Drive</button>
-                    <button id="gdrive-disconnect-btn" type="button" class="btn" style="display:none">Déconnecter</button>
-                </div>
-                <p class="section-desc" style="margin-top:10px;font-size:0.88em;opacity:0.92;">Les sauvegardes sont rangées dans un dossier à la racine de ton Drive nommé <strong>SLIMEDEALS BACKUP</strong>. Si tu utilises <strong>un autre compte</strong> Google sur ce PC, clique <strong>Déconnecter</strong> puis reconnecte-toi avec ce compte : le launcher parle alors au Drive de <em>ce</em> compte (les fichiers du compte précédent restent sur l’autre compte Google). Le chemin Steam et l’ID userdata sur le PC, eux, ne changent pas automatiquement.</p>
+            <div class="gamefixes-layout gamefixes-layout--single">
+                <article class="gamefixes-panel gamefixes-panel--fix" aria-labelledby="gamefixes-fix-heading">
+                    <div class="gamefixes-panel-head">
+                        <span class="gamefixes-kicker" data-i18n="Fixed Games Panel Kicker">Bientôt</span>
+                        <h2 id="gamefixes-fix-heading" class="gamefixes-panel-title" data-i18n="Fixed Games Panel Title">Jeux avec fix et multijoueur</h2>
+                    </div>
+                    <p class="gamefixes-lead" data-i18n="Fixed Games Teaser Lead">Ici, tu pourras parcourir plein de jeux avec leur fix intégré, le multijoueur quand c’est prévu, le tout directement depuis le launcher.</p>
+                    <p class="gamefixes-examples" data-i18n="Fixed Games Teaser Examples">Parmi les titres qu’on vise pour l’ouverture : par exemple Crimson Web, Pragmata — la liste s’étoffera régulièrement.</p>
+                    <div class="gamefixes-callout" data-i18n="Fixed Games Triple Badge">📌 Réservé au palier Triple Monstre — ouverture prévue prochainement.</div>
+                    <p class="gamefixes-foot" data-i18n="Fixed Games Teaser Foot">Tu es déjà abonné ou curieux ? Reste connecté sur Discord et sur slimedeals.fr : on annoncera la dispo ici dès que c’est en ligne.</p>
+                </article>
             </div>
+        </section>
 
-            <div class="tool-card" style="margin-bottom:16px;border:2px solid var(--accent, #3b82f6);">
-                <h2 class="section-title" style="margin-top:0;">2. Sauvegarder tout automatiquement</h2>
-                <p class="section-desc">Envoie <strong>toutes</strong> les sauvegardes détectées sur Drive tant que le launcher reste ouvert.</p>
-                <p class="section-desc" style="margin-top:8px;color:var(--muted,#888);font-size:0.95em;">Ce n’est pas suffisant de connecter Drive seul : il faut aussi le <strong>dossier Steam</strong> et l’<strong>ID userdata</strong> (étape 3, ou les mêmes champs dans <strong>Paramètres</strong>). Sinon le launcher ne sait pas où lire les fichiers et l’auto ne fait rien.</p>
-                <p class="section-desc" style="margin-top:6px;font-size:0.92em;">Tout est <strong>enregistré sur le disque</strong> (comme le reste du launcher) : au prochain lancement, intervalle, chemin Steam, ID et destination Drive restent tels que tu les as laissés.</p>
-                <div class="input-group">
-                    <label>Minutes entre chaque envoi (0 = désactivé) :</label>
-                    <input type="number" id="cloud-auto-interval" value="15" min="0" max="1440" style="max-width:8rem;">
-                </div>
-                <p class="section-desc" style="margin-top:4px;font-size:0.88em;opacity:0.9;">Modifier ce nombre l’<strong>enregistre tout de suite</strong> (tu peux ensuite activer ou non l’auto ci‑dessous).</p>
-                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;">
-                    <button type="button" id="cloud-auto-enable-btn" class="btn btn-primary btn-lg">Activer la sauvegarde auto sur Google Drive</button>
-                    <button type="button" id="cloud-auto-disable-btn" class="btn btn-lg">Désactiver l’auto</button>
-                </div>
+        <!-- Page: Abonnement (site + parrainage Discord) -->
+        <section id="page-subscriptions" class="page page-subscriptions">
+            <div class="page-header">
+                <h1 data-i18n="Subscriptions Page Title">💎 Abonnement</h1>
+                <p class="page-subtitle" data-i18n="Subscriptions Page Subtitle">Tarifs sur le site officiel, gestion de ton offre et astuce parrainage.</p>
             </div>
-
-            <div class="cloudsaves-setup tool-card" style="margin-bottom:16px;">
-                <h2 class="section-title" style="margin-top:0;">3. Où sont tes sauvegardes Steam ? <strong style="color:var(--warning,#d97706);font-weight:600;">obligatoire</strong></h2>
-                <p class="section-desc" style="margin-bottom:12px;">Sans ces deux infos, le launcher ne peut pas trouver tes dossiers de jeu (<code>userdata/…/appid</code>). C’est requis pour : scan d’un jeu, sauvegarde manuelle, envoi de tout, et la sauvegarde auto. Les valeurs viennent des <strong>paramètres enregistrés</strong> et <strong>restent après redémarrage</strong> du launcher.</p>
-                <div class="input-group">
-                    <label>Dossier d’installation Steam <span style="color:var(--warning,#d97706);">*</span> <small style="font-weight:normal;opacity:0.85;">(dossier qui contient <code>steam.exe</code>)</small></label>
-                    <p class="section-desc" style="margin:4px 0 8px;font-size:0.9em;">Choisis-le avec <strong>Parcourir</strong> ou colle le chemin puis clique ailleurs : il est <strong>enregistré tout seul</strong> dans les paramètres.</p>
-                    <div class="input-with-btn">
-                        <input type="text" id="cloud-steam-path" placeholder="Ex. C:\Program Files (x86)\Steam" autocomplete="off" data-tooltip="Chemin complet vers le dossier Steam (steam.exe dedans)">
-                        <button id="cloud-steam-browse" type="button" class="btn" data-tooltip="Choisir le dossier Steam">Parcourir</button>
+            <div class="gamefixes-layout gamefixes-layout--single">
+                <article class="gamefixes-panel gamefixes-panel--subs" aria-labelledby="subscriptions-page-heading">
+                    <div class="gamefixes-panel-head">
+                        <span class="gamefixes-kicker gamefixes-kicker--muted" data-i18n="Subscriptions Panel Kicker">Offres</span>
+                        <h2 id="subscriptions-page-heading" class="gamefixes-panel-title" data-i18n="Subscriptions Panel Heading">SlimeDeals — paliers et paiement</h2>
                     </div>
-                </div>
-                <div class="input-group">
-                    <label>Numéro du dossier <code>userdata</code> <span style="color:var(--warning,#d97706);">*</span> <small style="font-weight:normal;opacity:0.85;">(pas ton pseudo Steam)</small></label>
-                    <p class="section-desc" style="margin:4px 0 8px;font-size:0.9em;">Ouvre l’explorateur : <code>Steam → userdata →</code> tu vois un ou plusieurs dossiers <strong>uniquement en chiffres</strong> — mets <strong>celui qui est à toi</strong> (souvent différent du SteamID64 du profil web). Indication : <a href="https://steamid.xyz" target="_blank" rel="noopener">steamid.xyz</a>. Enregistré aussi quand tu quittes le champ.</p>
-                    <div class="input-with-btn">
-                        <input type="text" id="cloud-steam32" inputmode="numeric" pattern="[0-9]*" placeholder="Ex. 123456789" autocomplete="off" data-tooltip="Nom du dossier chiffres sous Steam/userdata/">
-                        <button id="cloud-save-id" type="button" class="btn" data-tooltip="Enregistrer tout de suite dans les paramètres">Enregistrer l’ID</button>
+                    <p class="gamefixes-lead" data-i18n="Subscriptions Panel Lead">Découvre les paliers sur le site officiel, compare les offres et gère ton abonnement en quelques clics.</p>
+                    <div class="gamefixes-subs-actions">
+                        <button type="button" class="btn btn-primary" id="subscriptions-open-tarifs" data-i18n="Subscriptions CTA Site">Voir les abonnements sur slimedeals.fr</button>
+                        <button type="button" class="btn" id="subscriptions-open-discord" data-i18n="Subscriptions CTA Discord">Rejoindre le Discord</button>
                     </div>
-                </div>
-                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;">
-                    <button id="cloud-self-test-btn" type="button" class="btn btn-secondary" data-tooltip="Vérifie Steam, userdata et Google Drive">Tester la configuration</button>
-                    <span class="section-desc" style="margin:0;font-size:0.88em;max-width:36rem;">Une fois Drive connecté et les champs remplis, clique ici pour voir si tout est bon avant un scan ou une sauvegarde.</span>
-                </div>
-                <button id="cloud-scan" type="button" class="btn btn-primary" data-tooltip="Liste les jeux avec sauvegardes détectées">Scanner les jeux</button>
-                <p id="cloud-scan-hint" class="section-desc hidden" style="margin-top:10px;color:var(--warning,#d97706);max-width:52rem;"></p>
-                <div id="cloud-games" class="data-table hidden" style="margin-top:14px;">
-                    <table>
-                        <thead><tr><th>App ID</th><th>Nom du jeu</th><th>Taille</th></tr></thead>
-                        <tbody id="cloud-games-tbody"></tbody>
-                    </table>
-                </div>
-                <button id="cloud-backup-btn" type="button" class="btn btn-primary btn-lg" style="margin-top:16px;display:block;width:100%;max-width:32rem;">Sauvegarder ce jeu sur Google Drive</button>
-            </div>
-
-            <div class="tool-card" style="margin-bottom:16px;">
-                <h2 class="section-title" style="margin-top:0;">4. Restaurer dans Steam (dossier de sauvegarde)</h2>
-                <p class="section-desc">Choisis un jeu <strong>dans le tableau ci‑dessus</strong> après scan, puis le dossier où tu as une ancienne sauvegarde.</p>
-                <div class="input-group">
-                    <label>Dossier de la sauvegarde à remettre dans Steam :</label>
-                    <div class="input-with-btn">
-                        <input type="text" id="cloud-import-path" placeholder="Dossier contenant remote/ ..." data-tooltip="Dossier de backup du jeu">
-                        <button id="cloud-import-browse" type="button" class="btn">Parcourir</button>
-                    </div>
-                </div>
-                <button id="cloud-import-btn" type="button" class="btn btn-primary btn-lg" style="margin-top:8px;">Restaurer ce jeu dans Steam</button>
-            </div>
-
-            <div id="cloud-log" class="log-output hidden">
-                <h3>Log</h3>
-                <pre id="cloud-log-content"></pre>
-            </div>
-
-            <div class="cloudsaves-allsaves tool-card" id="all-saves-section" style="margin-bottom:16px;">
-                <h2 class="section-title" style="margin-top:0;">5. Tout envoyer sur Google Drive (une fois)</h2>
-                <p class="section-desc">Utilise les mêmes infos Steam qu’à l’<strong>étape 3</strong>. Steam + emplacements cracks / Goldberg / etc. Clique <strong>Scanner tout</strong>, vérifie les coches, puis <strong>Tout envoyer sur Google Drive</strong>.</p>
-                <div class="all-saves-actions" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-                    <button id="all-saves-scan-btn" type="button" class="btn btn-primary">Scanner tout</button>
-                    <button id="all-saves-backup-btn" type="button" class="btn btn-primary btn-lg" style="display:none">Tout envoyer sur Google Drive</button>
-                </div>
-                <div id="all-saves-progress" class="backup-progress hidden">
-                    <div class="backup-progress-header">
-                        <span id="all-saves-progress-label">Sauvegarde en cours...</span>
-                        <span id="all-saves-progress-count">0 / 0</span>
-                    </div>
-                    <div class="backup-progress-track">
-                        <div id="all-saves-progress-fill"></div>
-                    </div>
-                    <div class="backup-progress-stats">
-                        <span id="all-saves-progress-ok">&#10003; 0 terminé</span>
-                        <span id="all-saves-progress-fail">&#10007; 0 échoué</span>
-                    </div>
-                </div>
-                <div id="all-saves-results" class="hidden">
-                    <h3>Dossiers de sauvegarde trouvés</h3>
-                    <table class="all-saves-table">
-                        <thead><tr><th><input type="checkbox" id="all-saves-select-all" checked title="Select all"></th><th>Emplacement</th><th>Jeu</th><th>Fichiers</th></tr></thead>
-                        <tbody id="all-saves-tbody"></tbody>
-                    </table>
-                </div>
-                <div class="restore-panel">
-                    <h3>6. Restaurer depuis Google Drive</h3>
-                    <p class="section-desc" style="margin-bottom:10px;">Lit la copie déjà sur ton Drive (pas besoin de dossier local ici).</p>
-                    <div id="restore-source-row" class="input-group">
-                        <label id="restore-source-label">Source</label>
-                        <div class="input-with-btn" id="restore-folder-input-row">
-                            <input type="text" id="restore-backup-root" placeholder="(non utilisé pour Drive)">
-                            <button id="restore-backup-browse" type="button" class="btn">Parcourir</button>
-                        </div>
-                    </div>
-                    <button id="restore-scan-btn" type="button" class="btn btn-primary">Lire les jeux sauvegardés sur Drive</button>
-                    <div id="restore-results" class="hidden">
-                        <div class="input-group">
-                            <label>Emplacement :</label>
-                            <select id="restore-location-select"><option value="">Sélectionner un emplacement...</option></select>
-                        </div>
-                        <div id="restore-games-list" class="hidden">
-                            <label>Jeu :</label>
-                            <select id="restore-game-select"><option value="">Sélectionner un jeu...</option></select>
-                            <div id="restore-game-info" class="restore-game-info hidden"></div>
-                            <button id="restore-selected-btn" class="btn btn-primary">Restaurer la sélection</button>
-                        </div>
-                    </div>
-                </div>
-                <div id="all-saves-log" class="log-output hidden">
-                    <h3>Log</h3>
-                    <pre id="all-saves-log-content"></pre>
-                </div>
+                    <p class="gamefixes-subs-hint" data-i18n="Subscriptions Referral Hint">Tu peux obtenir un abonnement gratuitement en invitant 5 personnes sur le serveur Discord SlimeDeals — conditions et détails sur le site ou dans le salon #avis.</p>
+                </article>
             </div>
         </section>
 
@@ -1069,9 +1271,7 @@
 
             <div class="settings-section">
                 <h2 class="section-title">À propos</h2>
-                <p id="about-info">SlimeDeals — Outil de configuration et gestion de jeux Steam<br>
-                    <a href="#" id="about-github">GitHub</a> · <a href="#" id="about-update">Vérifier les mises à jour</a>
-                </p>
+                <p id="about-info">SlimeDeals — Outil de configuration et gestion de jeux Steam</p>
             </div>
         </section>
     </main>

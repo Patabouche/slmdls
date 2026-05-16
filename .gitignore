@@ -5,6 +5,8 @@ credentials.json
 # OAuth Google Drive (ne jamais versionner)
 client_secret*.json
 gdrive_oauth_client.json
+sff/gdrive_oauth_client.json
+sff/_gc_secrets.py
 # Identifiants multijoueur locaux (prioritaires sur online_fix_embed.py)
 sff/online_fix_embed_local.py
 debug.log
@@ -17,6 +19,8 @@ analytics.json
 greenluma/
 build/
 dist/
+dist2/
+BUILDER/.venv_build/
 .hypothesis/
 .pytest_cache/
 htmlcov/
@@ -109,4 +113,3 @@ GLDLL_Analysis/
 diff_gl.py
 diff_output.txt
 _gc.py
-sff/_gc.py

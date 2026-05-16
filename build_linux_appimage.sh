@@ -118,7 +118,10 @@ fi
 
 # ── Step 3: PyInstaller ───────────────────────────────────────────────────────
 echo ""
-echo "==> [3/7] Running PyInstaller (2-5 min)..."
+echo "==> [3/7] Preparing Google Drive OAuth embed (optional)..."
+python3 prepare_gdrive_for_build.py 2>/dev/null || python prepare_gdrive_for_build.py 2>/dev/null || true
+echo ""
+echo "==> [3b/7] Running PyInstaller (2-5 min)..."
 rm -rf build dist
 pyinstaller build_sff_linux.spec \
     || die "PyInstaller failed. Check the output above for the specific error."

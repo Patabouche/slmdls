@@ -1,5 +1,5 @@
 /**
- * SteaMidra -- Web UI i18n
+ * SlimeDeals -- Web UI i18n
  * Loads translations from the backend and applies them to [data-i18n] elements.
  * Supports RTL layout for Arabic and other right-to-left languages.
  */

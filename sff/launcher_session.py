@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -42,39 +43,36 @@ def fetch_launcher_banner() -> dict:
             code = resp.getcode()
             body = resp.read().decode("utf-8", errors="replace")
             if code != 200:
-                logger.warning("fetch_launcher_banner: HTTP %s", code)
                 return {"text": "", "rev": -1}
-            data = json.loads(body)
+            try:
+                data = json.loads(body)
+            except json.JSONDecodeError:
+                return {"text": "", "rev": -1}
             if not isinstance(data, dict):
                 return {"text": "", "rev": -1}
             return {
                 "text": str(data.get("text") or ""),
                 "rev": int(data.get("rev") or 0),
             }
-    except urllib.error.HTTPError as e:
-        try:
-            err_body = e.read().decode("utf-8", errors="replace")[:500]
-        except Exception:
-            err_body = ""
-        logger.warning(
-            "fetch_launcher_banner: HTTPError %s %s — %s",
-            e.code,
-            e.reason,
-            err_body or "—",
-        )
+    except urllib.error.HTTPError:
         return {"text": "", "rev": -1}
-    except Exception as exc:
-        logger.warning("fetch_launcher_banner: %s: %s", exc.__class__.__name__, exc)
+    except Exception:
         return {"text": "", "rev": -1}
 
 
 def _hwid() -> str:
     try:
-        raw = subprocess.run(
-            ["wmic", "csproduct", "get", "uuid"],
+        _run_kw: dict = dict(
             capture_output=True,
             text=True,
             timeout=8,
+            stdin=subprocess.DEVNULL,
+        )
+        if sys.platform == "win32" and hasattr(subprocess, "CREATE_NO_WINDOW"):
+            _run_kw["creationflags"] = subprocess.CREATE_NO_WINDOW
+        raw = subprocess.run(
+            ["wmic", "csproduct", "get", "uuid"],
+            **_run_kw,
         )
         lines = [l.strip() for l in raw.stdout.strip().splitlines() if l.strip() and l.strip() != "UUID"]
         uuid = lines[0] if lines else "unknown"

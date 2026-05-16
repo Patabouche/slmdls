@@ -28,9 +28,11 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from difflib import SequenceMatcher
+from io import StringIO
 from pathlib import Path
 from urllib.parse import quote, unquote, urljoin
 
@@ -42,7 +44,35 @@ from sff.prompts import prompt_confirm, prompt_secret, prompt_text
 from sff.storage.settings import Settings, get_setting, set_setting
 from sff.utils import root_folder
 
+# Import statique pour PyInstaller (voir _embedded_online_fix_credentials).
+try:
+    import sff.online_fix_embed  # noqa: F401
+except ImportError:
+    pass
+
 logger = logging.getLogger(__name__)
+
+
+def _stdio_for_progress():
+    """Streams utilisés par tqdm : sous GUI / PyInstaller, stderr/stdout peuvent être None."""
+    s_err = getattr(sys, "stderr", None)
+    if s_err is not None and hasattr(s_err, "write"):
+        return s_err
+    s_out = getattr(sys, "stdout", None)
+    if s_out is not None and hasattr(s_out, "write"):
+        return s_out
+    return StringIO()
+
+
+def _stdin_is_interactive() -> bool:
+    """True seulement si une vraie console permet la saisie (pas None comme sous Qt)."""
+    stdin = getattr(sys, "stdin", None)
+    if stdin is None:
+        return False
+    try:
+        return stdin.isatty()
+    except (AttributeError, OSError):
+        return False
 
 
 def _safe_log_fragment(s: str) -> str:
@@ -50,8 +80,6 @@ def _safe_log_fragment(s: str) -> str:
     if not s:
         return ""
     try:
-        import sys
-
         enc = getattr(getattr(sys, "stderr", None), "encoding", None) or "utf-8"
     except Exception:
         enc = "utf-8"
@@ -178,7 +206,16 @@ def _download_with_session(url, cookies_list, user_agent, save_path):
                     return False
                 try: total = int(response.headers.get("Content-Length", "0"))
                 except (ValueError, TypeError): total = 0
-                with save_path.open("wb") as f, tqdm(desc="Downloading Fix", total=total or None, unit="B", unit_scale=True, unit_divisor=1024, miniters=1, colour='green') as pbar:
+                with save_path.open("wb") as f, tqdm(
+                    desc="Downloading Fix",
+                    total=total or None,
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    miniters=1,
+                    colour="green",
+                    file=_stdio_for_progress(),
+                ) as pbar:
                     for chunk in response.iter_bytes(chunk_size=1024*1024):
                         f.write(chunk); pbar.update(len(chunk))
             return True
@@ -475,8 +512,7 @@ def _run_multiplayer_fix_process(game_name, game_folder, username, password, aty
 def apply_multiplayer_fix(game_name, game_folder, app_id=None):
     username, password = _read_credentials()
     if not username or not password:
-        import sys
-        if sys.stdin.isatty():
+        if _stdin_is_interactive():
             username = prompt_text("\nMultiplayer fix username:")
             password = prompt_secret("Password:")
             if not username or not password:

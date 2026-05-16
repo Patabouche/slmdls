@@ -57,7 +57,7 @@ def get_steamauto_cli_path():
 
     # 2. Dev mode or one-folder distribution: check next to the EXE / project root.
     #    For the one-file EXE this covers files the user placed manually beside
-    #    SteaMidra_GUI.exe (e.g. .\third_party\SteamAutoCrack\cli\SteamAutoCrack.CLI.exe).
+    #    SlimeDeals_GUI.exe (e.g. .\third_party\SteamAutoCrack\cli\SteamAutoCrack.CLI.exe).
     root = root_folder()
     for subpath in _EXE_PATHS:
         p = root / subpath
@@ -98,13 +98,13 @@ def _verify_and_restore(
             if backup.exists():
                 shutil.copy2(backup, original)
                 print_func(
-                    f"[SteaMidra] RESTORED {original.name} — SteamAutoCrack "
+                    f"[SlimeDeals] RESTORED {original.name} — SteamAutoCrack "
                     "removed it without producing a patched version."
                 )
                 restored += 1
             else:
                 print_func(
-                    f"[SteaMidra] WARNING: {original.name} was removed and "
+                    f"[SlimeDeals] WARNING: {original.name} was removed and "
                     "backup is also missing. Manual intervention needed."
                 )
 

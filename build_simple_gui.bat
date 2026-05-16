@@ -1,5 +1,10 @@
 @echo off
+setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
+
+REM Evite WinError 5 : tuer l'arborescence du processus Qt WebEngine.
+taskkill /F /T /IM SteaMidra_GUI.exe >nul 2>&1
+timeout /t 3 /nobreak >nul
 
 echo ========================================
 echo Building SteaMidra GUI Executable
@@ -53,15 +58,25 @@ if exist "%SDB_PROJ%" (
 )
 
 echo.
+echo Préparation Google Drive (embarqué dans l'exe si JSON ou variables présents)…
+python prepare_gdrive_for_build.py
+echo.
+
 echo Building GUI executable...
 echo This may take 5-10 minutes...
+echo.
+echo Pour Google Drive : avec gdrive_oauth_client.json ou client_secret*.json
+echo   ^(racine SFF ou dossier sff/^), le build genere automatiquement sff\_gc_secrets.py.
 echo.
 
 REM Suppress pkg_resources deprecation from PyInstaller/build deps so log stays clean
 set PYTHONWARNINGS=ignore::UserWarning
-python -m PyInstaller build_sff_gui.spec
-
+echo Livrable : dist2\SteaMidra_GUI ^(staging dist2\_pyi_stage_*^)
+if not exist "dist2" mkdir "dist2"
+set "PYI_STAGE=dist2\_pyi_stage_!RANDOM!"
+python -m PyInstaller --noconfirm --distpath "!PYI_STAGE!" build_sff_gui.spec
 if errorlevel 1 (
+    if exist "!PYI_STAGE!" rmdir /s /q "!PYI_STAGE!" 2>nul
     echo.
     echo ========================================
     echo BUILD FAILED!
@@ -75,23 +90,50 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+if not exist "!PYI_STAGE!\SteaMidra_GUI\SteaMidra_GUI.exe" (
+    echo BUILD FAILED: exe manquant dans !PYI_STAGE!
+    if exist "!PYI_STAGE!" rmdir /s /q "!PYI_STAGE!" 2>nul
+    pause
+    exit /b 1
+)
+taskkill /F /T /IM SteaMidra_GUI.exe >nul 2>&1
+timeout /t 5 /nobreak >nul
+set "GUI_OUT=dist2\SteaMidra_GUI"
+if exist "!GUI_OUT!" rmdir /s /q "!GUI_OUT!" 2>nul
+if exist "!GUI_OUT!" ren "!GUI_OUT!" "SteaMidra_GUI.bak_!RANDOM!" 2>nul
+if exist "!GUI_OUT!" set "GUI_OUT=dist2\SteaMidra_gui_!RANDOM!"
+echo Copie ^(robocopy^) vers !GUI_OUT! ...
+robocopy "!PYI_STAGE!\SteaMidra_GUI" "!GUI_OUT!" /E /COPY:DAT /R:5 /W:2 /NFL /NDL /NJH /NJS
+if errorlevel 8 (
+    echo BUILD FAILED: robocopy. Build OK dans !PYI_STAGE!\SteaMidra_GUI\
+    pause
+    exit /b 1
+)
+if not exist "!GUI_OUT!\SteaMidra_GUI.exe" (
+    echo BUILD FAILED: exe manquant dans !GUI_OUT!
+    pause
+    exit /b 1
+)
+rmdir /s /q "!PYI_STAGE!" 2>nul
 
 echo.
 echo ========================================
 echo BUILD SUCCESSFUL!
 echo ========================================
 echo.
-echo Folder:     dist\SteaMidra_GUI\
-echo Executable: dist\SteaMidra_GUI\SteaMidra_GUI.exe
+echo Folder:     !GUI_OUT!\
+echo Executable: !GUI_OUT!\SteaMidra_GUI.exe
 echo.
 
-if exist "dist\SteaMidra_GUI\SteaMidra_GUI.exe" (
-    python -c "import os; size = sum(os.path.getsize(os.path.join(r,f)) for r,d,files in os.walk('dist/SteaMidra_GUI') for f in files); print(f'Total size: {size / (1024*1024):.1f} MB')"
+if exist "!GUI_OUT!\SteaMidra_GUI.exe" (
+    set "SFF_SIZEPATH=!CD!\!GUI_OUT!"
+    python -c "import os; p=os.environ['SFF_SIZEPATH']; size=sum(os.path.getsize(os.path.join(r,f)) for r,d,files in os.walk(p) for f in files); print(f'Total size: {size / (1024*1024):.1f} MB')"
+    set "SFF_SIZEPATH="
 )
 
 echo.
-echo You can now run: dist\SteaMidra_GUI\SteaMidra_GUI.exe
-echo Zip the dist\SteaMidra_GUI\ folder for distribution.
+echo You can now run: !GUI_OUT!\SteaMidra_GUI.exe
+echo Zip le dossier !GUI_OUT!\ pour distribution.
 echo Settings will be saved next to the EXE.
 echo.
 pause

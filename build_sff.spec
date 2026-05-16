@@ -70,16 +70,55 @@ for _gcs in sorted(glob.glob(os.path.join(spec_root, 'client_secret*.json'))):
     datas.append((_gcs, '.'))
     print(f"Including Google OAuth client JSON (datas): {os.path.basename(_gcs)}")
 
+_gdrive_oauth_root = os.path.join(spec_root, 'gdrive_oauth_client.json')
+if os.path.exists(_gdrive_oauth_root):
+    datas.append((_gdrive_oauth_root, '.'))
+    print(f"Including Google OAuth: {os.path.basename(_gdrive_oauth_root)} → bundle racine")
+
+_gdrive_oauth_sff = os.path.join(spec_root, 'sff', 'gdrive_oauth_client.json')
+if os.path.exists(_gdrive_oauth_sff):
+    datas.append((_gdrive_oauth_sff, 'sff'))
+    print("Including Google OAuth: sff/gdrive_oauth_client.json")
+
+_hidden_gc_secrets = []
+if os.path.isfile(os.path.join(spec_root, 'sff', '_gc_secrets.py')):
+    _hidden_gc_secrets.append('sff._gc_secrets')
+    print("PyInstaller: hiddenimport sff._gc_secrets (OAuth embarqué)")
+
 # Add win10toast data
 win10toast_data = get_win10toast_data()
 if win10toast_data:
     datas.append(win10toast_data)
     print(f"Including win10toast data from: {win10toast_data[0]}")
 
+_gd_oauth_d, _gd_oauth_b, _gd_oauth_h = [], [], []
+try:
+    from PyInstaller.utils.hooks import collect_all
+
+    for _pkg in (
+        "google_auth_oauthlib",
+        "googleapiclient",
+        "google_auth_httplib2",
+        "httplib2",
+        "uritemplate",
+        "google.api_core",
+    ):
+        try:
+            _d, _b, _h = collect_all(_pkg)
+            _gd_oauth_d += _d
+            _gd_oauth_b += _b
+            _gd_oauth_h += _h
+        except Exception as _ex:
+            print(f"Note: collect_all({_pkg}): {_ex}")
+except Exception as _ex:
+    print(f"Note: Google OAuth collect_all skipped: {_ex}")
+
+datas = datas + _gd_oauth_d
+
 a = Analysis(
     ['Main.py'],
     pathex=[spec_root],
-    binaries=[],
+    binaries=_gd_oauth_b,
     datas=datas,
     hiddenimports=[
         'InquirerPy',
@@ -103,6 +142,9 @@ a = Analysis(
         'sff.cloud_saves',
         'sff.google_drive',
         'sff._gc',
+    ]
+    + _hidden_gc_secrets
+    + [
         'google.auth',
         'google.auth.transport.requests',
         'google.oauth2.credentials',
@@ -112,6 +154,7 @@ a = Analysis(
         'googleapiclient.discovery',
         'googleapiclient.http',
         'sff.fix_game.online_fix_applier',
+        'sff.online_fix_embed',
         'sff.linux.steam_process',
         'psutil',
         'colorama',
@@ -127,7 +170,8 @@ a = Analysis(
         'bs4.builder._lxml',
         'bs4.builder._htmlparser',
         # pkg_resources.py2_warn / pkg_resources.markers removed: not present in newer setuptools
-    ],
+    ]
+    + _gd_oauth_h,
     hookspath=['hooks'],
     hooksconfig={},
     runtime_hooks=[],

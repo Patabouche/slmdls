@@ -40,6 +40,8 @@ window.Bridge = (function() {
                 if (!ver) return;
                 var el = document.getElementById('sidebar-app-version');
                 if (el) el.textContent = ver;
+                var about = document.getElementById('about-app-version');
+                if (about) about.textContent = ' — version ' + ver;
                 try {
                     document.title = 'SlimeDeals ' + ver;
                 } catch (e2) {}

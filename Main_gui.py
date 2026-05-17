@@ -126,6 +126,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("SlimeDeals")
     app.setApplicationDisplayName(f"SlimeDeals {VERSION}")
+    app.setApplicationVersion(VERSION)
 
     from sff.single_instance import SingleInstanceGuard
     _guard = SingleInstanceGuard()

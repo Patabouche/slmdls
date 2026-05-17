@@ -76,7 +76,7 @@ except Exception as e:
 
 logger = logging.getLogger("sff")
 logger.setLevel(logging.DEBUG)
-fh = logging.FileHandler("debug.log")
+fh = logging.FileHandler("debug.log", encoding="utf-8")
 fh.setFormatter(
     logging.Formatter(
         "%(asctime)s::%(name)s::%(levelname)s::%(message)s",

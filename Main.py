@@ -1,4 +1,4 @@
-﻿# SlimeDeals - Steam game setup and manifest tool (SFF)
+# SlimeDeals - Steam game setup and manifest tool (SFF)
 
 # Copyright (c) 2025-2026 Midrag (https://github.com/Midrags)
 
@@ -84,7 +84,7 @@ logger.setLevel(logging.DEBUG)
 
 
 
-fh = logging.FileHandler("debug.log")
+fh = logging.FileHandler("debug.log", encoding="utf-8")
 
 fh.setFormatter(
 

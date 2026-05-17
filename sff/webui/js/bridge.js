@@ -34,17 +34,29 @@ window.Bridge = (function() {
     }
 
     function _applyAppVersionToUI() {
+        function apply(ver) {
+            if (!ver) return;
+            ver = String(ver).trim();
+            if (!ver) return;
+            var el = document.getElementById('sidebar-app-version');
+            if (el) el.textContent = ver;
+            var about = document.getElementById('about-app-version');
+            if (about) about.textContent = ' — version ' + ver;
+            try {
+                document.title = 'SlimeDeals ' + ver;
+            } catch (e2) {}
+        }
+        var pinned = typeof window.__SLIMEDEALS_APP_VERSION__ === 'string'
+            ? window.__SLIMEDEALS_APP_VERSION__.trim()
+            : '';
+        if (pinned) {
+            apply(pinned);
+            return;
+        }
         if (!_py || typeof _py.get_app_version !== 'function') return;
         try {
             _py.get_app_version(function(ver) {
-                if (!ver) return;
-                var el = document.getElementById('sidebar-app-version');
-                if (el) el.textContent = ver;
-                var about = document.getElementById('about-app-version');
-                if (about) about.textContent = ' — version ' + ver;
-                try {
-                    document.title = 'SlimeDeals ' + ver;
-                } catch (e2) {}
+                apply(ver);
             });
         } catch (e) {
             console.warn('[Bridge] get_app_version:', e);

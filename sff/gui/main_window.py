@@ -15,6 +15,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with SlimeDeals.  If not, see <https://www.gnu.org/licenses/>.
+import json
 import logging
 import re
 import sys
@@ -34,7 +35,7 @@ from PyQt6.QtGui import (
     QPixmap,
 )
 from PyQt6.QtWebChannel import QWebChannel
-from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings, QWebEngineScript
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
     QApplication,
@@ -565,6 +566,17 @@ class SFFMainWindow(QMainWindow):
         except Exception:
             pass
         root_layout.addWidget(self._web_view)
+        # Même valeur que le titre de fenêtre — visible dans l’UI web avant / sans dépendre du retour QWebChannel.
+        _ver_inj = QWebEngineScript()
+        _ver_inj.setName("slimedeals-app-version")
+        _ver_inj.setSourceCode(
+            "window.__SLIMEDEALS_APP_VERSION__ = " + json.dumps(VERSION) + ";\n"
+        )
+        _ver_inj.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
+        _ver_inj.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+        _ver_inj.setRunsOnSubFrames(False)
+        self._web_view.page().scripts().insert(_ver_inj)
+
         self._web_channel = QWebChannel()
         from sff.gui.web_bridge import WebBridge
         self._web_bridge = WebBridge(ui=ui, steam_path=steam_path, parent=self)

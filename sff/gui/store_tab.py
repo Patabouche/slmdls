@@ -324,39 +324,14 @@ class VersionPickerDialog(QDialog):
         if not self.steam_path or not self.steam_path.exists():
             QMessageBox.critical(self, "Error", "Steam path is not configured. Cannot write to depotcache.")
             return
-        # If full pipeline is available, ask for source and route through process_from_store
+        # Flux catalogue TwentyTwoCloud uniquement (pas de choix Hubcap / OurEveryday).
         if self._ui is not None and self._run_tool_fn is not None:
-            from PyQt6.QtWidgets import QDialog as _QDialog, QVBoxLayout as _QVB, QLabel as _QL, QPushButton as _QPB, QHBoxLayout as _QHL
-            src_dlg = _QDialog(self)
-            src_dlg.setWindowTitle("Choose Download Source")
-            src_dlg.setMinimumWidth(380)
-            vl = _QVB(src_dlg)
-            vl.addWidget(_QL(
-                f"<b>Download {self.game_name} ({self.app_id})</b><br><br>"
-                f"Select source for the Lua file (decryption keys + app setup):"
-            ))
-            hl = _QHL()
-            btn_oe = _QPB("oureveryday")
-            btn_hc = _QPB("Hubcap Manifest")
-            btn_cancel = _QPB("Cancel")
-            hl.addWidget(btn_oe)
-            hl.addWidget(btn_hc)
-            hl.addWidget(btn_cancel)
-            vl.addLayout(hl)
-            chosen = [None]
-            btn_oe.clicked.connect(lambda: [chosen.__setitem__(0, False), src_dlg.accept()])
-            btn_hc.clicked.connect(lambda: [chosen.__setitem__(0, True), src_dlg.accept()])
-            btn_cancel.clicked.connect(src_dlg.reject)
-            if src_dlg.exec() != _QDialog.DialogCode.Accepted or chosen[0] is None:
-                return
-            use_hubcap = chosen[0]
-            # Build {depot_id: manifest_id} override from selections
             manifest_override = {depot_id: manifest_id for depot_id, manifest_id in selections}
             app_id = str(self.app_id)
             ui = self._ui
             run_tool_fn = self._run_tool_fn
             self.accept()  # close version picker dialog
-            run_tool_fn(lambda: ui.process_from_store(app_id, manifest_override, use_hubcap))
+            run_tool_fn(lambda: ui.process_from_store(app_id, manifest_override, False))
             return
         # Fallback: manifest-only download (no Lua, no ACF) when UI not available
         self._dl_btn.setEnabled(False)

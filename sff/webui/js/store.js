@@ -16,6 +16,26 @@ window.Store = (function () {
     /** Pendant installation catalogue FREE : attendre task_finished download_fastest pour ce app_id. */
     var _freeCatalogInstallPending = null;
     var _freeCatalogTaskListenerBound = false;
+    /** Réponse async begin_free_catalog_install (Worker Python — évite blocage WebChannel). */
+    var _freeCatalogBeginHandler = null;
+    var _freeCatalogBeginSignalBound = false;
+
+    function _toast(level, msg) {
+        if (typeof Components !== 'undefined' && Components.showToast) {
+            Components.showToast(level, msg);
+        }
+    }
+
+    function _bindFreeCatalogBeginResult() {
+        if (_freeCatalogBeginSignalBound) return;
+        _freeCatalogBeginSignalBound = true;
+        Bridge.on('free_catalog_begin_result', function (jsonStr) {
+            var h = _freeCatalogBeginHandler;
+            _freeCatalogBeginHandler = null;
+            if (!h) return;
+            h(jsonStr);
+        });
+    }
 
     var TRIPLE_RANK_IDS = {
         triple_monstre: 1, triplemonstre: 1, triple_monster: 1, triplemonster: 1,
@@ -206,10 +226,12 @@ window.Store = (function () {
                                 if (r.ok) {
                                     _freeClaimed = okApp;
                                     _renderFreeCatalog();
-                                } else if (typeof showToast === 'function') {
-                                    showToast(
-                                        'Steam semble à jour mais l’enregistrement du choix sur le compte a échoué — contacte le support.',
-                                        'error'
+                                } else {
+                                    var detail = (r.error && String(r.error).trim()) || '';
+                                    _toast('error',
+                                        detail
+                                            ? ('Enregistrement du choix sur le compte : ' + detail)
+                                            : 'Steam semble à jour mais l’enregistrement du choix sur le compte a échoué — contacte le support.'
                                     );
                                 }
                                 Bridge.call('sync_launcher_profile');
@@ -242,8 +264,8 @@ window.Store = (function () {
                                     _renderFreeCatalog();
                                 }
                                 Bridge.call('sync_launcher_profile');
-                                if (r.ok && (r.cleared === 'pending' || r.reverted) && typeof showToast === 'function') {
-                                    showToast('Tu peux sélectionner un autre jeu du catalogue.', 'info');
+                                if (r.ok && (r.cleared === 'pending' || r.reverted)) {
+                                    _toast('info', 'Tu peux sélectionner un autre jeu du catalogue.');
                                 }
                             });
                         } else if (py.revert_free_claim) {
@@ -506,6 +528,7 @@ window.Store = (function () {
             + 'Si le téléchargement ou l’installation échoue, tu pourras en choisir un autre.\n'
             + 'Une fois l’installation réussie, ce choix devient définitif.')) return;
 
+        _bindFreeCatalogBeginResult();
         _bindFreeCatalogInstallTaskListener();
 
         var allBtns = document.querySelectorAll('.free-catalog-card-btn');
@@ -513,19 +536,17 @@ window.Store = (function () {
 
         _showFreeCatalogWaitModal(gameName);
 
-        Bridge.onReady(function(py) {
+        Bridge.onReady(function (py) {
             if (!py.begin_free_catalog_install) {
                 _freeCatalogInstallPending = null;
                 _hideFreeCatalogWaitModal();
-                allBtns.forEach(function(b) { b.disabled = false; b.textContent = '⬇ Choisir ce jeu'; });
-                if (typeof showToast === 'function') {
-                    showToast('Mise à jour du launcher requise pour le catalogue gratuit.', 'error');
-                }
+                allBtns.forEach(function (b) { b.disabled = false; b.textContent = '⬇ Choisir ce jeu'; });
+                _toast('error', 'Mise à jour du launcher requise pour le catalogue gratuit.');
                 return;
             }
-            py.begin_free_catalog_install(appId, function(jsonStr) {
+            _freeCatalogBeginHandler = function (jsonStr) {
                 var result;
-                try { result = JSON.parse(jsonStr); } catch(e) { result = {ok: false, error: 'Erreur interne'}; }
+                try { result = JSON.parse(jsonStr); } catch (e) { result = { ok: false, error: 'Erreur interne' }; }
 
                 if (result.ok) {
                     if (result.mode === 'committed') {
@@ -539,25 +560,63 @@ window.Store = (function () {
                     var spinLabel = document.querySelector('#free-catalog-steam-wait-modal .free-catalog-wait-spinner span');
                     if (spinLabel) spinLabel.textContent = 'En cours…';
                     _freeCatalogInstallPending = { appId: String(appId), gameName: gameName };
-                    setTimeout(function() {
-                        Bridge.call('download_game_with_source', String(appId), 'twentytwocloud', '0');
+                    setTimeout(function () {
+                        Bridge.call('download_game_with_source', String(appId), 'twentytwocloud', '0', '');
                     }, 0);
                     _renderFreeCatalog();
+                } else if (result.error === 'pending_other_game') {
+                    _freeCatalogInstallPending = null;
+                    _hideFreeCatalogWaitModal();
+                    allBtns.forEach(function (b) { b.disabled = false; b.textContent = '⬇ Choisir ce jeu'; });
+                    var pendId = String(result.app_id || '');
+                    if (pendId && confirm(
+                        'Une préparation catalogue est enregistrée pour l\'App ' + pendId + '.\n\n' +
+                        'Si cette installation ne tourne plus (fenêtre fermée, plantage, etc.), clique OK pour effacer cette étape et pouvoir choisir un autre jeu.'
+                    )) {
+                        Bridge.onReady(function (py) {
+                            if (!py.cancel_free_catalog_install) {
+                                _toast('error', 'Impossible d\'annuler : mets à jour le launcher.');
+                                return;
+                            }
+                            py.cancel_free_catalog_install(pendId, function (jsonStr) {
+                                var cr = {};
+                                try { cr = JSON.parse(jsonStr || '{}'); } catch (e1) { cr = {}; }
+                                if (cr.ok) {
+                                    _toast('info', 'Préparation annulée — tu peux choisir un jeu à nouveau.');
+                                    Bridge.call('sync_launcher_profile');
+                                } else {
+                                    _toast('error', cr.error || 'Impossible d\'annuler.');
+                                }
+                                _renderFreeCatalog();
+                            });
+                        });
+                    } else if (pendId) {
+                        _toast('warning',
+                            'Installation encore réservée pour l\'App ' + pendId + '. Réessaie et accepte l\'annulation si tu veux changer de jeu.'
+                        );
+                    } else {
+                        _toast('error', 'Conflit de préparation catalogue. Réessaie ou reconnecte-toi.');
+                    }
                 } else if (result.error === 'already_claimed') {
                     _freeCatalogInstallPending = null;
                     _hideFreeCatalogWaitModal();
-                    allBtns.forEach(function(b) { b.disabled = false; b.textContent = '⬇ Choisir ce jeu'; });
+                    allBtns.forEach(function (b) { b.disabled = false; b.textContent = '⬇ Choisir ce jeu'; });
                     _freeClaimed = result.app_id || appId;
                     _renderFreeCatalog();
+                    if (String(result.app_id || '') !== String(appId)) {
+                        _toast('warning',
+                            'Tu as déjà utilisé ton jeu catalogue gratuit (App ' + result.app_id + ').'
+                        );
+                    }
+                    Bridge.call('sync_launcher_profile');
                 } else {
                     _freeCatalogInstallPending = null;
                     _hideFreeCatalogWaitModal();
-                    allBtns.forEach(function(b) { b.disabled = false; b.textContent = '⬇ Choisir ce jeu'; });
-                    if (typeof showToast === 'function') {
-                        showToast('Erreur : ' + (result.error || 'Impossible de valider.'), 'error');
-                    }
+                    allBtns.forEach(function (b) { b.disabled = false; b.textContent = '⬇ Choisir ce jeu'; });
+                    _toast('error', 'Erreur : ' + (result.error || 'Impossible de valider.'));
                 }
-            });
+            };
+            Bridge.call('begin_free_catalog_install', String(appId));
         });
     }
 
@@ -728,7 +787,7 @@ window.Store = (function () {
                 }
                 _resetProgress();
                 _showProgress('Démarrage du téléchargement…', 5);
-                Bridge.call('download_game_with_source', _currentAppId, 'twentytwocloud', '0');
+                Bridge.call('download_game_with_source', _currentAppId, 'twentytwocloud', '0', '');
             });
         }
         if (depotBtn) {
@@ -773,6 +832,7 @@ window.Store = (function () {
 
     function onPageEnter() {
         init();
+        _bindFreeCatalogBeginResult();
         Bridge.call('sync_launcher_profile');
         _loadRankAndDisplay();
         // Focus input only if premium section ends up visible

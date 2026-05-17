@@ -72,7 +72,8 @@ window.Bridge = (function() {
             'log_message',
             'ttc_game_info',
             'auth_done',
-            'launcher_profile_synced'
+            'launcher_profile_synced',
+            'free_catalog_begin_result'
         ];
         signalNames.forEach(function(name) {
             if (_py[name] && typeof _py[name].connect === 'function') {

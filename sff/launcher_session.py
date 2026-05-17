@@ -122,7 +122,14 @@ def apply_verify_to_local_auth(verify_out: dict) -> None:
             return
         data["rank"] = verify_out.get("rank", data.get("rank", "free"))
         if "free_claimed" in verify_out:
-            data["free_claimed"] = verify_out.get("free_claimed")
+            fc = verify_out.get("free_claimed")
+            pend = str(data.get("free_catalog_pending_install") or "").strip()
+            if fc is not None and str(fc).strip() != "":
+                data["free_claimed"] = str(fc).strip()
+            elif not pend:
+                # Ne pas effacer free_claimed local pendant une install « pending » :
+                # verify peut renvoyer null jusqu'à record_free_claim.
+                data["free_claimed"] = None
         if "rank_expires_at" in verify_out:
             data["rank_expires_at"] = verify_out.get("rank_expires_at")
         _AUTH_FILE.parent.mkdir(parents=True, exist_ok=True)

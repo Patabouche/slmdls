@@ -579,13 +579,11 @@ window.App = (function() {
             }
         });
 
-        // Radio change — show/hide Ryuu update option, local file row, and manifest folder row
+        // Radio change — afficher ligne fichier local et dossier manifest
         document.querySelectorAll('input[name="dl-source"]').forEach(function(r) {
             r.addEventListener('change', function() {
-                var opt = document.getElementById('ryuu-update-option');
                 var localRow = document.getElementById('dl-local-row');
                 var mfRow = document.getElementById('dl-manifest-folder-row');
-                if (opt) opt.style.display = this.value === 'ryuu' ? 'block' : 'none';
                 if (localRow) localRow.style.display = this.value === 'local' ? 'block' : 'none';
                 if (mfRow && this.value !== 'local') mfRow.style.display = 'none';
             });
@@ -628,11 +626,17 @@ window.App = (function() {
             dlFastest.addEventListener('click', function() {
                 var appId = this.dataset.appid;
                 var sourceEl = document.querySelector('input[name="dl-source"]:checked');
-                var source = sourceEl ? sourceEl.value : 'hubcap';
-                var updateEl = document.getElementById('ryuu-request-update');
-                var requestUpdate = (source === 'ryuu' && updateEl && updateEl.checked) ? '1' : '0';
+                var source = sourceEl ? sourceEl.value : 'twentytwocloud';
+                var localPath = '';
+                if (source === 'local') {
+                    localPath = (document.getElementById('dl-local-lua-path') || {}).value || '';
+                    if (!localPath) {
+                        Components.showToast('warning', 'Veuillez sélectionner un fichier .lua ou .zip local d\'abord.');
+                        return;
+                    }
+                }
                 Components.hideModal('download-modal');
-                _startDownload(appId, 'fastest', source, requestUpdate);
+                _startDownload(appId, 'fastest', source, '0', localPath);
             });
         }
 
@@ -652,7 +656,7 @@ window.App = (function() {
             dlDdmod.addEventListener('click', function() {
                 var appId = this.dataset.appid;
                 var sourceEl = document.querySelector('input[name="dl-source"]:checked');
-                var source = sourceEl ? sourceEl.value : 'hubcap';
+                var source = sourceEl ? sourceEl.value : 'twentytwocloud';
                 var luaPath = '';
                 var manifestFolder = '';
                 if (source === 'local') {
@@ -741,7 +745,7 @@ window.App = (function() {
                     return;
                 }
                 var sourceEl = document.querySelector('input[name="ddmod-home-source"]:checked');
-                var source = sourceEl ? sourceEl.value : 'hubcap';
+                var source = sourceEl ? sourceEl.value : 'twentytwocloud';
                 var luaPath = '';
                 var manifestFolder = '';
                 if (source === 'local') {
@@ -848,7 +852,7 @@ window.App = (function() {
         if (recentRow) recentRow.style.display = 'none';
         if (mfRow) mfRow.style.display = 'none';
         if (mfInp) mfInp.value = '';
-        var firstRadio = document.querySelector('input[name="ddmod-home-source"][value="hubcap"]');
+        var firstRadio = document.querySelector('input[name="ddmod-home-source"][value="twentytwocloud"]');
         if (firstRadio) firstRadio.checked = true;
 
         Bridge.callSync('get_recent_lua_files', function(json) {
@@ -871,7 +875,7 @@ window.App = (function() {
         Components.showModal('ddmod-home-modal');
     }
 
-    function _startDownload(appId, mode, source, requestUpdate) {
+    function _startDownload(appId, mode, source, requestUpdate, localLuaPath) {
         // First, ask for library selection
         Bridge.callSync('get_steam_libraries', function(json) {
             var libs;
@@ -884,21 +888,21 @@ window.App = (function() {
 
             if (libs.length === 1) {
                 Bridge.call('set_active_library', libs[0]);
-                _executeDownload(appId, mode, source, requestUpdate);
+                _executeDownload(appId, mode, source, requestUpdate, localLuaPath);
             } else {
                 Components.showLibraryModal(libs, function(selectedLib) {
                     Bridge.call('set_active_library', selectedLib);
-                    _executeDownload(appId, mode, source, requestUpdate);
+                    _executeDownload(appId, mode, source, requestUpdate, localLuaPath);
                 });
             }
         });
     }
 
-    function _executeDownload(appId, mode, source, requestUpdate) {
+    function _executeDownload(appId, mode, source, requestUpdate, localLuaPath) {
         Components.showToast('info', 'Démarrage du téléchargement pour l\'App ' + appId + '...');
         if (mode === 'fastest') {
-            var src = source || 'hubcap';
-            Bridge.call('download_game_with_source', appId, src, requestUpdate || '0');
+            var src = source || 'twentytwocloud';
+            Bridge.call('download_game_with_source', appId, src, requestUpdate || '0', localLuaPath || '');
         }
     }
 

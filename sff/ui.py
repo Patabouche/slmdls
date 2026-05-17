@@ -967,7 +967,8 @@ class UI:
             return MainReturnCode.LOOP_NO_PROMPT
         saved_lua = launcher_saved_lua_dir()
         saved_lua.mkdir(parents=True, exist_ok=True)
-        source = LuaEndpoint.HUBCAP if use_hubcap else LuaEndpoint.OUREVERYDAY
+        _ = use_hubcap  # compat. appelants ; le Lua vient toujours du catalogue TwentyTwoCloud
+        source = LuaEndpoint.TWENTYTWOCLOUD
         print(
             Fore.CYAN
             + f"\nDownloading Lua for app {app_id} from {source.value}…"
@@ -988,7 +989,7 @@ class UI:
             return MainReturnCode.LOOP_NO_PROMPT
         provider = self._steam_provider()
         downloader = ManifestDownloader(provider, self.steam_path)
-        downloader.use_hubcap = use_hubcap
+        downloader.use_hubcap = False
         config = ConfigVDFWriter(self.steam_path)
         acf = ACFWriter(lib_path)
         steam_proc = (

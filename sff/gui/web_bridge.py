@@ -200,10 +200,17 @@ def _save_auth(
         pinst = prev.get("free_catalog_pending_install")
         if pinst:
             payload["free_catalog_pending_install"] = pinst
+        pat = prev.get("free_catalog_pending_at")
+        if pat is not None:
+            try:
+                payload["free_catalog_pending_at"] = int(pat)
+            except (TypeError, ValueError):
+                pass
     elif free_catalog_pending_install is None:
         pass
     else:
         payload["free_catalog_pending_install"] = str(free_catalog_pending_install).strip()
+        payload["free_catalog_pending_at"] = int(time.time())
     _AUTH_FILE.write_text(json.dumps(payload), encoding="utf-8")
     try:
         from sff.launcher_session import invalidate_launcher_verify_cache
@@ -245,6 +252,47 @@ _LAUNCHER_FREE_CATALOG_IDS = frozenset({
     "526870",
 })
 
+# Préparation catalogue FREE : auto-déblocage si abandonnée (crash, ancien état sans date).
+_FREE_CATALOG_PENDING_STALE_SEC = 24 * 3600
+
+
+def _free_catalog_pending_is_stale(saved: dict) -> bool:
+    """True si une préparation « en cours » est trop vieille ou sans horodatage (fichier legacy)."""
+    pend = str(saved.get("free_catalog_pending_install") or "").strip()
+    if not pend:
+        return False
+    at = saved.get("free_catalog_pending_at")
+    try:
+        t0 = int(at)
+    except (TypeError, ValueError):
+        t0 = 0
+    if t0 <= 0:
+        return True
+    return (int(time.time()) - t0) > _FREE_CATALOG_PENDING_STALE_SEC
+
+
+def _clear_free_catalog_pending_fields(saved: dict) -> None:
+    """Retire pending + horodatage sans toucher au reste de l'auth."""
+    _save_auth(
+        str(saved.get("token") or ""),
+        str(saved.get("username") or ""),
+        str(saved.get("rank") or "free"),
+        saved.get("free_claimed"),
+        saved.get("rank_expires_at"),
+        free_catalog_pending_install=None,
+    )
+
+
+def _sync_expire_free_catalog_pending_if_stale(saved: dict | None = None) -> dict:
+    """Purge pending périmé et retourne auth.json à jour."""
+    if saved is None:
+        saved = _load_auth()
+    if _free_catalog_pending_is_stale(saved):
+        _clear_free_catalog_pending_fields(saved)
+        return _load_auth()
+    return saved
+
+
 _CLOUD_SAVES_DENIED_MSG = (
     "Les sauvegardes cloud Google Drive sont reservees au plan Triple Monstre "
     "(pas au plan Monstre ni au plan FREE). Voir slimedeals.fr/#tarifs."
@@ -259,7 +307,7 @@ def _cloud_saves_feature_allowed() -> bool:
 
 def _launcher_free_catalog_download_allowed(app_id: str) -> tuple[bool, str]:
     """Compte FREE : un jeu du catalogue gratuit après choix — réclamation serveur OU session locale (pending)."""
-    saved = _load_auth()
+    saved = _sync_expire_free_catalog_pending_if_stale()
     if _norm_saved_launcher_rank(saved.get("rank")) != "free":
         return True, ""
     aid = str(app_id).strip()
@@ -270,14 +318,86 @@ def _launcher_free_catalog_download_allowed(app_id: str) -> tuple[bool, str]:
         )
     claimed = saved.get("free_claimed")
     pending = saved.get("free_catalog_pending_install")
-    if claimed is not None and str(claimed).strip() == aid:
+    c = str(claimed).strip() if claimed is not None else ""
+    p = str(pending).strip() if pending is not None else ""
+    if c and c != aid:
+        return False, (
+            f"Plan FREE : tu as déjà réclamé ton jeu catalogue gratuit (App {c}). "
+            "Un seul titre : passe à un abonnement Monstre ou Triple Monstre pour d'autres jeux."
+        )
+    if c == aid:
         return True, ""
-    if pending is not None and str(pending).strip() == aid:
+    if p == aid:
         return True, ""
     return False, (
         "Plan FREE : sur la carte du jeu dans « Télécharger », clique d'abord sur "
         "« Choisir ce jeu » pour lancer la préparation, puis l'installation."
     )
+
+
+def _begin_free_catalog_install_impl(app_id: str) -> str:
+    """Logique catalogue FREE (appelée depuis un worker — pas sur le thread UI)."""
+    saved = _sync_expire_free_catalog_pending_if_stale()
+    token = (saved.get("token") or "").strip()
+    if not token:
+        return json.dumps({"ok": False, "error": "Non connecté"})
+    aid = str(app_id).strip()
+    if aid not in _LAUNCHER_FREE_CATALOG_IDS:
+        return json.dumps({"ok": False, "error": "Jeu hors catalogue Free"})
+    from sff.launcher_session import apply_verify_to_local_auth, verify_launcher_session
+
+    vr = verify_launcher_session(force_refresh=True)
+    apply_verify_to_local_auth(vr)
+    saved = _load_auth()
+    if not vr.get("ok"):
+        return json.dumps({"ok": False, "error": (vr.get("error") or "Session invalide")})
+    rank = vr.get("rank", saved.get("rank", "free"))
+    if _norm_saved_launcher_rank(rank) != "free":
+        return json.dumps(
+            {
+                "ok": False,
+                "error": "Le catalogue gratuit est réservé aux comptes plan FREE.",
+            }
+        )
+    srv_claim = vr.get("free_claimed")
+    local_claim = str(saved.get("free_claimed") or "").strip()
+    if local_claim and local_claim != aid:
+        return json.dumps(
+            {"ok": False, "error": "already_claimed", "app_id": local_claim}
+        )
+    if srv_claim is not None and str(srv_claim).strip() != "":
+        sc = str(srv_claim).strip()
+        if sc != aid:
+            return json.dumps(
+                {"ok": False, "error": "already_claimed", "app_id": sc}
+            )
+        _save_auth(
+            token,
+            saved.get("username", ""),
+            rank,
+            sc,
+            vr.get("rank_expires_at"),
+            free_catalog_pending_install=None,
+        )
+        return json.dumps({"ok": True, "mode": "committed"})
+    pend = str(saved.get("free_catalog_pending_install") or "").strip()
+    if pend and pend != aid:
+        return json.dumps(
+            {
+                "ok": False,
+                "error": "pending_other_game",
+                "app_id": pend,
+            }
+        )
+    _save_auth(
+        token,
+        saved.get("username", ""),
+        rank,
+        None,
+        vr.get("rank_expires_at"),
+        free_catalog_pending_install=aid,
+    )
+    return json.dumps({"ok": True, "mode": "pending"})
 
 
 def launcher_fetch_billing_portal() -> dict:
@@ -337,6 +457,8 @@ class WebBridge(QObject):
     ttc_game_info   = pyqtSignal(str)
     auth_done       = pyqtSignal(str)   # emitted with username after successful login
     launcher_profile_synced = pyqtSignal(str)  # JSON {ok, rank?, free_claimed?, username?} après /verify
+    # Résultat de begin_free_catalog_install (worker — évite blocage WebChannel sur /verify)
+    free_catalog_begin_result = pyqtSignal(str)
     # Notification Discord d’activité : traitement sur le thread UI uniquement
     request_notify_gen = pyqtSignal(str)
 
@@ -695,17 +817,47 @@ class WebBridge(QObject):
         token = saved.get("token", "")
         if not token:
             return json.dumps({"ok": False, "error": "Non connecté"})
-        hwid   = _get_hwid()
-        result = _api_post("/api/launcher/free-claim", {
-            "token": token,
-            "hwid": hwid,
-            "app_id": str(app_id).strip(),
-        })
-        aid = str(app_id).strip()
-        committed = result.get("ok") or (
-            result.get("error") == "already_claimed"
-            and str(result.get("app_id") or "").strip() == aid
+
+        def _norm_catalog_aid(raw: object) -> str:
+            if raw is None:
+                return ""
+            s = str(raw).strip()
+            if not s:
+                return ""
+            try:
+                n = int(float(s))
+                if n > 0:
+                    return str(n)
+            except (TypeError, ValueError):
+                pass
+            return s
+
+        aid = _norm_catalog_aid(app_id)
+        if not aid:
+            return json.dumps({"ok": False, "error": "App ID invalide"})
+        hwid = _get_hwid()
+        result = _api_post(
+            "/api/launcher/free-claim",
+            {"token": token, "hwid": hwid, "app_id": aid},
         )
+        err = str(result.get("error") or "").strip()
+        committed = bool(result.get("ok")) or (
+            err == "already_claimed" and _norm_catalog_aid(result.get("app_id")) == aid
+        )
+        if not committed:
+            # Réponse réseau perdue alors que le POST a réussi, ou course côté serveur :
+            # re-sync via /verify avant d'afficher un échec.
+            try:
+                from sff.launcher_session import apply_verify_to_local_auth, verify_launcher_session
+
+                vr = verify_launcher_session(force_refresh=True)
+                apply_verify_to_local_auth(vr)
+                srv = str(vr.get("free_claimed") or "").strip()
+                if vr.get("ok") and srv == aid:
+                    committed = True
+                    result = {"ok": True, "app_id": aid, "note": "synced_from_verify"}
+            except Exception:
+                logger.debug("record_free_claim verify fallback", exc_info=True)
         if committed:
             fresh = _load_auth()
             _save_auth(
@@ -719,58 +871,39 @@ class WebBridge(QObject):
             if result.get("ok"):
                 return json.dumps(result)
             return json.dumps({"ok": True, "app_id": aid, "note": "already_claimed_same_app"})
+        if aid in _LAUNCHER_FREE_CATALOG_IDS and "non autorisé" in err.lower():
+            logger.warning(
+                "free-claim refusé pour l'app catalogue %s (%s) : l'API distante n'autorise pas cet ID — "
+                "vérifier que le bot en production expose la même liste que _LAUNCHER_FREE_CATALOG_IDS.",
+                aid,
+                err,
+            )
         return json.dumps(result)
 
-    @pyqtSlot(str, result=str)
-    def begin_free_catalog_install(self, app_id: str) -> str:
-        """Prépare l'installation catalogue FREE sans enregistrer le choix côté serveur tant que ça n'a pas réussi.
-        Utilise ``free_catalog_pending_install`` en local si /verify indique free_claimed=null."""
-        saved = _load_auth()
-        token = (saved.get("token") or "").strip()
-        if not token:
-            return json.dumps({"ok": False, "error": "Non connecté"})
+    @pyqtSlot(str)
+    def begin_free_catalog_install(self, app_id: str) -> None:
+        """Prépare l'installation catalogue FREE (réseau sur worker → signal free_catalog_begin_result)."""
         aid = str(app_id).strip()
-        if aid not in _LAUNCHER_FREE_CATALOG_IDS:
-            return json.dumps({"ok": False, "error": "Jeu hors catalogue Free"})
-        from sff.launcher_session import apply_verify_to_local_auth, verify_launcher_session
 
-        vr = verify_launcher_session(force_refresh=True)
-        apply_verify_to_local_auth(vr)
-        saved = _load_auth()
-        if not vr.get("ok"):
-            return json.dumps({"ok": False, "error": (vr.get("error") or "Session invalide")})
-        rank = vr.get("rank", saved.get("rank", "free"))
-        if _norm_saved_launcher_rank(rank) != "free":
-            return json.dumps(
-                {
-                    "ok": False,
-                    "error": "Le catalogue gratuit est réservé aux comptes plan FREE.",
-                }
-            )
-        srv_claim = vr.get("free_claimed")
-        if srv_claim is not None and str(srv_claim).strip() != "":
-            if str(srv_claim).strip() != aid:
-                return json.dumps(
-                    {"ok": False, "error": "already_claimed", "app_id": str(srv_claim)}
+        def _do():
+            return _begin_free_catalog_install_impl(aid)
+
+        def _done(res):
+            if res is None:
+                res = json.dumps({"ok": False, "error": "Échec interne"})
+            self.free_catalog_begin_result.emit(str(res))
+
+        def _err(_msg):
+            self.free_catalog_begin_result.emit(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": "Erreur réseau ou serveur (vérifie ta connexion).",
+                    }
                 )
-            _save_auth(
-                token,
-                saved.get("username", ""),
-                rank,
-                str(srv_claim).strip(),
-                vr.get("rank_expires_at"),
-                free_catalog_pending_install=None,
             )
-            return json.dumps({"ok": True, "mode": "committed"})
-        _save_auth(
-            token,
-            saved.get("username", ""),
-            rank,
-            None,
-            vr.get("rank_expires_at"),
-            free_catalog_pending_install=aid,
-        )
-        return json.dumps({"ok": True, "mode": "pending"})
+
+        self._run_async(_do, on_done=_done, on_error=_err)
 
     @pyqtSlot(str, result=str)
     def cancel_free_catalog_install(self, app_id: str) -> str:
@@ -1086,10 +1219,13 @@ class WebBridge(QObject):
 
         self._run_async(_do, on_done=_on_done)
 
-    @pyqtSlot(str, str, str)
-    def download_game_with_source(self, app_id, source, request_update='0'):
-        """Fastest download with explicit source choice ('hubcap' or 'oureveryday').
-        Emits download_progress + task_finished signals."""
+    @pyqtSlot(str, str, str, str)
+    def download_game_with_source(self, app_id, source, request_update='0', local_lua_path=''):
+        """Téléchargement rapide : catalogue SlimeDeals (TwentyTwoCloud) ou fichier Lua local.
+
+        ``local_lua_path`` : obligatoire si ``source == 'local'`` (Windows : pipeline rapide ;
+        Linux/macOS : ``process_lua_full``). Émet download_progress + task_finished.
+        """
         self._log_ui(
             f"[Slot] download_game_with_source(app_id={app_id!r}, source={_log_download_source(source)!r}, "
             f"request_update={request_update!r}) — lancement thread worker…"
@@ -1140,13 +1276,27 @@ class WebBridge(QObject):
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Starting", "progress": 0
             }))
+            src_key = str(source or "").strip().lower()
             if sys.platform == "win32":
                 self._log_ui(
                     f"Windows : _run_windows_fastest (request_update={(request_update == '1')!r})"
                 )
                 return self._run_windows_fastest(
-                    app_id, source=source, request_update=(request_update == '1')
+                    app_id,
+                    source=source,
+                    request_update=(request_update == '1'),
+                    local_lua_path=str(local_lua_path or ""),
                 )
+            if src_key == "local":
+                lp = str(local_lua_path or "").strip()
+                if not lp:
+                    self._log_ui("Échec : fichier local non sélectionné.")
+                    return False
+                from sff.structs import MainReturnCode
+
+                self._log_ui(f"Linux/macOS : traitement Lua local {lp!r} (process_lua_full)")
+                rc = self._ui.process_lua_full(file=lp)
+                return rc == MainReturnCode.LOOP
             self._log_ui("Linux : _run_linux_fastest")
             return self._run_linux_fastest(app_id)
 
@@ -1171,7 +1321,7 @@ class WebBridge(QObject):
 
         self._run_async(_do, on_done=_on_done)
 
-    def _run_windows_fastest(self, app_id, source='', request_update=False):
+    def _run_windows_fastest(self, app_id, source='', request_update=False, local_lua_path=''):
         """Prompt-free 11-step pipeline for Windows."""
         try:
             from sff.lua.choices import download_lua_direct
@@ -1194,26 +1344,43 @@ class WebBridge(QObject):
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Downloading Lua", "progress": 10
             }))
-            if src_key == "hubcap":
-                selected_source = LuaEndpoint.HUBCAP
-            elif src_key == "oureveryday":
-                selected_source = LuaEndpoint.OUREVERYDAY
-            elif src_key == "ryuu":
-                selected_source = LuaEndpoint.RYUU
-            elif src_key in ("twentytwocloud", "catalogue"):
-                selected_source = LuaEndpoint.TWENTYTWOCLOUD
+            lua_path = None
+            local_path_raw = str(local_lua_path or "").strip()
+            if src_key == "local":
+                if not local_path_raw:
+                    self._log_ui("Échec : source locale sans chemin de fichier.")
+                    return False
+                lp = Path(local_path_raw)
+                if not lp.is_file():
+                    self._log_ui(f"Échec : fichier Lua local introuvable : {local_path_raw!r}")
+                    return False
+                if lp.suffix.lower() == ".zip":
+                    from sff.zip import read_lua_from_zip
+
+                    _dc = (steam_path / "depotcache") if steam_path else None
+                    lua_text = read_lua_from_zip(lp, decode=True, depotcache=_dc)
+                    if not lua_text:
+                        self._log_ui("Échec : aucun .lua lisible dans l’archive ZIP.")
+                        return False
+                    _out_dir = steam_path / "config" if steam_path else Path(".")
+                    _out_dir.mkdir(parents=True, exist_ok=True)
+                    lua_path = _out_dir / f"{app_id}_local.lua"
+                    lua_path.write_text(lua_text, encoding="utf-8")
+                else:
+                    lua_path = lp
             else:
-                selected_source = LuaEndpoint.HUBCAP if self._api_key else LuaEndpoint.OUREVERYDAY
-            self._log_ui(
-                f"Téléchargement Lua ({getattr(selected_source, 'value', str(selected_source))})…"
-            )
-            lua_path = download_lua_direct(
-                dest=steam_path / "config",
-                app_id=app_id,
-                source=selected_source,
-                steam_path=steam_path,
-                request_update=request_update,
-            )
+                # Catalogue SlimeDeals uniquement (pas de clés Hubcap / OurEveryday / Ryuu).
+                selected_source = LuaEndpoint.TWENTYTWOCLOUD
+                self._log_ui(
+                    f"Téléchargement Lua ({getattr(selected_source, 'value', str(selected_source))})…"
+                )
+                lua_path = download_lua_direct(
+                    dest=steam_path / "config",
+                    app_id=app_id,
+                    source=selected_source,
+                    steam_path=steam_path,
+                    request_update=request_update,
+                )
             if not lua_path:
                 self._log_ui(
                     "Échec : download_lua_direct n’a renvoyé aucun chemin (réseau, source, ou jeu indisponible)."
@@ -1384,7 +1551,7 @@ class WebBridge(QObject):
             self._ui.process_from_store(
                 app_id=app_id,
                 manifest_override=manifest_override,
-                use_hubcap=bool(self._api_key),
+                use_hubcap=False,
             )
 
             self.download_progress.emit(json.dumps({
@@ -1428,7 +1595,7 @@ class WebBridge(QObject):
             self._ui.process_from_store(
                 app_id=app_id,
                 manifest_override=manifest_override,
-                use_hubcap=bool(self._api_key),
+                use_hubcap=False,
             )
 
             self.download_progress.emit(json.dumps({
@@ -2962,7 +3129,7 @@ class WebBridge(QObject):
     @pyqtSlot(str, str, str, str)
     def download_game_ddmod(self, app_id, source, lua_path, manifest_folder=''):
         """Download a game using DepotDownloaderMod.
-        source: 'hubcap' | 'oureveryday' | 'ryuu' | 'local'
+        source: 'twentytwocloud' / 'catalogue' (défaut réseau) ou 'local'
         lua_path: used when source == 'local'
         Emits download_progress + task_finished signals."""
         def _do():
@@ -2971,7 +3138,7 @@ class WebBridge(QObject):
             }))
             try:
                 from pathlib import Path as _Path
-                from sff.lua.endpoints import get_hubcap, get_oureverday, get_ryuu
+                from sff.lua.endpoints import get_twentytwocloud
                 from sff.lua.manager import parse_lua_contents
                 from sff.depot_downloader import run_download
 
@@ -2981,6 +3148,7 @@ class WebBridge(QObject):
                     return (False, "No Steam library selected. Please select a download location.")
 
                 lua_dest = (steam_path / "config") if steam_path else _Path(".")
+                _dc = (steam_path / "depotcache") if steam_path else None
 
                 self.download_progress.emit(json.dumps({
                     "app_id": app_id, "status": "Fetching Lua file...", "progress": 5
@@ -2990,14 +3158,8 @@ class WebBridge(QObject):
                     lua_file = _Path(lua_path) if lua_path else None
                     if not lua_file or not lua_file.exists():
                         return (False, f"Lua file not found: {lua_path}")
-                elif source == "hubcap":
-                    lua_file = get_hubcap(lua_dest, app_id)
-                elif source == "oureveryday":
-                    lua_file = get_oureverday(lua_dest, app_id)
-                elif source == "ryuu":
-                    lua_file = get_ryuu(lua_dest, app_id, request_update=False)
                 else:
-                    return (False, f"Unknown source: {source}")
+                    lua_file = get_twentytwocloud(lua_dest, app_id, depotcache=_dc)
 
                 if not lua_file or not lua_file.exists():
                     return (False, f"Failed to obtain Lua file from source '{source}'")

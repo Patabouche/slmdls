@@ -127,6 +127,17 @@ if win10toast_data:
     datas.append(win10toast_data)
     print(f"Including win10toast data from: {win10toast_data[0]}")
 
+# TLS : cacert.pem certifi (httpx / ssl — évite FileNotFoundError si le hook ne suffit pas)
+try:
+    from PyInstaller.utils.hooks import collect_data_files
+
+    _certifi_files = collect_data_files('certifi')
+    if _certifi_files:
+        datas.extend(_certifi_files)
+        print(f"Including certifi CA bundle ({len(_certifi_files)} data entries).")
+except Exception as _cert_ex:
+    print(f"Note: certifi collect_data_files: {_cert_ex}")
+
 # Google OAuth — collect_all : fichiers de données + binaires parfois requis (évite ImportError en exe)
 _gd_oauth_d, _gd_oauth_b, _gd_oauth_h = [], [], []
 try:
@@ -188,6 +199,7 @@ a = Analysis(
         'psutil',
         'colorama',
         'httpx',
+        'certifi',
         'keyring',
         'keyring.backends',
         'keyring.backends.Windows',

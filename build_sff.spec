@@ -91,6 +91,16 @@ if win10toast_data:
     datas.append(win10toast_data)
     print(f"Including win10toast data from: {win10toast_data[0]}")
 
+try:
+    from PyInstaller.utils.hooks import collect_data_files
+
+    _certifi_files = collect_data_files('certifi')
+    if _certifi_files:
+        datas.extend(_certifi_files)
+        print(f"Including certifi CA bundle ({len(_certifi_files)} data entries).")
+except Exception as _cert_ex:
+    print(f"Note: certifi collect_data_files: {_cert_ex}")
+
 _gd_oauth_d, _gd_oauth_b, _gd_oauth_h = [], [], []
 try:
     from PyInstaller.utils.hooks import collect_all
@@ -159,6 +169,7 @@ a = Analysis(
         'psutil',
         'colorama',
         'httpx',
+        'certifi',
         'keyring',
         'cryptography',
         'win10toast',

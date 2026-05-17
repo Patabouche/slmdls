@@ -21,6 +21,17 @@ import os
 import sys
 from pathlib import Path
 
+# Avant PyQt / httpx : chemin CA pour TLS (évite FileNotFoundError au démarrage exe).
+try:
+    import certifi as _certifi
+
+    _ca = _certifi.where()
+    if _ca and os.path.isfile(_ca):
+        os.environ.setdefault("SSL_CERT_FILE", _ca)
+        os.environ.setdefault("REQUESTS_CA_BUNDLE", _ca)
+except Exception:
+    pass
+
 from PyQt6.QtGui import QIcon
 
 

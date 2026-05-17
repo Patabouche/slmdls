@@ -18,11 +18,24 @@
 
 import asyncio
 import logging
+import os
 import sys
 from contextlib import contextmanager
 from tempfile import TemporaryFile
 from pathlib import Path
 from urllib.parse import urlparse
+
+# Exe PyInstaller : ssl.create_default_context() peut lever FileNotFoundError si aucun
+# magasin CA n’est résolu — forcer le PEM embarqué (certifi) avant httpx.
+try:
+    import certifi
+
+    _ca_bundle = certifi.where()
+    if _ca_bundle and os.path.isfile(_ca_bundle):
+        os.environ.setdefault("SSL_CERT_FILE", _ca_bundle)
+        os.environ.setdefault("REQUESTS_CA_BUNDLE", _ca_bundle)
+except Exception:
+    pass
 
 import httpx
 from tqdm import tqdm  # type: ignore

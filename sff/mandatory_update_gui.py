@@ -24,8 +24,7 @@ import logging
 import os
 import sys
 
-from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -120,8 +119,8 @@ class MandatoryUpdateDialog(QDialog):
             self,
             "Échec de la mise à jour",
             "La mise à jour automatique a échoué (réseau, antivirus, ou fichier manquant sur GitHub).\n\n"
-            "Utilise « Ouvrir la page des téléchargements », récupère le zip Windows indiqué sur la release, "
-            "puis remplace ton dossier d'installation.",
+            f"Ouvre cette page dans ton navigateur, récupère le zip Windows de la dernière release, "
+            f"puis remplace ton dossier d'installation :\n{RELEASE_PAGE_URL}",
         )
 
 

@@ -13,6 +13,9 @@ window.Store = (function () {
     var _freeClaimed   = null;   // null | app_id string
     var _monstreSlotsUsed = null;
     var _monstreSlotsMax = null;
+    /** Pendant installation catalogue FREE : attendre task_finished download_fastest pour ce app_id. */
+    var _freeCatalogInstallPending = null;
+    var _freeCatalogTaskListenerBound = false;
 
     var TRIPLE_RANK_IDS = {
         triple_monstre: 1, triplemonstre: 1, triple_monster: 1, triplemonster: 1,
@@ -79,6 +82,79 @@ window.Store = (function () {
 
     function _steamHeader(appId) {
         return 'https://cdn.cloudflare.steamstatic.com/steam/apps/' + appId + '/header.jpg';
+    }
+
+    function _escHtml(s) {
+        if (typeof Components !== 'undefined' && Components.escapeHtml) {
+            return Components.escapeHtml(s);
+        }
+        if (!s) return '';
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(s));
+        return div.innerHTML;
+    }
+
+    function _hideFreeCatalogWaitModal() {
+        if (typeof Components !== 'undefined' && Components.hideModal) {
+            Components.hideModal('free-catalog-steam-wait-modal');
+        }
+    }
+
+    function _showFreeCatalogWaitModal(gameName) {
+        var waitGame = document.getElementById('free-catalog-wait-game');
+        if (waitGame) waitGame.textContent = gameName || '—';
+        var sub = document.getElementById('free-catalog-wait-sub');
+        if (sub) {
+            sub.innerHTML =
+                'Merci de <strong>patienter quelques instants</strong> : le jeu va être téléchargé puis enregistré sur <strong>Steam</strong>.';
+        }
+        var spinLabel = document.querySelector('#free-catalog-steam-wait-modal .free-catalog-wait-spinner span');
+        if (spinLabel) spinLabel.textContent = 'Préparation…';
+        if (typeof Components !== 'undefined' && Components.showModal) {
+            Components.showModal('free-catalog-steam-wait-modal');
+        }
+    }
+
+    function _bindFreeCatalogInstallTaskListener() {
+        if (_freeCatalogTaskListenerBound) return;
+        _freeCatalogTaskListenerBound = true;
+        Bridge.on('task_finished', function(jsonStr) {
+            var d;
+            try { d = JSON.parse(jsonStr); } catch (e) { return; }
+            if (d.task !== 'download_fastest') return;
+            if (!_freeCatalogInstallPending) return;
+            if (String(d.app_id || '') !== String(_freeCatalogInstallPending.appId)) return;
+            var gameName = _freeCatalogInstallPending.gameName;
+            _freeCatalogInstallPending = null;
+            _hideFreeCatalogWaitModal();
+            var wrap = document.getElementById('free-catalog-install-result-modal');
+            var titleEl = document.getElementById('free-catalog-result-title');
+            var bodyEl = document.getElementById('free-catalog-result-body');
+            if (wrap) {
+                wrap.classList.remove('free-catalog-result--ok', 'free-catalog-result--fail');
+                wrap.classList.add(d.success ? 'free-catalog-result--ok' : 'free-catalog-result--fail');
+            }
+            if (d.success) {
+                if (titleEl) titleEl.textContent = 'C’est dans Steam';
+                if (bodyEl) {
+                    bodyEl.innerHTML =
+                        '<p><strong>' + _escHtml(gameName) + '</strong> a bien été ajouté à ta bibliothèque <strong>Steam</strong>.</p>' +
+                        '<p class="text-muted free-catalog-result-hint">Tu peux ouvrir le client Steam pour vérifier.</p>';
+                }
+            } else {
+                if (titleEl) titleEl.textContent = 'Problème rencontré';
+                var err = d.message ? String(d.message) : 'Erreur inconnue';
+                if (bodyEl) {
+                    bodyEl.innerHTML =
+                        '<p>Le jeu <strong>n’a pas pu être correctement mis sur Steam</strong> (téléchargement ou étape Steam).</p>' +
+                        '<p class="text-muted free-catalog-result-err">' + _escHtml(err) + '</p>' +
+                        '<p class="text-muted free-catalog-result-hint">Vérifie ta connexion, l’espace disque et la console du launcher, puis réessaie si besoin.</p>';
+                }
+            }
+            if (typeof Components !== 'undefined' && Components.showModal) {
+                Components.showModal('free-catalog-install-result-modal');
+            }
+        });
     }
 
     // ── Rank detection ────────────────────────────────────────────────────────
@@ -267,12 +343,14 @@ window.Store = (function () {
     }
 
     function _claimFreeGame(appId, gameName) {
-        // Confirm
         if (!confirm('Confirmer la sélection de "' + gameName + '" ?\nCe choix est définitif et ne peut pas être changé.')) return;
 
-        // Disable all buttons during processing
+        _bindFreeCatalogInstallTaskListener();
+
         var allBtns = document.querySelectorAll('.free-catalog-card-btn');
         allBtns.forEach(function(b) { b.disabled = true; b.textContent = 'Traitement…'; });
+
+        _showFreeCatalogWaitModal(gameName);
 
         Bridge.onReady(function(py) {
             py.record_free_claim(appId, function(jsonStr) {
@@ -281,19 +359,26 @@ window.Store = (function () {
 
                 if (result.ok) {
                     _freeClaimed = String(appId);
-                    // Laisser le disque enregistrer auth.json avant le téléchargement (évite faux refus plan FREE)
-                    setTimeout(function () {
+                    var sub = document.getElementById('free-catalog-wait-sub');
+                    if (sub) {
+                        sub.innerHTML =
+                            'Téléchargement et enregistrement sur <strong>Steam</strong> en cours… Merci de <strong>patienter</strong> encore un instant.';
+                    }
+                    var spinLabel = document.querySelector('#free-catalog-steam-wait-modal .free-catalog-wait-spinner span');
+                    if (spinLabel) spinLabel.textContent = 'En cours…';
+                    _freeCatalogInstallPending = { appId: String(appId), gameName: gameName };
+                    setTimeout(function() {
                         Bridge.call('download_game_with_source', String(appId), 'twentytwocloud', '0');
                     }, 0);
-                    if (typeof showToast === 'function') {
-                        showToast('Téléchargement de ' + gameName + ' lancé !', 'success');
-                    }
                     _renderFreeCatalog();
                 } else if (result.error === 'already_claimed') {
+                    _freeCatalogInstallPending = null;
+                    _hideFreeCatalogWaitModal();
                     _freeClaimed = result.app_id || appId;
                     _renderFreeCatalog();
                 } else {
-                    // Restore buttons on error
+                    _freeCatalogInstallPending = null;
+                    _hideFreeCatalogWaitModal();
                     allBtns.forEach(function(b) { b.disabled = false; b.textContent = '⬇ Choisir ce jeu'; });
                     if (typeof showToast === 'function') {
                         showToast('Erreur : ' + (result.error || 'Impossible de valider.'), 'error');
@@ -509,6 +594,7 @@ window.Store = (function () {
     function init() {
         if (_initialized) return;
         _initialized = true;
+        _bindFreeCatalogInstallTaskListener();
         _bindLauncherProfileSync();
     }
 

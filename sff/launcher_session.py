@@ -155,3 +155,24 @@ def verify_launcher_session(force_refresh: bool = False) -> dict:
     _CACHE["t"] = now
     _CACHE["result"] = out
     return out
+
+
+def fetch_launcher_notifications() -> dict:
+    """POST /api/launcher/notifications — même auth que verify (token + HWID local)."""
+    auth = _load_auth()
+    token = (auth.get("token") or "").strip()
+    if not token:
+        return {"ok": False, "error": "non_connecte", "items": [], "unread": 0}
+    return _api_post("/api/launcher/notifications", {"token": token, "hwid": _hwid()})
+
+
+def mark_launcher_notifications_read(ids: list[int]) -> dict:
+    """POST /api/launcher/notifications/read."""
+    auth = _load_auth()
+    token = (auth.get("token") or "").strip()
+    if not token:
+        return {"ok": False, "error": "non_connecte"}
+    return _api_post(
+        "/api/launcher/notifications/read",
+        {"token": token, "hwid": _hwid(), "ids": ids},
+    )

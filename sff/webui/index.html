@@ -416,6 +416,42 @@
                     </div>
                 </div>
             </div>
+
+            <div id="free-catalog-steam-wait-modal" class="modal hidden">
+                <div class="modal-overlay" data-no-close></div>
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Ajout à Steam</h2>
+                    </div>
+                    <div class="modal-body free-catalog-wait-body">
+                        <div class="free-catalog-wait-icon" aria-hidden="true">🎮</div>
+                        <p class="free-catalog-wait-lead">
+                            <strong id="free-catalog-wait-game">—</strong> va être mis dans ta bibliothèque <strong>Steam</strong>.
+                        </p>
+                        <p id="free-catalog-wait-sub" class="text-muted free-catalog-wait-sub">
+                            Merci de <strong>patienter quelques instants</strong> pendant que le téléchargement et l’enregistrement sur Steam se déroulent.
+                        </p>
+                        <div class="ttc-loading free-catalog-wait-spinner">
+                            <div class="ttc-spinner"></div>
+                            <span>Préparation…</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="free-catalog-install-result-modal" class="modal hidden">
+                <div class="modal-overlay"></div>
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="free-catalog-result-title">Résultat</h2>
+                        <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
+                    </div>
+                    <div class="modal-body" id="free-catalog-result-body"></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary modal-cancel">OK</button>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- Page: Library -->

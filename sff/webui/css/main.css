@@ -683,6 +683,78 @@ input:focus, select:focus {
     padding: 20px;
 }
 
+/* Plan FREE — catalogue : attente puis résultat ajout Steam */
+#free-catalog-steam-wait-modal .modal-content {
+    max-width: 430px;
+    border-radius: 16px;
+    border: 1px solid rgba(165, 233, 1, 0.3);
+    box-shadow:
+        0 24px 56px rgba(0, 0, 0, 0.52),
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    background: linear-gradient(168deg, rgba(26, 42, 0, 0.4) 0%, var(--card-bg) 48%);
+}
+
+.free-catalog-wait-body {
+    text-align: center;
+    padding-top: 8px;
+}
+
+.free-catalog-wait-icon {
+    font-size: 2.75rem;
+    line-height: 1;
+    margin-bottom: 14px;
+    filter: drop-shadow(0 4px 14px rgba(165, 233, 1, 0.28));
+}
+
+.free-catalog-wait-lead {
+    font-size: 15px;
+    line-height: 1.55;
+    margin-bottom: 12px;
+}
+
+.free-catalog-wait-sub {
+    font-size: 13px;
+    line-height: 1.5;
+    opacity: 0.92;
+}
+
+.free-catalog-wait-spinner {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.free-catalog-wait-spinner .ttc-spinner {
+    margin: 0 auto;
+}
+
+#free-catalog-install-result-modal .modal-content {
+    max-width: 440px;
+    border-radius: 14px;
+}
+
+#free-catalog-install-result-modal.free-catalog-result--ok .modal-header {
+    border-bottom-color: rgba(165, 233, 1, 0.28);
+}
+
+#free-catalog-install-result-modal.free-catalog-result--fail .modal-header {
+    border-bottom-color: rgba(239, 68, 68, 0.35);
+}
+
+.free-catalog-result-hint {
+    margin-top: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.free-catalog-result-err {
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
 /* ROCKSTAR BYPASS — upsell plan FREE */
 .modal-bprg-premium .modal-content {
     max-width: 460px;

@@ -18,6 +18,7 @@
 import logging
 import re
 import sys
+from html import escape as html_escape
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QPoint, QThread, QTimer, QUrl, pyqtSignal, Qt
@@ -424,6 +425,30 @@ class SFFMainWindow(QMainWindow):
 
         card_outer.addWidget(self._user_emoji_lbl, 0, Qt.AlignmentFlag.AlignVCenter)
         card_outer.addWidget(self._user_name_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        self._notif_container = QWidget()
+        self._notif_container.setFixedSize(38, 26)
+        self._notif_container.setVisible(False)
+        self._notif_btn = QPushButton("🔔", self._notif_container)
+        self._notif_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._notif_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._notif_btn.setGeometry(4, 1, 28, 24)
+        self._notif_btn.setStyleSheet(
+            "QPushButton { border: none; background: transparent; font-size: 15px; border-radius: 8px; }"
+            "QPushButton:hover { background: rgba(255,255,255,0.09); }"
+        )
+        self._notif_btn.setToolTip("Notifications compte (abonnements, annulations…)")
+        self._notif_btn.clicked.connect(self._show_notifications_dialog)
+        self._notif_badge = QLabel("", self._notif_container)
+        self._notif_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._notif_badge.setStyleSheet(
+            "QLabel { background: #ef4444; color: white; font-size: 9px; font-weight: 800; "
+            "border-radius: 9px; padding: 1px 5px; min-height: 14px; }"
+        )
+        self._notif_badge.hide()
+        self._notif_badge.raise_()
+
+        card_outer.addWidget(self._notif_container, 0, Qt.AlignmentFlag.AlignVCenter)
         card_outer.addWidget(self._user_quota_lbl, 0, Qt.AlignmentFlag.AlignVCenter)
         card_outer.addWidget(self._user_rank_lbl, 0, Qt.AlignmentFlag.AlignVCenter)
 
@@ -495,6 +520,7 @@ class SFFMainWindow(QMainWindow):
         self._current_username = ""
         self._current_rank = "free"       # brut serveur ; affichage via launcher_rank_bucket
         self._profile_sync_timer: QTimer | None = None  # rafraîchit rang / free_claim depuis le serveur
+        self._notif_items_cache: list = []
         main_tab_widget = QWidget()
         main_tab_layout = QVBoxLayout(main_tab_widget)
         scroll = QScrollArea()
@@ -1034,6 +1060,7 @@ class SFFMainWindow(QMainWindow):
         # Show user info + logout button in top bar (rang visible à droite, avant Déconnexion)
         self._set_user_bar_display(username, self._current_rank)
         self._user_bar_widget.setVisible(True)
+        self._notif_container.setVisible(True)
         self._logout_btn.setVisible(True)
         self._load_web_ui()
         self._web_ui_loaded = True
@@ -1044,10 +1071,12 @@ class SFFMainWindow(QMainWindow):
         if not self._profile_sync_timer.isActive():
             self._profile_sync_timer.start()
         QTimer.singleShot(2500, self._on_profile_sync_tick)
+        QTimer.singleShot(900, self._refresh_launcher_notifications)
 
     def _on_profile_sync_tick(self) -> None:
         if self._authenticated and getattr(self, "_web_bridge", None):
             self._web_bridge.sync_launcher_profile()
+        self._refresh_launcher_notifications()
 
     def _apply_rank_from_server(self, username: str, rank: str) -> None:
         """Après un /verify : met à jour la barre du haut sans recharger la page web."""
@@ -1165,6 +1194,172 @@ class SFFMainWindow(QMainWindow):
         dlg.resize(440, 360)
         dlg.exec()
 
+    def _update_notif_badge(self, n: int) -> None:
+        if n <= 0:
+            self._notif_badge.clear()
+            self._notif_badge.hide()
+            return
+        txt = "9+" if n > 9 else str(n)
+        self._notif_badge.setText(txt)
+        self._notif_badge.adjustSize()
+        self._notif_badge.show()
+        x = self._notif_container.width() - self._notif_badge.width() + 4
+        self._notif_badge.move(max(10, x), -4)
+        self._notif_badge.raise_()
+
+    def _refresh_launcher_notifications(self) -> None:
+        if not getattr(self, "_authenticated", False):
+            return
+        try:
+            from sff.launcher_session import fetch_launcher_notifications
+
+            data = fetch_launcher_notifications()
+        except Exception as exc:
+            logging.getLogger(__name__).debug("notifications: %s", exc)
+            return
+        if not data.get("ok"):
+            return
+        self._notif_items_cache = data.get("items") or []
+        unread = data.get("unread")
+        if unread is None:
+            unread = sum(1 for x in self._notif_items_cache if not x.get("read"))
+        self._update_notif_badge(int(unread))
+
+    def _format_notif_time(self, iso_s: str) -> str:
+        if not iso_s:
+            return ""
+        s = str(iso_s).strip()
+        try:
+            from datetime import datetime
+
+            if s.endswith("Z"):
+                s = s[:-1] + "+00:00"
+            dt = datetime.fromisoformat(s)
+            return dt.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            return s[:16]
+
+    def _show_notifications_dialog(self) -> None:
+        self._refresh_launcher_notifications()
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Notifications SlimeDeals")
+        dlg.setMinimumSize(520, 400)
+        lay = QVBoxLayout(dlg)
+
+        intro = QLabel(
+            "Ici tu retrouves les alertes liées à ton compte : merci après un achat, annulation programmée, "
+            "fin d’abonnement ou échec de paiement. Clique <b>Lu</b> pour faire disparaître le point rouge."
+        )
+        intro.setWordWrap(True)
+        intro.setTextFormat(Qt.TextFormat.RichText)
+        intro.setStyleSheet("color:#cbd5e1;font-size:12px;margin-bottom:4px;")
+        lay.addWidget(intro)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        inner = QWidget()
+        inner_l = QVBoxLayout(inner)
+        inner_l.setSpacing(10)
+        items = list(self._notif_items_cache or [])
+        unread_ids: list[int] = []
+
+        if not items:
+            empty = QLabel("Aucune notification pour le moment.")
+            empty.setStyleSheet("color:#94a3b8;padding:28px;")
+            inner_l.addWidget(empty)
+        else:
+            for it in items:
+                if not it.get("read"):
+                    try:
+                        unread_ids.append(int(it["id"]))
+                    except (TypeError, KeyError, ValueError):
+                        pass
+                card = QFrame()
+                is_unread = not it.get("read")
+                border_c = "rgba(165,233,1,0.35)" if is_unread else "rgba(148,163,184,0.18)"
+                card.setStyleSheet(
+                    f"QFrame {{ background: rgba(22,18,32,0.95); border:1px solid {border_c}; "
+                    "border-radius:12px; padding: 2px; }}"
+                )
+                cv = QVBoxLayout(card)
+                head = QHBoxLayout()
+                title_l = QLabel(f"<span style='font-weight:800;font-size:13px;'>{html_escape(it.get('title') or '')}</span>")
+                title_l.setTextFormat(Qt.TextFormat.RichText)
+                head.addWidget(title_l, 1)
+                when = self._format_notif_time(it.get("created_at") or "")
+                if when:
+                    wh = QLabel(when)
+                    wh.setStyleSheet("color:#64748b;font-size:11px;")
+                    head.addWidget(wh, 0, Qt.AlignmentFlag.AlignRight)
+                cv.addLayout(head)
+                body_raw = (it.get("body") or "").replace("**", "")
+                body_l = QLabel()
+                body_l.setPlainText(body_raw)
+                body_l.setWordWrap(True)
+                body_l.setStyleSheet("color:#e2e8f0;font-size:12px;")
+                cv.addWidget(body_l)
+                btn_row = QHBoxLayout()
+                btn_row.addStretch()
+                mark_btn = QPushButton("Lu ✓" if is_unread else "Déjà lu")
+                mark_btn.setEnabled(is_unread)
+                mark_btn.setToolTip("Marquer comme lu et retirer du compteur rouge")
+
+                def _make_mark(nid: int, button: QPushButton) -> None:
+                    def _go() -> None:
+                        from sff.launcher_session import mark_launcher_notifications_read
+
+                        out = mark_launcher_notifications_read([nid])
+                        if out.get("ok"):
+                            button.setText("Déjà lu")
+                            button.setEnabled(False)
+                            card.setStyleSheet(
+                                "QFrame { background: rgba(22,18,32,0.95); border:1px solid rgba(148,163,184,0.18); "
+                                "border-radius:12px; padding: 2px; }"
+                            )
+                            self._refresh_launcher_notifications()
+                        else:
+                            QMessageBox.warning(
+                                dlg,
+                                "Notifications",
+                                out.get("error") or "Impossible de mettre à jour.",
+                            )
+
+                    return _go
+
+                mark_btn.clicked.connect(_make_mark(int(it["id"]), mark_btn))
+                btn_row.addWidget(mark_btn)
+                cv.addLayout(btn_row)
+                inner_l.addWidget(card)
+
+        inner_l.addStretch()
+        scroll.setWidget(inner)
+        lay.addWidget(scroll, 1)
+
+        foot = QHBoxLayout()
+        close_all = QPushButton("Fermer")
+        mark_all = QPushButton("Tout marquer comme lu")
+        mark_all.setEnabled(bool(unread_ids))
+        foot.addWidget(mark_all)
+        foot.addStretch()
+        foot.addWidget(close_all)
+        lay.addLayout(foot)
+
+        def _mark_all() -> None:
+            from sff.launcher_session import mark_launcher_notifications_read
+
+            if not unread_ids:
+                return
+            out = mark_launcher_notifications_read(unread_ids)
+            if out.get("ok"):
+                self._refresh_launcher_notifications()
+                dlg.accept()
+            else:
+                QMessageBox.warning(dlg, "Notifications", out.get("error") or "Erreur serveur.")
+
+        mark_all.clicked.connect(_mark_all)
+        close_all.clicked.connect(dlg.accept)
+        dlg.exec()
+
     def _on_mandatory_update_poll(self):
         """Revérifie GitHub toutes les 5 min (premier passage ~10 s après ouverture de la fenêtre)."""
         import sys
@@ -1244,6 +1439,9 @@ class SFFMainWindow(QMainWindow):
         self._user_quota_lbl.setVisible(False)
         self._user_rank_lbl.setText("")
         self._user_bar_widget.setToolTip("")
+        self._notif_container.setVisible(False)
+        self._update_notif_badge(0)
+        self._notif_items_cache = []
         self._logout_btn.setVisible(False)
         # Return to auth page
         self._web_ui_loaded = False

@@ -110,7 +110,10 @@ def _api_post(path: str, payload: dict) -> dict:
         except Exception:
             body = {}
         err_msg = body.get("error", f"Erreur HTTP {e.code}")
-        return {"ok": False, "error": err_msg, "http_status": e.code}
+        out: dict = {"ok": False, "error": err_msg, "http_status": e.code}
+        if "app_id" in body:
+            out["app_id"] = body["app_id"]
+        return out
     except Exception as exc:
         logger.debug("api_post: %s", redact_sensitive_log_text(str(exc)))
         return {"ok": False, "error": "Serveur injoignable"}
@@ -167,14 +170,22 @@ def _notify_launcher_gen_activity(
         _u("Notification d’activité sur Discord envoyée.")
 
 
+_PENDING_INSTALL_UNCHANGED = object()
+
+
 def _save_auth(
     token: str,
     username: str,
     rank: str = "free",
     free_claimed=None,
     rank_expires_at=None,
+    *,
+    free_catalog_pending_install=_PENDING_INSTALL_UNCHANGED,
 ) -> None:
+    """Persiste auth.json. ``free_catalog_pending_install`` autorise le téléchargement catalogue
+    avant enregistrement serveur (une seule fois, après installation réussie)."""
     _AUTH_FILE.parent.mkdir(parents=True, exist_ok=True)
+    prev = _load_auth()
     payload = {
         "token": token,
         "username": username,
@@ -182,7 +193,18 @@ def _save_auth(
         "free_claimed": free_claimed,
         "rank_expires_at": rank_expires_at,
     }
-    _AUTH_FILE.write_text(json.dumps(payload))
+    committed = free_claimed is not None and str(free_claimed).strip() != ""
+    if committed:
+        pass
+    elif free_catalog_pending_install is _PENDING_INSTALL_UNCHANGED:
+        pinst = prev.get("free_catalog_pending_install")
+        if pinst:
+            payload["free_catalog_pending_install"] = pinst
+    elif free_catalog_pending_install is None:
+        pass
+    else:
+        payload["free_catalog_pending_install"] = str(free_catalog_pending_install).strip()
+    _AUTH_FILE.write_text(json.dumps(payload), encoding="utf-8")
     try:
         from sff.launcher_session import invalidate_launcher_verify_cache
 
@@ -212,7 +234,16 @@ def _clear_auth() -> None:
 
 
 # Jeux catalogue plan FREE (doit rester aligné avec le bot / store.js)
-_LAUNCHER_FREE_CATALOG_IDS = frozenset({"2416450", "284160", "3241660", "1943950"})
+_LAUNCHER_FREE_CATALOG_IDS = frozenset({
+    "2416450",
+    "284160",
+    "1943950",
+    "1144200",
+    "2968420",
+    "1321680",
+    "655500",
+    "526870",
+})
 
 _CLOUD_SAVES_DENIED_MSG = (
     "Les sauvegardes cloud Google Drive sont reservees au plan Triple Monstre "
@@ -227,23 +258,26 @@ def _cloud_saves_feature_allowed() -> bool:
 
 
 def _launcher_free_catalog_download_allowed(app_id: str) -> tuple[bool, str]:
-    """Compte FREE : uniquement un des 4 jeux, après réclamation enregistrée (auth.json)."""
+    """Compte FREE : un jeu du catalogue gratuit après choix — réclamation serveur OU session locale (pending)."""
     saved = _load_auth()
     if _norm_saved_launcher_rank(saved.get("rank")) != "free":
         return True, ""
     aid = str(app_id).strip()
     if aid not in _LAUNCHER_FREE_CATALOG_IDS:
         return False, (
-            "Plan FREE : seuls les 4 jeux du catalogue (onglet « Télécharger ») sont autorisés. "
+            "Plan FREE : seuls les jeux du catalogue gratuit (onglet « Télécharger ») sont autorisés. "
             "Passe a un abonnement Monstre ou Triple Monstre pour installer n'importe quel jeu Steam."
         )
     claimed = saved.get("free_claimed")
-    if claimed is None or str(claimed).strip() != aid:
-        return False, (
-            "Plan FREE : sur la carte du jeu dans « Télécharger », clique d'abord sur "
-            "« Choisir ce jeu » pour enregistrer ta réclamation, puis lance l'installation."
-        )
-    return True, ""
+    pending = saved.get("free_catalog_pending_install")
+    if claimed is not None and str(claimed).strip() == aid:
+        return True, ""
+    if pending is not None and str(pending).strip() == aid:
+        return True, ""
+    return False, (
+        "Plan FREE : sur la carte du jeu dans « Télécharger », clique d'abord sur "
+        "« Choisir ce jeu » pour lancer la préparation, puis l'installation."
+    )
 
 
 def launcher_fetch_billing_portal() -> dict:
@@ -461,6 +495,7 @@ class WebBridge(QObject):
                 result.get("rank", "free"),
                 result.get("free_claimed"),
                 result.get("rank_expires_at"),
+                free_catalog_pending_install=None,
             )
         return json.dumps(result)
 
@@ -480,6 +515,7 @@ class WebBridge(QObject):
                 result.get("rank", "free"),
                 result.get("free_claimed"),
                 result.get("rank_expires_at"),
+                free_catalog_pending_install=None,
             )
         return json.dumps(result)
 
@@ -665,9 +701,135 @@ class WebBridge(QObject):
             "hwid": hwid,
             "app_id": str(app_id).strip(),
         })
-        if result.get("ok"):
-            # Update local auth.json (toujours string pour cohérence avec la vérif d'install)
-            _save_auth(token, saved.get("username", ""), "free", str(app_id).strip(), None)
+        aid = str(app_id).strip()
+        committed = result.get("ok") or (
+            result.get("error") == "already_claimed"
+            and str(result.get("app_id") or "").strip() == aid
+        )
+        if committed:
+            fresh = _load_auth()
+            _save_auth(
+                token,
+                fresh.get("username", "") or saved.get("username", ""),
+                fresh.get("rank", "free"),
+                aid,
+                fresh.get("rank_expires_at"),
+                free_catalog_pending_install=None,
+            )
+            if result.get("ok"):
+                return json.dumps(result)
+            return json.dumps({"ok": True, "app_id": aid, "note": "already_claimed_same_app"})
+        return json.dumps(result)
+
+    @pyqtSlot(str, result=str)
+    def begin_free_catalog_install(self, app_id: str) -> str:
+        """Prépare l'installation catalogue FREE sans enregistrer le choix côté serveur tant que ça n'a pas réussi.
+        Utilise ``free_catalog_pending_install`` en local si /verify indique free_claimed=null."""
+        saved = _load_auth()
+        token = (saved.get("token") or "").strip()
+        if not token:
+            return json.dumps({"ok": False, "error": "Non connecté"})
+        aid = str(app_id).strip()
+        if aid not in _LAUNCHER_FREE_CATALOG_IDS:
+            return json.dumps({"ok": False, "error": "Jeu hors catalogue Free"})
+        from sff.launcher_session import apply_verify_to_local_auth, verify_launcher_session
+
+        vr = verify_launcher_session(force_refresh=True)
+        apply_verify_to_local_auth(vr)
+        saved = _load_auth()
+        if not vr.get("ok"):
+            return json.dumps({"ok": False, "error": (vr.get("error") or "Session invalide")})
+        rank = vr.get("rank", saved.get("rank", "free"))
+        if _norm_saved_launcher_rank(rank) != "free":
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "Le catalogue gratuit est réservé aux comptes plan FREE.",
+                }
+            )
+        srv_claim = vr.get("free_claimed")
+        if srv_claim is not None and str(srv_claim).strip() != "":
+            if str(srv_claim).strip() != aid:
+                return json.dumps(
+                    {"ok": False, "error": "already_claimed", "app_id": str(srv_claim)}
+                )
+            _save_auth(
+                token,
+                saved.get("username", ""),
+                rank,
+                str(srv_claim).strip(),
+                vr.get("rank_expires_at"),
+                free_catalog_pending_install=None,
+            )
+            return json.dumps({"ok": True, "mode": "committed"})
+        _save_auth(
+            token,
+            saved.get("username", ""),
+            rank,
+            None,
+            vr.get("rank_expires_at"),
+            free_catalog_pending_install=aid,
+        )
+        return json.dumps({"ok": True, "mode": "pending"})
+
+    @pyqtSlot(str, result=str)
+    def cancel_free_catalog_install(self, app_id: str) -> str:
+        """Échec installation : supprime le pending local, ou tente free-claim-revert si ancienne logique."""
+        saved = _load_auth()
+        token = (saved.get("token") or "").strip()
+        if not token:
+            return json.dumps({"ok": False, "error": "Non connecté"})
+        aid = str(app_id).strip()
+        rank = saved.get("rank", "free")
+        pending = saved.get("free_catalog_pending_install")
+        if pending is not None and str(pending).strip() == aid:
+            _save_auth(
+                token,
+                saved.get("username", ""),
+                rank,
+                saved.get("free_claimed"),
+                saved.get("rank_expires_at"),
+                free_catalog_pending_install=None,
+            )
+            return json.dumps({"ok": True, "cleared": "pending"})
+        if str(saved.get("free_claimed") or "").strip() == aid:
+            return self.revert_free_claim(aid)
+        _save_auth(
+            token,
+            saved.get("username", ""),
+            rank,
+            saved.get("free_claimed"),
+            saved.get("rank_expires_at"),
+            free_catalog_pending_install=None,
+        )
+        return json.dumps({"ok": True, "cleared": "noop"})
+
+    @pyqtSlot(str, result=str)
+    def revert_free_claim(self, app_id: str) -> str:
+        """Après échec du téléchargement catalogue FREE : retire la réclamation serveur + locale.
+        Retourne JSON {ok, reverted?, error?}."""
+        saved = _load_auth()
+        token = saved.get("token", "")
+        if not token:
+            return json.dumps({"ok": False, "error": "Non connecté"})
+        hwid = _get_hwid()
+        result = _api_post(
+            "/api/launcher/free-claim-revert",
+            {
+                "token": token,
+                "hwid": hwid,
+                "app_id": str(app_id).strip(),
+            },
+        )
+        if result.get("ok") and result.get("reverted"):
+            _save_auth(
+                token,
+                saved.get("username", ""),
+                saved.get("rank", "free"),
+                None,
+                saved.get("rank_expires_at"),
+                free_catalog_pending_install=None,
+            )
         return json.dumps(result)
 
     @pyqtSlot(result=str)

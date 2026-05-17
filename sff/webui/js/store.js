@@ -1,6 +1,6 @@
 /**
  * SlimeDeals — Store Page
- * - Plan FREE  -> catalogue 4 jeux + recherche Steam (install reservee abonnes)
+ * - Plan FREE  -> catalogue gratuit (jeux listés) + recherche Steam (install réservée abonnés)
  * - Monstre / Triple Monstre -> recherche + installation
  */
 
@@ -57,6 +57,7 @@ window.Store = (function () {
         return _normalizeRank(rank) !== 'free';
     }
 
+    /** Aligné avec web_bridge._LAUNCHER_FREE_CATALOG_IDS et le bot (free-claim). */
     var FREE_CATALOG = [
         {
             app_id : '2416450',
@@ -69,14 +70,60 @@ window.Store = (function () {
             url    : 'https://store.steampowered.com/app/284160/BeamNGdrive/',
         },
         {
-            app_id : '3241660',
-            name   : 'R.E.P.O.',
-            url    : 'https://store.steampowered.com/app/3241660/REPO/',
-        },
-        {
             app_id : '1943950',
             name   : 'Escape the Backrooms',
             url    : 'https://store.steampowered.com/app/1943950/Escape_the_Backrooms/',
+        },
+        {
+            app_id : '1144200',
+            name   : 'Ready or Not',
+            url    : 'https://store.steampowered.com/app/1144200/Ready_or_Not/',
+        },
+        {
+            app_id : '2968420',
+            name   : 'PowerWash Simulator 2',
+            url    : 'https://store.steampowered.com/app/2968420/PowerWash_Simulator_2/',
+        },
+        {
+            app_id : '1321680',
+            name   : 'Hello Neighbor 2',
+            url    : 'https://store.steampowered.com/app/1321680/Hello_Neighbor_2/',
+        },
+        {
+            app_id : '655500',
+            name   : 'MX Bikes',
+            url    : 'https://store.steampowered.com/app/655500/MX_Bikes/',
+        },
+        {
+            app_id : '526870',
+            name   : 'Satisfactory',
+            url    : 'https://store.steampowered.com/app/526870/Satisfactory/',
+        },
+    ];
+
+    /** Aperçu non gratuit : exemples accessibles avec abonnement (+ lien Steam). */
+    var SUBSCRIPTION_SHOWCASE = [
+        {
+            app_id : '2483190',
+            name   : 'Forza Horizon 6',
+            url    : 'https://store.steampowered.com/app/2483190/Forza_Horizon_6/',
+            header_url :
+                'https://gaming-cdn.com/images/products/21624/orig/forza-horizon-6-premium-upgrade-acces-en-avant-premiere-pc-xbox-series-x-s-microsoft-store-cover.jpg?v=1778688480',
+        },
+        {
+            app_id : '221100',
+            name   : 'DayZ',
+            url    : 'https://store.steampowered.com/app/221100/DayZ/',
+        },
+        {
+            app_id : '1962700',
+            name   : 'Subnautica 2',
+            url    : 'https://store.steampowered.com/app/1962700/Subnautica_2/',
+        },
+        {
+            app_id : '3240220',
+            name   : 'Grand Theft Auto V Enhanced',
+            url    : 'https://store.steampowered.com/app/3240220/Grand_Theft_Auto_V_Enhanced/',
         },
     ];
 
@@ -92,6 +139,14 @@ window.Store = (function () {
         var div = document.createElement('div');
         div.appendChild(document.createTextNode(s));
         return div.innerHTML;
+    }
+
+    function _escAttr(s) {
+        if (s == null || s === '') return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;');
     }
 
     function _hideFreeCatalogWaitModal() {
@@ -141,6 +196,31 @@ window.Store = (function () {
                         '<p><strong>' + _escHtml(gameName) + '</strong> a bien été ajouté à ta bibliothèque <strong>Steam</strong>.</p>' +
                         '<p class="text-muted free-catalog-result-hint">Tu peux ouvrir le client Steam pour vérifier.</p>';
                 }
+                var okApp = String(d.app_id || '');
+                if (okApp) {
+                    Bridge.onReady(function(py) {
+                        if (py.record_free_claim) {
+                            py.record_free_claim(okApp, function(jsonStr) {
+                                var r = {};
+                                try { r = JSON.parse(jsonStr); } catch (e) { r = {}; }
+                                if (r.ok) {
+                                    _freeClaimed = okApp;
+                                    _renderFreeCatalog();
+                                } else if (typeof showToast === 'function') {
+                                    showToast(
+                                        'Steam semble à jour mais l’enregistrement du choix sur le compte a échoué — contacte le support.',
+                                        'error'
+                                    );
+                                }
+                                Bridge.call('sync_launcher_profile');
+                            });
+                        } else {
+                            _freeClaimed = okApp;
+                            _renderFreeCatalog();
+                            Bridge.call('sync_launcher_profile');
+                        }
+                    });
+                }
             } else {
                 if (titleEl) titleEl.textContent = 'Problème rencontré';
                 var err = d.message ? String(d.message) : 'Erreur inconnue';
@@ -148,7 +228,40 @@ window.Store = (function () {
                     bodyEl.innerHTML =
                         '<p>Le jeu <strong>n’a pas pu être correctement mis sur Steam</strong> (téléchargement ou étape Steam).</p>' +
                         '<p class="text-muted free-catalog-result-err">' + _escHtml(err) + '</p>' +
-                        '<p class="text-muted free-catalog-result-hint">Vérifie ta connexion, l’espace disque et la console du launcher, puis réessaie si besoin.</p>';
+                        '<p class="text-muted free-catalog-result-hint">Ton <strong>choix catalogue n’est pas définitif</strong> tant que l’installation ne réussit pas : tu peux en sélectionner un autre après fermeture de cette fenêtre.</p>';
+                }
+                var failAppId = String(d.app_id || '');
+                if (failAppId) {
+                    Bridge.onReady(function(py) {
+                        if (py.cancel_free_catalog_install) {
+                            py.cancel_free_catalog_install(failAppId, function(jsonStr) {
+                                var r = {};
+                                try { r = JSON.parse(jsonStr); } catch (e2) { r = {}; }
+                                if (r.ok) {
+                                    _freeClaimed = null;
+                                    _renderFreeCatalog();
+                                }
+                                Bridge.call('sync_launcher_profile');
+                                if (r.ok && (r.cleared === 'pending' || r.reverted) && typeof showToast === 'function') {
+                                    showToast('Tu peux sélectionner un autre jeu du catalogue.', 'info');
+                                }
+                            });
+                        } else if (py.revert_free_claim) {
+                            py.revert_free_claim(failAppId, function(jsonStr) {
+                                var r = {};
+                                try { r = JSON.parse(jsonStr); } catch (e2) { r = {}; }
+                                if (r.ok && r.reverted) {
+                                    _freeClaimed = null;
+                                    _renderFreeCatalog();
+                                }
+                                Bridge.call('sync_launcher_profile');
+                            });
+                        } else {
+                            Bridge.call('sync_launcher_profile');
+                        }
+                    });
+                } else {
+                    Bridge.call('sync_launcher_profile');
                 }
             }
             if (typeof Components !== 'undefined' && Components.showModal) {
@@ -216,6 +329,7 @@ window.Store = (function () {
             }
             _renderFreeCatalog();
             _bindFreePlanGuide();
+            _bindSubscriptionShowcaseCta();
         } else {
             if (freeSection) freeSection.classList.add('hidden');
             if (subtitle) {
@@ -258,7 +372,19 @@ window.Store = (function () {
     }
 
     var _freePlanGuideBound = false;
+    var _subscriptionShowcaseCtaBound = false;
     var _discordAvisUrl = 'https://discord.gg/c2pRJKjvgE';
+
+    function _bindSubscriptionShowcaseCta() {
+        if (_subscriptionShowcaseCtaBound) return;
+        var cta = document.getElementById('subscription-showcase-cta-tarifs');
+        if (!cta) return;
+        _subscriptionShowcaseCtaBound = true;
+        cta.addEventListener('click', function (e) {
+            e.preventDefault();
+            Bridge.call('open_url', 'https://slimedeals.fr/#tarifs');
+        });
+    }
 
     function _bindFreePlanGuide() {
         if (_freePlanGuideBound) return;
@@ -340,10 +466,45 @@ window.Store = (function () {
 
             grid.appendChild(card);
         });
+
+        _renderSubscriptionShowcase();
+    }
+
+    function _renderSubscriptionShowcase() {
+        var grid = document.getElementById('subscription-showcase-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        SUBSCRIPTION_SHOWCASE.forEach(function (game) {
+            var card = document.createElement('article');
+            card.className = 'subscription-showcase-card';
+            var nm = _escHtml(game.name);
+            var imgSrc = _escAttr(game.header_url || _steamHeader(game.app_id));
+            card.innerHTML =
+                '<div class="subscription-showcase-card-badge" aria-hidden="true">Abonnement</div>' +
+                '<img src="' + imgSrc + '" alt="' + nm + '" loading="lazy" referrerpolicy="no-referrer">' +
+                '<div class="subscription-showcase-card-body">' +
+                    '<div class="subscription-showcase-card-name">' + nm + '</div>' +
+                    '<p class="subscription-showcase-card-hint">Exemple — dispo via recherche Steam avec un plan payant.</p>' +
+                    '<button type="button" class="btn subscription-showcase-card-btn">Fiche Steam</button>' +
+                '</div>';
+            var btn = card.querySelector('.subscription-showcase-card-btn');
+            if (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    Bridge.call('open_url', game.url);
+                });
+            }
+            card.addEventListener('click', function () {
+                Bridge.call('open_url', game.url);
+            });
+            grid.appendChild(card);
+        });
     }
 
     function _claimFreeGame(appId, gameName) {
-        if (!confirm('Confirmer la sélection de "' + gameName + '" ?\nCe choix est définitif et ne peut pas être changé.')) return;
+        if (!confirm('Confirmer la sélection de "' + gameName + '" ?\n'
+            + 'Si le téléchargement ou l’installation échoue, tu pourras en choisir un autre.\n'
+            + 'Une fois l’installation réussie, ce choix devient définitif.')) return;
 
         _bindFreeCatalogInstallTaskListener();
 
@@ -353,12 +514,23 @@ window.Store = (function () {
         _showFreeCatalogWaitModal(gameName);
 
         Bridge.onReady(function(py) {
-            py.record_free_claim(appId, function(jsonStr) {
+            if (!py.begin_free_catalog_install) {
+                _freeCatalogInstallPending = null;
+                _hideFreeCatalogWaitModal();
+                allBtns.forEach(function(b) { b.disabled = false; b.textContent = '⬇ Choisir ce jeu'; });
+                if (typeof showToast === 'function') {
+                    showToast('Mise à jour du launcher requise pour le catalogue gratuit.', 'error');
+                }
+                return;
+            }
+            py.begin_free_catalog_install(appId, function(jsonStr) {
                 var result;
                 try { result = JSON.parse(jsonStr); } catch(e) { result = {ok: false, error: 'Erreur interne'}; }
 
                 if (result.ok) {
-                    _freeClaimed = String(appId);
+                    if (result.mode === 'committed') {
+                        _freeClaimed = String(appId);
+                    }
                     var sub = document.getElementById('free-catalog-wait-sub');
                     if (sub) {
                         sub.innerHTML =
@@ -374,6 +546,7 @@ window.Store = (function () {
                 } else if (result.error === 'already_claimed') {
                     _freeCatalogInstallPending = null;
                     _hideFreeCatalogWaitModal();
+                    allBtns.forEach(function(b) { b.disabled = false; b.textContent = '⬇ Choisir ce jeu'; });
                     _freeClaimed = result.app_id || appId;
                     _renderFreeCatalog();
                 } else {

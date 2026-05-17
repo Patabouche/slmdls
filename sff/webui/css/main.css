@@ -3287,6 +3287,148 @@ body.platform-linux .platform-win { display: none; }
 }
 .free-catalog-card.is-claimed .free-catalog-card-claimed-ribbon { display: block; }
 
+/* Aperçu abonnement (plan Free) — panneau séparé, ton premium */
+.subscription-showcase {
+    margin: 36px 0 28px;
+    border-radius: 16px;
+    overflow: hidden;
+    background:
+        radial-gradient(120% 80% at 10% 0%, rgba(212, 175, 55, 0.14), transparent 55%),
+        radial-gradient(90% 70% at 100% 20%, rgba(99, 102, 241, 0.12), transparent 50%),
+        linear-gradient(165deg, rgba(18, 16, 28, 0.98) 0%, rgba(12, 10, 22, 0.99) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.28);
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 20px 48px rgba(0, 0, 0, 0.45);
+}
+.subscription-showcase-shell {
+    padding: 22px 22px 20px;
+}
+.subscription-showcase-intro {
+    max-width: 920px;
+    margin-bottom: 20px;
+}
+.subscription-showcase-kicker {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(212, 175, 55, 0.95);
+    background: rgba(212, 175, 55, 0.12);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 999px;
+    padding: 5px 12px;
+    margin-bottom: 12px;
+}
+.subscription-showcase-title {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--fg, #f4f4f8);
+    margin: 0 0 10px;
+    line-height: 1.25;
+}
+.subscription-showcase-lead {
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--fg-muted, #a8a3b8);
+    margin: 0 0 14px;
+}
+.subscription-showcase-stat {
+    display: block;
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(212, 175, 55, 0.08);
+    border-left: 3px solid rgba(212, 175, 55, 0.75);
+    color: #ede9fe;
+    font-weight: 600;
+}
+.subscription-showcase-pct {
+    color: #f5d978;
+    font-weight: 800;
+}
+.subscription-showcase-foot {
+    margin: 0;
+}
+.subscription-showcase-cta {
+    box-shadow: 0 4px 18px rgba(99, 102, 241, 0.35);
+}
+.subscription-showcase-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+.subscription-showcase-card {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(8, 6, 14, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s, box-shadow 0.18s;
+}
+.subscription-showcase-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(212, 175, 55, 0.45);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+.subscription-showcase-card:focus-within {
+    outline: 2px solid rgba(212, 175, 55, 0.5);
+    outline-offset: 2px;
+}
+.subscription-showcase-card-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #1a1525;
+    background: linear-gradient(135deg, #e8c547, #f5e6a8);
+    padding: 4px 8px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.subscription-showcase-card img {
+    width: 100%;
+    aspect-ratio: 460 / 215;
+    object-fit: cover;
+    display: block;
+    filter: saturate(1.05);
+}
+.subscription-showcase-card-body {
+    padding: 10px 12px 12px;
+}
+.subscription-showcase-card-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--fg, #f0f0f0);
+    margin-bottom: 6px;
+    line-height: 1.3;
+}
+.subscription-showcase-card-hint {
+    font-size: 11px;
+    color: var(--fg-muted, #8b8599);
+    margin: 0 0 10px;
+    line-height: 1.4;
+}
+.subscription-showcase-card-btn {
+    width: 100%;
+    font-size: 11px;
+    padding: 7px 0;
+    border-radius: 8px;
+    background: rgba(212, 175, 55, 0.18) !important;
+    border: 1px solid rgba(212, 175, 55, 0.4) !important;
+    color: #f5e6b8 !important;
+    font-weight: 700;
+}
+.subscription-showcase-card-btn:hover {
+    background: rgba(212, 175, 55, 0.28) !important;
+}
+
 .free-already-claimed-msg {
     display: flex;
     align-items: flex-start;

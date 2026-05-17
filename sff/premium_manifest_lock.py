@@ -26,7 +26,16 @@ _STATE_FILE = Path.home() / ".slimedeals" / "premium_manifest_state.json"
 _REGISTRY_FILE = Path.home() / ".slimedeals" / "premium_install_registry.json"
 _BACKUP_ROOT = Path.home() / ".slimedeals" / "Manifests_Backup"
 # Aligné avec web_bridge._LAUNCHER_FREE_CATALOG_IDS
-_LAUNCHER_FREE_CATALOG_IDS = frozenset({"2416450", "284160", "3241660", "1943950"})
+_LAUNCHER_FREE_CATALOG_IDS = frozenset({
+    "2416450",
+    "284160",
+    "1943950",
+    "1144200",
+    "2968420",
+    "1321680",
+    "655500",
+    "526870",
+})
 
 
 def _norm_rank(rank: Any) -> str:

@@ -343,7 +343,7 @@
                     <div class="free-plan-banner-icon">🎮</div>
                     <div class="free-plan-banner-text">
                         <strong>Plan FREE — 1 jeu au choix</strong>
-                        <span>Choisis <em>un seul</em> jeu parmi les 4 titres du catalogue ci-dessous. Cette sélection est définitive.</span>
+                        <span>Choisis <em>un seul</em> jeu parmi les <strong>titres gratuits</strong> du catalogue ci-dessous. Après une installation réussie, ce choix devient définitif.</span>
                     </div>
                     <div id="free-plan-claimed-badge" class="free-plan-claimed-badge hidden">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -354,6 +354,23 @@
                 <div id="free-catalog-grid" class="free-catalog-grid">
                     <!-- Cards injected by store.js -->
                 </div>
+
+                <section class="subscription-showcase" id="subscription-showcase-section" aria-label="Aperçu catalogue abonnement">
+                    <div class="subscription-showcase-shell">
+                        <div class="subscription-showcase-intro">
+                            <span class="subscription-showcase-kicker">Hors plan Free</span>
+                            <h3 class="subscription-showcase-title">Avec un abonnement, tu peux viser bien plus large</h3>
+                            <p class="subscription-showcase-lead">
+                                Les jeux ci-dessous ne sont <strong>pas</strong> offerts en plan Free : ce sont des exemples AAA ou très demandés qu’un abonné peut viser avec la <strong>recherche Steam</strong> du launcher, comme pour n’importe quelle app du store.
+                                <strong class="subscription-showcase-stat">Pour environ <span class="subscription-showcase-pct">99&nbsp;%</span> du catalogue Steam, le coût d’accès via SlimeDeals reste très faible</strong>.
+                            </p>
+                            <p class="subscription-showcase-foot">
+                                <button type="button" class="btn btn-primary subscription-showcase-cta" id="subscription-showcase-cta-tarifs">Voir les abonnements</button>
+                            </p>
+                        </div>
+                        <div id="subscription-showcase-grid" class="subscription-showcase-grid"></div>
+                    </div>
+                </section>
 
                 <div id="free-already-claimed-msg" class="free-already-claimed-msg hidden">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -383,7 +400,7 @@
                         <div class="free-plan-guide-card free-plan-guide-card--avis">
                             <div class="free-plan-guide-card-kicker">Communauté</div>
                             <h4 class="free-plan-guide-card-title">Un nouveau jeu catalogue grâce à ton avis</h4>
-                            <p class="free-plan-guide-card-desc"><strong>Plus tard</strong>, si tu veux une <strong>nouvelle</strong> sélection parmi les quatre jeux du plan Free, la règle est la même que sur le bot Discord : poste un <strong>avis vérifié</strong> dans le salon <strong>#avis</strong> — au moins <strong>80 caractères</strong> et une <strong>image</strong> (capture, retour d’expérience…). Une fois l’avis accepté, tu pourras à nouveau choisir <strong>un seul</strong> titre du catalogue.</p>
+                            <p class="free-plan-guide-card-desc"><strong>Plus tard</strong>, si tu veux une <strong>nouvelle</strong> sélection parmi les jeux <strong>gratuits</strong> du plan Free, la règle est la même que sur le bot Discord : poste un <strong>avis vérifié</strong> dans le salon <strong>#avis</strong> — au moins <strong>80 caractères</strong> et une <strong>image</strong> (capture, retour d’expérience…). Une fois l’avis accepté, tu pourras à nouveau choisir <strong>un seul</strong> titre du catalogue gratuit.</p>
                             <button type="button" class="btn free-plan-guide-cta free-plan-guide-cta--secondary" id="free-cta-avis" data-tooltip="Ouvre Discord — salon des avis membres">Ouvrir le salon #avis sur Discord</button>
                             <p class="free-plan-guide-card-foot">Même salon que <code class="free-plan-guide-code">&lt;#1502728174356660274&gt;</code> sur le serveur officiel — lis les retours ou partage le tien.</p>
                         </div>

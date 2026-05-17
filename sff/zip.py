@@ -64,7 +64,7 @@ def read_lua_from_zip(
                     data = f.read(file)
                     # Staging sous ~/.slimedeals/work/manifests
                     manifests_dir = launcher_manifests_dir()
-                    manifests_dir.mkdir(exist_ok=True)
+                    manifests_dir.mkdir(parents=True, exist_ok=True)
                     (manifests_dir / filename).write_bytes(data)
                     # Always write to depotcache — fresh ZIP data wins over
                     # stale local copies (prevents 'no internet connection')
@@ -119,7 +119,7 @@ def extract_manifests_from_zip_bytes(
                 written.append(filename)
                 # Also stage in ./manifests/ for backward compat
                 if staging is not None:
-                    staging.mkdir(exist_ok=True)
+                    staging.mkdir(parents=True, exist_ok=True)
                     (staging / filename).write_bytes(mf_data)
     except zipfile.BadZipFile:
         pass

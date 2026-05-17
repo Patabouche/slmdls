@@ -1184,6 +1184,7 @@ class WebBridge(QObject):
 
             steam_path = self._steam_path
             lib_path = Path(self._active_library) if self._active_library else steam_path
+            src_key = str(source or "").strip().lower()
             self._log_ui(
                 f"_run_windows_fastest : steam_path={steam_path} lib_path={lib_path} "
                 f"source={_log_download_source(source)!r} request_update={request_update}"
@@ -1193,13 +1194,13 @@ class WebBridge(QObject):
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Downloading Lua", "progress": 10
             }))
-            if source == "hubcap":
+            if src_key == "hubcap":
                 selected_source = LuaEndpoint.HUBCAP
-            elif source == "oureveryday":
+            elif src_key == "oureveryday":
                 selected_source = LuaEndpoint.OUREVERYDAY
-            elif source == "ryuu":
+            elif src_key == "ryuu":
                 selected_source = LuaEndpoint.RYUU
-            elif source == "twentytwocloud":
+            elif src_key in ("twentytwocloud", "catalogue"):
                 selected_source = LuaEndpoint.TWENTYTWOCLOUD
             else:
                 selected_source = LuaEndpoint.HUBCAP if self._api_key else LuaEndpoint.OUREVERYDAY
@@ -3045,7 +3046,7 @@ class WebBridge(QObject):
                     import shutil as _shutil
                     _mf_path = _Path(manifest_folder)
                     if _mf_path.exists():
-                        _staging.mkdir(exist_ok=True)
+                        _staging.mkdir(parents=True, exist_ok=True)
                         for _mf in _mf_path.glob("*.manifest"):
                             _parts = _mf.stem.split("_", 1)
                             if len(_parts) == 2 and _parts[0] in _depot_ids_set:
@@ -3102,7 +3103,7 @@ class WebBridge(QObject):
                     try:
                         from sff.manifest.downloader import ManifestDownloader
                         _md2 = ManifestDownloader(provider=None, steam_path=steam_path, use_hubcap=False)
-                        _staging.mkdir(exist_ok=True)
+                        _staging.mkdir(parents=True, exist_ok=True)
                         _dc2 = steam_path / "depotcache"
                         _dc2.mkdir(parents=True, exist_ok=True)
                         _eff_app_id = str(parsed.app_id or app_id)

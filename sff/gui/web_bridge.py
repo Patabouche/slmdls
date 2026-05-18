@@ -1221,7 +1221,7 @@ class WebBridge(QObject):
 
     @pyqtSlot(str, str, str, str)
     def download_game_with_source(self, app_id, source, request_update='0', local_lua_path=''):
-        """Téléchargement rapide : catalogue SlimeDeals (TwentyTwoCloud) ou fichier Lua local.
+        """Téléchargement rapide : catalogue SlimeDeals (Ryuu secure_download) ou fichier Lua local.
 
         ``local_lua_path`` : obligatoire si ``source == 'local'`` (Windows : pipeline rapide ;
         Linux/macOS : ``process_lua_full``). Émet download_progress + task_finished.

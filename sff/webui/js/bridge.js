@@ -39,7 +39,7 @@ window.Bridge = (function() {
             ver = String(ver).trim();
             if (!ver) return;
             var el = document.getElementById('sidebar-app-version');
-            if (el) el.textContent = ver;
+            if (el) el.textContent = /^v/i.test(ver) ? ver : ('v' + ver);
             var about = document.getElementById('about-app-version');
             if (about) about.textContent = ' — version ' + ver;
             try {

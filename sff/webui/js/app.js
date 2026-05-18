@@ -265,9 +265,9 @@ window.App = (function() {
                             var ttl = document.getElementById('multiplayer-result-title');
                             var msgEl = document.getElementById('multiplayer-result-msg');
                             if (hdr) {
-                                hdr.style.background = result.success
-                                    ? 'rgba(34, 197, 94, 0.14)'
-                                    : 'rgba(239, 68, 68, 0.12)';
+                                hdr.classList.remove('modal-sd-header-ok', 'modal-sd-header-fail');
+                                hdr.classList.add(result.success ? 'modal-sd-header-ok' : 'modal-sd-header-fail');
+                                hdr.style.background = '';
                             }
                             if (ttl) {
                                 ttl.textContent = result.success

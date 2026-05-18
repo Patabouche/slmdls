@@ -10,16 +10,26 @@
     <link rel="stylesheet" href="css/cards.css">
     <link rel="stylesheet" href="css/animations.css">
     <link rel="stylesheet" href="css/premium.css">
+    <link rel="stylesheet" href="css/pages-slime.css">
+    <link rel="stylesheet" href="css/modals-slime.css">
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 </head>
 <body>
     <!-- Sidebar Navigation -->
-    <nav id="sidebar" class="sidebar">
+    <nav id="sidebar" class="sidebar" aria-label="Navigation principale">
         <div class="sidebar-logo">
-            <img src="assets/blob.png" alt="SlimeDeals" class="sidebar-icon" onerror="this.style.display='none'">
-            <span class="sidebar-title">SlimeDeals <span class="sidebar-version" id="sidebar-app-version"></span></span>
+            <div class="sidebar-logo-mark" aria-hidden="true">
+                <img src="assets/blob.png" alt="" class="sidebar-icon" onerror="this.style.display='none'">
+            </div>
+            <div class="sidebar-logo-text">
+                <span class="sidebar-title">SlimeDeals</span>
+                <span class="sidebar-version" id="sidebar-app-version"></span>
+                <span class="sidebar-tagline">Launcher</span>
+            </div>
         </div>
         <div class="sidebar-nav">
+            <div class="sidebar-nav-group">
+                <p class="sidebar-nav-label">Navigation</p>
             <button class="nav-item active" data-page="home" data-tooltip="Tableau de bord avec les actions rapides">
                 <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4"/></svg>
                 <span class="nav-label" data-i18n="Home">Accueil</span>
@@ -48,11 +58,17 @@
                 <span class="nav-icon nav-icon-emoji" aria-hidden="true">🔥</span>
                 <span class="nav-label" data-i18n="Fixed Games">Jeux fixed</span>
             </button>
+            </div>
+            <div class="sidebar-nav-group">
+                <p class="sidebar-nav-label">Compte</p>
             <button class="nav-item" data-page="subscriptions" data-tooltip="Offres, tarifs et parrainage Discord (abonnement gratuit possible)">
                 <span class="nav-icon nav-icon-emoji" aria-hidden="true">💎</span>
                 <span class="nav-label" data-i18n="Subscriptions Nav">Abonnement</span>
             </button>
-            <div class="nav-separator"></div>
+            </div>
+            <div class="nav-separator" role="presentation"></div>
+            <div class="sidebar-nav-group">
+                <p class="sidebar-nav-label">Système</p>
             <button class="nav-item" data-page="settings" data-tooltip="Thèmes, chemin Steam, clés API, profils AppList">
                 <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                 <span class="nav-label" data-i18n="Settings">Paramètres</span>
@@ -61,6 +77,7 @@
                 <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                 <span class="nav-label" data-i18n="Logs">Journaux</span>
             </button>
+            </div>
         </div>
         <div class="sidebar-bottom">
             <button class="nav-item" id="btn-restart-steam" data-tooltip="Redémarrer le processus Steam">
@@ -82,8 +99,15 @@
                         <p class="home-hero-kicker">SlimeDeals</p>
                         <h1 data-i18n="Welcome to SlimeDeals">Bienvenue sur SlimeDeals</h1>
                         <p class="page-subtitle home-hero-sub" data-i18n="Steam game setup and manifest tool">Outil de configuration et gestion de jeux Steam</p>
+                        <div class="home-hero-badges" aria-hidden="true">
+                            <span class="home-hero-badge">Sélectionne un jeu</span>
+                            <span class="home-hero-badge">Actions en un clic</span>
+                        </div>
                     </div>
-                    <div class="home-hero-decoration" aria-hidden="true"></div>
+                    <div class="home-hero-decoration" aria-hidden="true">
+                        <span class="home-hero-orb home-hero-orb--lime"></span>
+                        <span class="home-hero-orb home-hero-orb--violet"></span>
+                    </div>
                 </div>
             </header>
 
@@ -255,7 +279,7 @@
             <!-- Mini live log panel (top-right) -->
             <div class="home-log">
                 <div class="home-log-header">
-                    <span class="home-log-title">Live Log</span>
+                    <span class="home-log-title">Journal en direct</span>
                     <div class="home-log-btns">
                         <button id="home-log-clear" class="btn btn-sm" data-tooltip="Clear log">Clear</button>
                         <button id="home-log-copy" class="btn btn-sm" data-tooltip="Copy all log text">Copy</button>
@@ -268,11 +292,19 @@
         </section>
 
         <!-- Page: Store (recherche Steam) -->
-        <section id="page-store" class="page">
-            <div class="page-header">
-                <h1>Télécharger</h1>
-                <p class="page-subtitle" id="store-subtitle">Colle un lien Steam — le fichier est récupéré automatiquement</p>
-            </div>
+        <section id="page-store" class="page page-store">
+            <header class="store-hero">
+                <div class="store-hero-main">
+                    <p class="store-hero-kicker">Catalogue Steam</p>
+                    <h1>Télécharger</h1>
+                    <p class="page-subtitle store-hero-sub" id="store-subtitle">Colle un lien Steam — le fichier est récupéré automatiquement</p>
+                </div>
+                <ol class="store-hero-steps" aria-label="Étapes">
+                    <li class="store-hero-step"><span class="store-hero-step-num">1</span> Lien ou App ID</li>
+                    <li class="store-hero-step"><span class="store-hero-step-num">2</span> Recherche</li>
+                    <li class="store-hero-step"><span class="store-hero-step-num">3</span> Installation</li>
+                </ol>
+            </header>
 
             <!-- Recherche par lien Steam — visible plan FREE et TRIPLE MONSTRE -->
             <div id="store-ttc-section" class="hidden">
@@ -414,7 +446,7 @@
                 <span>Chargement…</span>
             </div>
 
-            <div id="free-plan-upsell-modal" class="modal hidden">
+            <div id="free-plan-upsell-modal" class="modal modal-bprg-premium modal-sd-upsell hidden">
                 <div class="modal-overlay"></div>
                 <div class="modal-content">
                     <div class="modal-header">
@@ -434,7 +466,7 @@
                 </div>
             </div>
 
-            <div id="free-catalog-steam-wait-modal" class="modal hidden">
+            <div id="free-catalog-steam-wait-modal" class="modal modal-sd-wait hidden">
                 <div class="modal-overlay" data-no-close></div>
                 <div class="modal-content">
                     <div class="modal-header">
@@ -480,7 +512,11 @@
                         <h1 data-i18n="Library">Bibliothèque</h1>
                         <p class="page-subtitle library-hero-sub" data-i18n="Your downloaded and installed games">Tes jeux téléchargés et installés</p>
                     </div>
-                    <div class="library-hero-decoration" aria-hidden="true"></div>
+                    <div class="library-hero-decoration" aria-hidden="true">
+                        <span class="library-hero-orb library-hero-orb--cyan"></span>
+                        <span class="library-hero-orb library-hero-orb--violet"></span>
+                    </div>
+
                 </div>
             </header>
 
@@ -1397,7 +1433,7 @@
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom:14px;opacity:0.85;">Choisissez comment télécharger ce jeu.</p>
+                <p class="modal-intro">Choisis comment télécharger ce jeu.</p>
                 <button id="ddmod-choose-steam" class="download-option" data-tooltip="Uses Lua keys so Steam installs the game natively">
                     <svg class="dl-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                     <div class="dl-info">
@@ -1538,15 +1574,15 @@
     </div>
 
     <!-- Restart After Download Modal -->
-    <div id="restart-after-download-modal" class="modal hidden">
+    <div id="restart-after-download-modal" class="modal modal-sd-success hidden">
         <div class="modal-overlay"></div>
-        <div class="modal-content" style="max-width:420px;">
+        <div class="modal-content">
             <div class="modal-header">
                 <h2>Téléchargement terminé</h2>
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom:0;opacity:0.9;">Redémarrez Steam pour appliquer les nouveaux manifests et clés.</p>
+                <p>Redémarre Steam pour appliquer les nouveaux manifests et clés.</p>
             </div>
             <div class="modal-footer">
                 <button id="restart-after-dl-run" class="btn btn-primary">Redémarrer Steam maintenant</button>
@@ -1556,23 +1592,23 @@
     </div>
 
     <!-- Library Delete Modal -->
-    <div id="library-delete-modal" class="modal hidden">
+    <div id="library-delete-modal" class="modal modal-sd-danger hidden">
         <div class="modal-overlay"></div>
-        <div class="modal-content" style="max-width:440px;">
+        <div class="modal-content modal-sd-md">
             <div class="modal-header">
                 <h2>Supprimer le jeu</h2>
                 <button class="modal-close" id="library-delete-cancel">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom:14px;opacity:0.9;">Comment voulez-vous supprimer <strong id="library-delete-game-name"></strong> ?</p>
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                    <button id="library-delete-applist" class="btn btn-primary" style="text-align:left;padding:12px 16px;">
-                        <strong>Retirer de l AppList uniquement</strong>
-                        <span style="display:block;font-size:12px;opacity:0.7;margin-top:3px;">Supprime le jeu de l AppList GreenLuma et tous les profils. Les fichiers restent sur le disque.</span>
+                <p>Comment veux-tu supprimer <strong id="library-delete-game-name"></strong> ?</p>
+                <div class="modal-choice-stack">
+                    <button type="button" id="library-delete-applist" class="btn btn-primary modal-choice-btn">
+                        <strong>Retirer de l'AppList uniquement</strong>
+                        <span class="modal-choice-desc">Supprime le jeu de l'AppList GreenLuma et tous les profils. Les fichiers restent sur le disque.</span>
                     </button>
-                    <button id="library-delete-full" class="btn btn-danger" style="text-align:left;padding:12px 16px;">
+                    <button type="button" id="library-delete-full" class="btn btn-danger modal-choice-btn">
                         <strong>Supprimer complètement</strong>
-                        <span style="display:block;font-size:12px;opacity:0.7;margin-top:3px;">Retire de l AppList et supprime définitivement tous les fichiers du jeu. Irréversible.</span>
+                        <span class="modal-choice-desc">Retire de l'AppList et supprime définitivement tous les fichiers du jeu. Irréversible.</span>
                     </button>
                 </div>
             </div>
@@ -1585,7 +1621,7 @@
     <!-- Auto GL Setup Modal -->
     <div id="gl-setup-modal" class="modal hidden">
         <div class="modal-overlay"></div>
-        <div class="modal-content" style="max-width:520px;">
+        <div class="modal-content modal-sd-setup">
             <div class="modal-header">
                 <h2>Configuration automatique GreenLuma</h2>
                 <button class="modal-close">&times;</button>
@@ -1633,13 +1669,13 @@
     </div>
 
     <!-- HyperVisor First-Use Warning Modal -->
-    <div id="hv-warning-modal" class="modal hidden">
+    <div id="hv-warning-modal" class="modal modal-sd-danger hidden">
         <div class="modal-overlay" data-no-close></div>
-        <div class="modal-content" style="max-width:580px;">
-            <div class="modal-header" style="background:rgba(220,38,38,0.15);border-bottom:1px solid rgba(220,38,38,0.4);">
-                <h2 style="color:#f87171;">&#9888; Cracks HyperVisor &mdash; Lire avant de continuer</h2>
+        <div class="modal-content modal-sd-lg-wide">
+            <div class="modal-header">
+                <h2 class="hv-warning-title">&#9888; Cracks HyperVisor &mdash; Lire avant de continuer</h2>
             </div>
-            <div class="modal-body" style="max-height:420px;overflow-y:auto;font-size:13px;line-height:1.6;">
+            <div class="modal-body modal-body-scroll">
                 <p style="margin-bottom:10px;opacity:0.9;">Les cracks HyperVisor (HV) contournent Denuvo via un pilote kernel personnalisé qui intercepte les vérifications CPU sous Windows. <strong style="color:#f87171;">Cela nécessite de baisser les protections de sécurité Windows.</strong></p>
 
                 <p style="font-weight:700;color:#fbbf24;margin-bottom:4px;">POUR UTILISER LES CRACKS HV VOUS DEVEZ :</p>
@@ -1666,13 +1702,13 @@
 
                 <p style="opacity:0.7;font-size:12px;">Full setup guide: <span style="color:#60a5fa;">cs.rin.ru/forum/viewtopic.php?f=10&amp;t=156407</span></p>
             </div>
-            <div class="modal-footer" style="flex-direction:column;gap:8px;align-items:stretch;">
-                <a id="hv-discord-btn" href="#" style="display:block;text-align:center;padding:9px 16px;background:rgba(88,101,242,0.25);border:1px solid rgba(88,101,242,0.5);border-radius:6px;color:#818cf8;font-weight:600;text-decoration:none;font-size:13px;">
+            <div class="modal-footer modal-footer-stack">
+                <a id="hv-discord-btn" class="hv-discord-btn" href="#">
                     &#128172; Join the Discord Community (denuvowo)
                 </a>
-                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <div class="hv-warning-actions">
                     <button id="hv-warning-cancel" class="btn">Annuler</button>
-                    <button id="hv-warning-ok" class="btn btn-primary" disabled style="min-width:240px;">
+                    <button id="hv-warning-ok" class="btn btn-primary hv-warning-continue" disabled>
                         Je comprends &mdash; Continuer (<span id="hv-countdown">20</span>s)
                     </button>
                 </div>
@@ -1773,16 +1809,43 @@
     <!-- Résultat correctif multijoueur (bibliothèque) -->
     <div id="multiplayer-result-modal" class="modal hidden" aria-labelledby="multiplayer-result-title">
         <div class="modal-overlay"></div>
-        <div class="modal-content" style="max-width:420px;">
+        <div class="modal-content modal-sd-sm">
             <div class="modal-header" id="multiplayer-result-header">
                 <h2 id="multiplayer-result-title">Multijoueur</h2>
                 <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
             </div>
             <div class="modal-body">
-                <p id="multiplayer-result-msg" style="margin:0;font-size:15px;line-height:1.5;"></p>
+                <p id="multiplayer-result-msg" class="modal-result-msg"></p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary modal-cancel" style="min-width:120px;">OK</button>
+                <button type="button" class="btn btn-primary modal-cancel">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mise à jour du launcher -->
+    <div id="launcher-update-modal" class="modal modal-sd-update hidden" aria-labelledby="launcher-update-title">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-sd-sm">
+            <div class="modal-header">
+                <h2 id="launcher-update-title">Mise à jour disponible</h2>
+                <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
+            </div>
+            <div class="modal-body launcher-update-body">
+                <p class="launcher-update-lead">Nouvelle mise à jour du launcher détectée.</p>
+                <p class="launcher-update-versions">
+                    Ta version : <strong id="launcher-update-current"></strong>
+                    &middot; Dernière : <strong id="launcher-update-remote"></strong>
+                </p>
+                <p class="launcher-update-hint">
+                    Télécharge la nouvelle version sur le site officiel SlimeDeals. Aucune installation automatique depuis l'application.
+                </p>
+            </div>
+            <div class="modal-footer launcher-update-footer">
+                <button type="button" class="btn modal-cancel">Plus tard</button>
+                <button type="button" class="btn btn-primary" id="launcher-update-download-btn">
+                    Télécharger sur slimedeals.fr
+                </button>
             </div>
         </div>
     </div>
@@ -1795,6 +1858,7 @@
     <!-- Scripts -->
     <script src="js/bridge.js"></script>
     <script src="js/components.js"></script>
+    <script src="js/launcher-update.js"></script>
     <script src="js/tooltips.js"></script>
     <script src="js/i18n.js"></script>
     <script src="js/app.js"></script>

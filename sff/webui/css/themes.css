@@ -2,16 +2,16 @@
 /* Source: sff/gui/themes.py */
 
 :root, [data-theme="dark"] {
-    --bg: #2d2d2d;
-    --fg: #e8e8e8;
-    --card-bg: #3c3c3c;
-    --accent: #4a9eff;
-    --border: #555;
-    --btn-bg: #404040;
-    --btn-hover: #505050;
-    --input-bg: #3c3c3c;
-    --sidebar-bg: #252525;
-    --sidebar-active: #4a9eff;
+    --bg: #1a1624;
+    --fg: #e8eaf0;
+    --card-bg: #262033;
+    --accent: #a5e901;
+    --border: rgba(148, 163, 184, 0.22);
+    --btn-bg: rgba(38, 32, 51, 0.95);
+    --btn-hover: rgba(126, 200, 227, 0.12);
+    --input-bg: #221c2e;
+    --sidebar-bg: #100e16;
+    --sidebar-active: #a5e901;
 }
 
 [data-theme="light"] {

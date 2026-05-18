@@ -287,6 +287,29 @@ def get_hubcap(dest, app_id, depotcache = None):
         return None
 
 
+# Ryuu generator — secure_download (catalogue SlimeDeals + clé Ryuu perso)
+_RYUU_GENERATOR_ORIGIN = (os.getenv("SLIMEDEALS_RYUU_GENERATOR_ORIGIN") or "https://generator.ryuu.lol").rstrip(
+    "/"
+)
+_SLIMEDEALS_CATALOG_RYUU_AUTH = (os.getenv("SLIMEDEALS_RYUU_GENERATOR_AUTH") or "").strip() or "RYUUMANIFESTppb5a0"
+
+
+def _ryuu_secure_download_json_error(body: bytes) -> str | None:
+    """Ex. {\"error\":\"Game not found\",\"status\":\"error\"} → message, sinon None."""
+    if not body or not body.strip().startswith(b"{"):
+        return None
+    try:
+        data = json.loads(body.decode("utf-8", errors="ignore"))
+        if str(data.get("status") or "").lower() == "error":
+            msg = data.get("error") or data.get("Error") or data.get("message")
+            if isinstance(msg, str) and msg.strip():
+                return msg.strip()
+            return "Erreur serveur"
+    except Exception:
+        pass
+    return None
+
+
 def get_ryuu(dest, app_id, depotcache=None, request_update=None):
     if request_update is None:
         request_update = prompt_confirm(
@@ -307,7 +330,7 @@ def get_ryuu(dest, app_id, depotcache=None, request_update=None):
         if request_update:
             try:
                 upd_resp = httpx.get(
-                    f"https://generator.ryuu.lol/resellerrequestupdate"
+                    f"{_RYUU_GENERATOR_ORIGIN}/resellerrequestupdate"
                     f"?appid={app_id}&auth_code={ryuu_key}",
                     timeout=30,
                     follow_redirects=True,
@@ -325,7 +348,7 @@ def get_ryuu(dest, app_id, depotcache=None, request_update=None):
 
         try:
             resp = httpx.get(
-                f"https://generator.ryuu.lol/secure_download"
+                f"{_RYUU_GENERATOR_ORIGIN}/secure_download"
                 f"?appid={app_id}&auth_code={ryuu_key}",
                 timeout=60,
                 follow_redirects=True,
@@ -340,6 +363,17 @@ def get_ryuu(dest, app_id, depotcache=None, request_update=None):
             return None
         except httpx.RequestError as e:
             print(Fore.RED + f"\nNetwork error connecting to Ryuu: {e}" + Style.RESET_ALL)
+            return None
+
+        json_err = _ryuu_secure_download_json_error(resp.content)
+        if json_err:
+            print(Fore.RED + f"Ryuu: {json_err} (App ID {app_id})." + Style.RESET_ALL)
+            low = json_err.strip().lower()
+            if "game not found" in low or low == "not found":
+                return None
+            if prompt_confirm("Do you want to enter a new API key?"):
+                set_setting(Settings.RYUU_KEY, "")
+                continue
             return None
 
         if resp.status_code == 404:
@@ -366,37 +400,30 @@ def get_ryuu(dest, app_id, depotcache=None, request_update=None):
         return lua_path
 
 
-# ── Téléchargement Lua catalogue (API interne, lien Steam) ───────────────────
-
-# Catalogue Lua (URL de base et jeton configurables en prod via variables d'environnement).
-_CATALOG_API_BASE = (os.getenv("SLIMEDEALS_CATALOG_API_BASE") or "https://api.twentytwocloud.com").rstrip("/")
-_CATALOG_TOKEN = (os.getenv("SLIMEDEALS_CATALOG_TOKEN") or "").strip() or (
-    "ttc_WMPOWDWDJPWYDWWIJPODWWPODDOWPDI9WDJPOWDWD89W7D489WD7"
-)
-_TTC_DOWNLOAD_URL = _CATALOG_API_BASE + "/download?appid={}&auth_token=" + _CATALOG_TOKEN
-_TTC_INFO_URL = _CATALOG_API_BASE + "/info?appid={}"
-
-
-def _ttc_body_is_not_found(body: bytes) -> bool:
-    """True si la réponse est {\"error\":\"Not found\"} (insensible à la casse)."""
-    if not body or not body.strip().startswith(b"{"):
-        return False
-    try:
-        data = json.loads(body.decode("utf-8", errors="ignore"))
-        err = data.get("error") or data.get("Error") or data.get("message")
-        return isinstance(err, str) and err.strip().lower() == "not found"
-    except Exception:
-        return False
-
-
 def ttc_get_game_info(app_id: str) -> dict | None:
-    """Récupère les métadonnées jeu pour l’onglet Télécharger (API catalogue), ou None."""
+    """Métadonnées pour l’onglet Télécharger : fiche Steam publique (sans API tiers)."""
+    aid = str(app_id).strip()
+    if not aid.isdigit():
+        return None
     try:
-        resp = httpx.get(_TTC_INFO_URL.format(app_id), timeout=15)
-        if resp.status_code == 200:
-            return resp.json()
+        resp = httpx.get(
+            "https://store.steampowered.com/api/appdetails",
+            params={"appids": aid, "l": "french"},
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            return None
+        root = resp.json()
+        entry = root.get(aid) or root.get(str(int(aid)))
+        if not isinstance(entry, dict) or not entry.get("success"):
+            return None
+        data = entry.get("data") or {}
+        name = data.get("name")
+        if not name:
+            return None
+        return {"data": {"name": name, "common": {"name": name}}}
     except Exception as e:
-        logger.warning("[catalogue] meta indisponible app_id=%s (%s)", app_id, type(e).__name__)
+        logger.warning("[catalogue] meta Steam app_id=%s (%s)", app_id, type(e).__name__)
     return None
 
 
@@ -428,18 +455,24 @@ def steam_store_dlc_count(app_id: str) -> int | None:
 
 
 def get_twentytwocloud(dest, app_id, depotcache=None):
-    """Télécharge le fichier Lua/ZIP depuis le catalogue intégré et retourne le chemin du .lua."""
+    """Télécharge le Lua/ZIP catalogue via Ryuu ``secure_download`` (jeton SlimeDeals intégré)."""
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
     app_id = str(app_id)
 
     print(Fore.CYAN + f"[Téléchargement] Téléchargement du fichier Lua pour l’app {app_id}…" + Style.RESET_ALL)
     try:
-        resp = httpx.get(_TTC_DOWNLOAD_URL.format(app_id), timeout=60, follow_redirects=True)
+        resp = httpx.get(
+            f"{_RYUU_GENERATOR_ORIGIN}/secure_download",
+            params={"appid": app_id, "auth_code": _SLIMEDEALS_CATALOG_RYUU_AUTH},
+            timeout=60,
+            follow_redirects=True,
+        )
         body = resp.content
 
-        if _ttc_body_is_not_found(body):
-            print(Fore.RED + f"[Téléchargement] Jeu introuvable (app_id={app_id})" + Style.RESET_ALL)
+        json_err = _ryuu_secure_download_json_error(body)
+        if json_err:
+            print(Fore.RED + f"[Téléchargement] {json_err} (app_id={app_id})" + Style.RESET_ALL)
             return None
 
         if resp.status_code != 200:
@@ -468,6 +501,19 @@ def get_twentytwocloud(dest, app_id, depotcache=None):
         return lua_path
 
     except Exception as e:
-        print(Fore.RED + "[Téléchargement] Erreur réseau ou catalogue." + Style.RESET_ALL)
-        logger.error("[catalogue] lua app_id=%s (%s)", app_id, type(e).__name__)
+        print(Fore.RED + "[Téléchargement] Échec pendant le traitement du catalogue (Lua / ZIP)." + Style.RESET_ALL)
+        if isinstance(e, FileNotFoundError):
+            print(
+                Fore.YELLOW
+                + "[Téléchargement] Indice : chemin Steam / disque inaccessible ou dossier manquant "
+                "(Paramètres → chemin d'installation Steam, disque branché, antivirus)."
+                + Style.RESET_ALL
+            )
+        elif isinstance(e, PermissionError):
+            print(
+                Fore.YELLOW
+                + "[Téléchargement] Indice : permission refusée — lance le launcher en admin ou vérifie les droits sur Steam/config et depotcache."
+                + Style.RESET_ALL
+            )
+        logger.exception("[catalogue] lua app_id=%s", app_id)
         return None

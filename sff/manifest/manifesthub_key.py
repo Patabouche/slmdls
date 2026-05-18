@@ -46,7 +46,7 @@ def get_manifesthub_api_key():
     Renvoie la clé ManifestHub si configurée et utilisable, sinon None.
 
     Pas de navigateur ni de saisie interactive : les flux catalogue / CDN
-    (ex. twentytwocloud) n’en dépendent pas ; pour ManifestHub uniquement,
+    (ex. catalogue Ryuu intégré) n’en dépendent pas ; pour ManifestHub uniquement,
     renseigner la clé dans les paramètres du launcher.
     """
     from sff.storage.settings import get_setting

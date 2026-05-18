@@ -324,7 +324,7 @@ class VersionPickerDialog(QDialog):
         if not self.steam_path or not self.steam_path.exists():
             QMessageBox.critical(self, "Error", "Steam path is not configured. Cannot write to depotcache.")
             return
-        # Flux catalogue TwentyTwoCloud uniquement (pas de choix Hubcap / OurEveryday).
+        # Flux catalogue Ryuu (secure_download intégré) uniquement (pas de choix Hubcap / OurEveryday).
         if self._ui is not None and self._run_tool_fn is not None:
             manifest_override = {depot_id: manifest_id for depot_id, manifest_id in selections}
             app_id = str(self.app_id)

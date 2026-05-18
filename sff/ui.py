@@ -967,7 +967,7 @@ class UI:
             return MainReturnCode.LOOP_NO_PROMPT
         saved_lua = launcher_saved_lua_dir()
         saved_lua.mkdir(parents=True, exist_ok=True)
-        _ = use_hubcap  # compat. appelants ; le Lua vient toujours du catalogue TwentyTwoCloud
+        _ = use_hubcap  # compat. appelants ; le Lua vient du catalogue Ryuu (secure_download intégré).
         source = LuaEndpoint.TWENTYTWOCLOUD
         print(
             Fore.CYAN

@@ -17,6 +17,7 @@
 # along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
 
 from io import BytesIO
+import logging
 import zipfile
 from pathlib import Path
 
@@ -24,6 +25,8 @@ from colorama import Fore, Style
 from typing import Literal, Union, overload
 
 from sff.utils import launcher_manifests_dir
+
+logger = logging.getLogger(__name__)
 
 
 @overload
@@ -61,30 +64,45 @@ def read_lua_from_zip(
                         lua_contents = f.read(file)
                 elif file.filename.endswith(".manifest"):
                     filename = Path(file.filename).name
+                    if not filename:
+                        continue
                     data = f.read(file)
-                    # Staging sous ~/.slimedeals/work/manifests
-                    manifests_dir = launcher_manifests_dir()
-                    manifests_dir.mkdir(parents=True, exist_ok=True)
-                    (manifests_dir / filename).write_bytes(data)
-                    # Always write to depotcache — fresh ZIP data wins over
-                    # stale local copies (prevents 'no internet connection')
+                    try:
+                        manifests_dir = launcher_manifests_dir()
+                        manifests_dir.mkdir(parents=True, exist_ok=True)
+                        (manifests_dir / filename).write_bytes(data)
+                    except OSError as ex:
+                        print(
+                            Fore.YELLOW
+                            + f"  Avertissement : impossible d'écrire {filename} dans le staging (~/.slimedeals) — {ex}"
+                            + Style.RESET_ALL
+                        )
+                        logger.warning("read_lua_from_zip staging %s: %s", filename, ex)
                     if depotcache is not None:
-                        depotcache.mkdir(parents=True, exist_ok=True)
-                        dest = depotcache / filename
-                        already = dest.exists()
-                        dest.write_bytes(data)
-                        if already:
+                        try:
+                            depotcache.mkdir(parents=True, exist_ok=True)
+                            dest = depotcache / filename
+                            already = dest.exists()
+                            dest.write_bytes(data)
+                            if already:
+                                print(
+                                    Fore.GREEN
+                                    + f"  Manifest refreshed in depotcache: {filename}"
+                                    + Style.RESET_ALL
+                                )
+                            else:
+                                print(
+                                    Fore.GREEN
+                                    + f"  Manifest seeded to depotcache: {filename}"
+                                    + Style.RESET_ALL
+                                )
+                        except OSError as ex:
                             print(
-                                Fore.GREEN
-                                + f"  Manifest refreshed in depotcache: {filename}"
+                                Fore.YELLOW
+                                + f"  Avertissement : impossible d'écrire {filename} dans depotcache — {ex}"
                                 + Style.RESET_ALL
                             )
-                        else:
-                            print(
-                                Fore.GREEN
-                                + f"  Manifest seeded to depotcache: {filename}"
-                                + Style.RESET_ALL
-                            )
+                            logger.warning("read_lua_from_zip depotcache %s: %s", filename, ex)
                     else:
                         print(f"Manifest found in ZIP: {filename}")
             if lua_contents is None:

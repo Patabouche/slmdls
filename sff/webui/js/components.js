@@ -208,15 +208,35 @@ window.Components = (function() {
         }, 4000);
     }
 
+    function _syncModalOpenState() {
+        var anyOpen = !!document.querySelector('.modal:not(.hidden)');
+        document.body.classList.toggle('sd-modal-open', anyOpen);
+    }
+
+    function _animateModalContent(modal) {
+        if (!modal) return;
+        var content = modal.querySelector('.modal-content');
+        if (!content) return;
+        content.classList.remove('modal-sd-enter');
+        void content.offsetWidth;
+        content.classList.add('modal-sd-enter');
+    }
+
     // Show/hide a modal
     function showModal(modalId) {
         var modal = document.getElementById(modalId);
-        if (modal) modal.classList.remove('hidden');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        _syncModalOpenState();
+        requestAnimationFrame(function() { _animateModalContent(modal); });
     }
 
     function hideModal(modalId) {
-        var modal = document.getElementById(modalId);
+        var modal = modalId && modalId.classList
+            ? modalId
+            : document.getElementById(modalId);
         if (modal) modal.classList.add('hidden');
+        _syncModalOpenState();
     }
 
     // Show download modal for a specific game
@@ -284,14 +304,14 @@ window.Components = (function() {
         document.querySelectorAll('.modal-close, .modal-cancel').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 var modal = this.closest('.modal');
-                if (modal) modal.classList.add('hidden');
+                if (modal) hideModal(modal);
             });
         });
 
         document.querySelectorAll('.modal-overlay:not([data-no-close])').forEach(function(overlay) {
             overlay.addEventListener('click', function() {
                 var modal = this.closest('.modal');
-                if (modal) modal.classList.add('hidden');
+                if (modal) hideModal(modal);
             });
         });
     }
@@ -376,20 +396,62 @@ window.Components = (function() {
         }
     };
 
+    CustomSelect.prototype._clearDropdownPosition = function() {
+        this._dropdown.style.position = '';
+        this._dropdown.style.left = '';
+        this._dropdown.style.top = '';
+        this._dropdown.style.width = '';
+        this._dropdown.style.right = '';
+        this._dropdown.style.zIndex = '';
+    };
+
+    CustomSelect.prototype._positionDropdownFixed = function() {
+        var rect = this._ui.getBoundingClientRect();
+        this._dropdown.style.position = 'fixed';
+        this._dropdown.style.left = rect.left + 'px';
+        this._dropdown.style.top = (rect.bottom + 4) + 'px';
+        this._dropdown.style.width = Math.max(rect.width, 200) + 'px';
+        this._dropdown.style.right = 'auto';
+        this._dropdown.style.zIndex = '10050';
+    };
+
+    CustomSelect.prototype._usesFixedDropdown = function() {
+        return this._ui.id === 'home-game-select-ui' || !!this._ui.closest('.home-panel--game');
+    };
+
     CustomSelect.prototype._open = function() {
+        var self = this;
         document.querySelectorAll('.custom-select-dropdown').forEach(function(d) {
             d.classList.add('hidden');
+            d.style.position = '';
+            d.style.left = '';
+            d.style.top = '';
+            d.style.width = '';
+            d.style.right = '';
+            d.style.zIndex = '';
         });
         document.querySelectorAll('.custom-select').forEach(function(el) {
             el.classList.remove('open');
         });
         this._dropdown.classList.remove('hidden');
         this._ui.classList.add('open');
+        if (this._usesFixedDropdown()) {
+            this._positionDropdownFixed();
+            this._boundReposition = function() { self._positionDropdownFixed(); };
+            window.addEventListener('scroll', this._boundReposition, true);
+            window.addEventListener('resize', this._boundReposition);
+        }
     };
 
     CustomSelect.prototype._close = function() {
+        if (this._boundReposition) {
+            window.removeEventListener('scroll', this._boundReposition, true);
+            window.removeEventListener('resize', this._boundReposition);
+            this._boundReposition = null;
+        }
         this._dropdown.classList.add('hidden');
         this._ui.classList.remove('open');
+        this._clearDropdownPosition();
     };
 
     function setHideImages(val) {

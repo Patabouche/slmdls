@@ -17,7 +17,7 @@
 # along with SteaMidra.  If not, see <https://www.gnu.org/licenses/>.
 
 
-VERSION = "1.0.5"
+VERSION = "1.0.7"
 # NOTE: Public key shared by oureveryday (https://github.com/SteamAutoCracks/Steam-auto-crack/issues/33)
 STEAM_WEB_API_KEY = "1DD0450A99F573693CD031EBB160907D"
 GITHUB_USERNAME = "Midrags"
@@ -26,5 +26,7 @@ REPO_NAME = "sff"
 GITHUB_RELEASE_OWNER = "Patabouche"
 GITHUB_RELEASE_REPO = "slmdls"
 RELEASE_PAGE_URL = f"https://github.com/{GITHUB_RELEASE_OWNER}/{GITHUB_RELEASE_REPO}/releases/"
+# Page officielle de téléchargement du launcher (notification MAJ — pas d’install auto)
+LAUNCHER_DOWNLOAD_PAGE_URL = "https://slimedeals.fr/launcher"
 WINDOWS_RELEASE_PREFIX = "0_windows_x86-64"
 LINUX_RELEASE_PREFIX = "1_linux_x86-64"

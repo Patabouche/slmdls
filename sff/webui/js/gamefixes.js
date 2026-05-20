@@ -34,10 +34,52 @@ window.GameFixes = (function() {
         return s;
     }
 
-    function _coverUrl(appId) {
-        if (!appId || typeof Components === 'undefined') return '';
-        var urls = Components.getCoverUrls(String(appId));
-        return urls && urls.header ? urls.header : '';
+    function _coverUrlsForGame(g) {
+        if (!g || typeof Components === 'undefined') return [];
+        var canonical = g.header_image || g.image_url || '';
+        var appId = String(g.app_id || '').trim();
+        var urls = [];
+        if (canonical) urls.push(String(canonical).split('?')[0]);
+        if (appId) {
+            var fromCdn = Components.getCoverUrls(appId);
+            if (Array.isArray(fromCdn)) {
+                fromCdn.forEach(function(u) {
+                    if (u && urls.indexOf(u) === -1) urls.push(u);
+                });
+            }
+        }
+        return urls;
+    }
+
+    function _applyCoverBackground(coverEl, urls) {
+        if (!coverEl) return;
+        if (!urls || !urls.length) {
+            coverEl.className = 'fixed-game-card-cover fixed-game-card-cover--placeholder';
+            coverEl.style.backgroundImage = '';
+            coverEl.textContent = '🎮';
+            return;
+        }
+        var idx = 0;
+        function tryNext() {
+            if (idx >= urls.length) {
+                coverEl.className = 'fixed-game-card-cover fixed-game-card-cover--placeholder';
+                coverEl.style.backgroundImage = '';
+                coverEl.textContent = '🎮';
+                return;
+            }
+            var probe = new Image();
+            probe.onload = function() {
+                coverEl.className = 'fixed-game-card-cover';
+                coverEl.textContent = '';
+                coverEl.style.backgroundImage = 'url("' + urls[idx].replace(/"/g, '\\"') + '")';
+            };
+            probe.onerror = function() {
+                idx += 1;
+                tryNext();
+            };
+            probe.src = urls[idx];
+        }
+        tryNext();
     }
 
     function _setStatus(msg, isError) {
@@ -590,23 +632,18 @@ window.GameFixes = (function() {
         _catalog.forEach(function(g) {
             var id = g.id || '';
             var name = g.name || id;
-            var appId = g.app_id || '';
             var size = g.size_label || '';
             var tags = Array.isArray(g.tags) ? g.tags : [];
             var prog = _progress[id];
-            var cover = _coverUrl(appId);
 
             var card = document.createElement(EL);
             card.className = 'fixed-game-card';
             card.setAttribute('data-game-id', id);
 
             var coverEl = document.createElement(EL);
-            coverEl.className = 'fixed-game-card-cover' + (cover ? '' : ' fixed-game-card-cover--placeholder');
-            if (cover) {
-                coverEl.style.backgroundImage = 'url("' + cover.replace(/"/g, '\\"') + '")';
-            } else {
-                coverEl.textContent = '🎮';
-            }
+            coverEl.className = 'fixed-game-card-cover fixed-game-card-cover--placeholder';
+            coverEl.textContent = '🎮';
+            _applyCoverBackground(coverEl, _coverUrlsForGame(g));
             card.appendChild(coverEl);
 
             var body = document.createElement(EL);

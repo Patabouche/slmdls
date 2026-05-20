@@ -450,7 +450,7 @@ class LauncherNewsTicker(QWidget):
         self._cycle = 400
         self._dot_phase = 0          # 0-59 pour l'animation du dot
         self._timer = QTimer(self)
-        self._timer.setInterval(28)
+        self._timer.setInterval(50)
         self._timer.timeout.connect(self._tick)
         self.setAutoFillBackground(False)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
@@ -482,7 +482,7 @@ class LauncherNewsTicker(QWidget):
         self.update()
 
     def _tick(self):
-        if self._msg:
+        if self._msg and self.isVisible() and not self.window().isMinimized():
             self._scroll = (self._scroll + 1) % self._cycle
             self._dot_phase = (self._dot_phase + 1) % 60
             self.update()
@@ -590,6 +590,7 @@ def _launcher_auth_strictly_free() -> bool:
 
 class SFFMainWindow(QMainWindow):
     _launcher_banner_payload = pyqtSignal(object)
+    _launcher_notifications_payload = pyqtSignal(object)
 
     def __init__(self, ui, steam_path):
         super().__init__()
@@ -853,8 +854,10 @@ class SFFMainWindow(QMainWindow):
         root_layout.addWidget(top_wrap)
 
         self._launcher_banner_payload.connect(self._apply_launcher_banner_payload)
+        self._launcher_notifications_payload.connect(self._apply_launcher_notifications_payload)
+        self._banner_poll_busy = False
         self._banner_poll_timer = QTimer(self)
-        self._banner_poll_timer.setInterval(1100)
+        self._banner_poll_timer.setInterval(5000)
         self._banner_poll_timer.timeout.connect(self._poll_launcher_banner_tick)
         self._banner_poll_timer.start()
         QTimer.singleShot(350, self._poll_launcher_banner_tick)
@@ -875,11 +878,17 @@ class SFFMainWindow(QMainWindow):
 
         # ── New Web UI (visible by default) ──
         self._web_view = QWebEngineView()
-        # Évite une ancienne version de index.html / CSS servie depuis le cache WebEngine après mise à jour des fichiers locaux.
+        # Cache disque WebEngine (assets locaux versionnés via ?v=mtime) — évite rechargements lourds.
         try:
             self._web_view.page().profile().setHttpCacheType(
-                QWebEngineProfile.HttpCacheType.NoCache
+                QWebEngineProfile.HttpCacheType.DiskHttpCache
             )
+            self._web_view.page().profile().setHttpCacheMaximumSize(80 * 1024 * 1024)
+        except Exception:
+            pass
+        try:
+            _ws = self._web_view.page().settings()
+            _ws.setAttribute(QWebEngineSettings.WebAttribute.ScrollAnimatorEnabled, False)
         except Exception:
             pass
         root_layout.addWidget(self._web_view)
@@ -1503,13 +1512,13 @@ class SFFMainWindow(QMainWindow):
         if not self._profile_sync_timer.isActive():
             self._profile_sync_timer.start()
         QTimer.singleShot(2500, self._on_profile_sync_tick)
-        QTimer.singleShot(900, self._refresh_launcher_notifications)
+        QTimer.singleShot(900, self._refresh_launcher_notifications_async)
         QTimer.singleShot(2200, self._flush_pending_launcher_update_notice)
 
     def _on_profile_sync_tick(self) -> None:
         if self._authenticated and getattr(self, "_web_bridge", None):
             self._web_bridge.sync_launcher_profile()
-        self._refresh_launcher_notifications()
+        self._refresh_launcher_notifications_async()
 
     def _apply_rank_from_server(self, username: str, rank: str) -> None:
         """Après un /verify : met à jour la barre du haut sans recharger la page web."""
@@ -1648,17 +1657,25 @@ class SFFMainWindow(QMainWindow):
         self._notif_badge.move(max(0, x), 0)
         self._notif_badge.raise_()
 
-    def _refresh_launcher_notifications(self) -> None:
+    def _refresh_launcher_notifications_async(self) -> None:
         if not getattr(self, "_authenticated", False):
             return
-        try:
-            from sff.launcher_session import fetch_launcher_notifications
+        import threading
 
-            data = fetch_launcher_notifications()
-        except Exception as exc:
-            logging.getLogger(__name__).debug("notifications: %s", exc)
-            return
-        if not data.get("ok"):
+        def work():
+            try:
+                from sff.launcher_session import fetch_launcher_notifications
+
+                data = fetch_launcher_notifications()
+            except Exception as exc:
+                logging.getLogger(__name__).debug("notifications: %s", exc)
+                data = None
+            self._launcher_notifications_payload.emit(data)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _apply_launcher_notifications_payload(self, data) -> None:
+        if not data or not isinstance(data, dict) or not data.get("ok"):
             return
         self._notif_items_cache = data.get("items") or []
         unread = data.get("unread")
@@ -1669,6 +1686,18 @@ class SFFMainWindow(QMainWindow):
                 if isinstance(x, dict) and not x.get("read")
             )
         self._update_notif_badge(int(unread))
+
+    def _refresh_launcher_notifications(self) -> None:
+        if not getattr(self, "_authenticated", False):
+            return
+        try:
+            from sff.launcher_session import fetch_launcher_notifications
+
+            data = fetch_launcher_notifications()
+        except Exception as exc:
+            logging.getLogger(__name__).debug("notifications: %s", exc)
+            return
+        self._apply_launcher_notifications_payload(data)
 
     def _notification_row_id(self, it: object) -> int | None:
         """ID entier pour l’API mark-read ; évite KeyError / TypeError si le serveur renvoie un item inattendu."""
@@ -1846,22 +1875,29 @@ class SFFMainWindow(QMainWindow):
 
     def _on_mandatory_update_poll(self):
         """Revérifie GitHub toutes les 5 min (premier passage ~10 s après ouverture de la fenêtre)."""
-        from sff.mandatory_update_gui import (
-            run_mandatory_version_gate_if_outdated,
-            update_disabled_by_env,
-        )
+        from sff.mandatory_update_gui import update_disabled_by_env
 
         if update_disabled_by_env():
             return
         if self._mandatory_update_poll_busy:
             return
         self._mandatory_update_poll_busy = True
-        try:
-            run_mandatory_version_gate_if_outdated(self)
-        finally:
-            self._mandatory_update_poll_busy = False
+        import threading
+
+        def work():
+            try:
+                from sff.mandatory_update_gui import run_mandatory_version_gate_if_outdated
+
+                run_mandatory_version_gate_if_outdated(self)
+            finally:
+                self._mandatory_update_poll_busy = False
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _poll_launcher_banner_tick(self):
+        if self._banner_poll_busy:
+            return
+        self._banner_poll_busy = True
         import threading
 
         def work():
@@ -1871,6 +1907,8 @@ class SFFMainWindow(QMainWindow):
                 data = fetch_launcher_banner()
             except Exception:
                 data = None
+            finally:
+                self._banner_poll_busy = False
             self._launcher_banner_payload.emit(data)
 
         threading.Thread(target=work, daemon=True).start()

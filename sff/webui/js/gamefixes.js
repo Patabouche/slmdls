@@ -393,7 +393,37 @@ window.GameFixes = (function() {
         } else {
             _updateInstallBanner(gid);
         }
-        _renderCards();
+        _patchCardProgress(gid);
+    }
+
+    function _patchCardProgress(gid) {
+        if (!gid || !_progress[gid] || !_progress[gid].active) return;
+        var card = document.querySelector('.fixed-game-card[data-game-id="' + gid + '"]');
+        if (!card) {
+            _renderCards();
+            return;
+        }
+        var prog = _progress[gid];
+        var body = card.querySelector('.fixed-game-card-body');
+        if (!body) return;
+        var wrap = body.querySelector('.fixed-game-progress');
+        if (!wrap) {
+            wrap = document.createElement('div');
+            wrap.className = 'fixed-game-progress';
+            var bar = document.createElement('div');
+            bar.className = 'fixed-game-progress-bar';
+            wrap.appendChild(bar);
+            body.appendChild(wrap);
+        }
+        var bar = wrap.querySelector('.fixed-game-progress-bar');
+        if (bar) bar.style.width = (prog.progress || 0) + '%';
+        var lbl = body.querySelector('.fixed-game-progress-label');
+        if (!lbl) {
+            lbl = document.createElement('p');
+            lbl.className = 'fixed-game-progress-label';
+            body.appendChild(lbl);
+        }
+        lbl.textContent = _progressDetailText(prog);
     }
 
     function _resetProgressModalHeader() {
@@ -948,8 +978,8 @@ window.GameFixes = (function() {
     function _startCatalogPoll() {
         _stopCatalogPoll();
         _catalogPollTimer = setInterval(function() {
-            _loadCatalog(true);
-        }, 15000);
+            _loadCatalog(false);
+        }, 60000);
     }
 
     function _stopCatalogPoll() {

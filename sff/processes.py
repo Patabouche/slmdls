@@ -37,26 +37,39 @@ from sff.prompts import prompt_confirm
 logger = logging.getLogger(__name__)
 
 
-def is_proc_running(process_name: str):
-
-    for proc in psutil.process_iter(["pid", "name"]):
-
+def is_proc_running(process_name: str) -> bool:
+    target = (process_name or "").lower()
+    if not target:
+        return False
+    for proc in psutil.process_iter(["name"]):
         try:
-            if process_name.lower() == proc.info["name"].lower():
+            if target == (proc.info.get("name") or "").lower():
                 return True
-        except psutil.Error:
+        except (psutil.Error, psutil.NoSuchProcess):
             pass
-
     return False
+
+
+def _running_process_names_lower() -> set[str]:
+    names: set[str] = set()
+    try:
+        for proc in psutil.process_iter(["name"]):
+            try:
+                n = (proc.info.get("name") or "").lower()
+                if n:
+                    names.add(n)
+            except (psutil.Error, psutil.NoSuchProcess):
+                pass
+    except Exception:
+        pass
+    return names
 
 
 def _steam_related_running() -> bool:
     if sys.platform != "win32":
-        return is_proc_running("steam.exe")
-    return any(
-        is_proc_running(name)
-        for name in ("steam.exe", "steamwebhelper.exe", "DLLInjector.exe", "steamservice.exe")
-    )
+        return "steam.exe" in _running_process_names_lower()
+    steam_names = {"steam.exe", "steamwebhelper.exe", "dllinjector.exe", "steamservice.exe"}
+    return bool(_running_process_names_lower() & steam_names)
 
 
 def _kill_steam_exe_windows_silent() -> None:

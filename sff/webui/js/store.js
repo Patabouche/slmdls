@@ -19,6 +19,9 @@ window.Store = (function () {
     /** Réponse async begin_free_catalog_install (Worker Python — évite blocage WebChannel). */
     var _freeCatalogBeginHandler = null;
     var _freeCatalogBeginSignalBound = false;
+    /** App ID → nom pour jeux Denuvo interdits au téléchargement classique. */
+    var _denuvoBlocked = null;
+    var _denuvoModalBound = false;
 
     function _toast(level, msg) {
         if (typeof Components !== 'undefined' && Components.showToast) {
@@ -167,6 +170,77 @@ window.Store = (function () {
             .replace(/&/g, '&amp;')
             .replace(/"/g, '&quot;')
             .replace(/</g, '&lt;');
+    }
+
+    function _loadDenuvoBlockedList() {
+        if (_denuvoBlocked) return;
+        Bridge.onReady(function (py) {
+            if (typeof py.get_denuvo_blocked_list !== 'function') {
+                _denuvoBlocked = {};
+                return;
+            }
+            py.get_denuvo_blocked_list(function (jsonStr) {
+                try {
+                    var d = JSON.parse(jsonStr || '{}');
+                    _denuvoBlocked = d.apps || {};
+                } catch (e) {
+                    _denuvoBlocked = {};
+                }
+            });
+        });
+    }
+
+    function _denuvoBlockedName(appId) {
+        if (!_denuvoBlocked) return null;
+        var key = String(appId || '');
+        return Object.prototype.hasOwnProperty.call(_denuvoBlocked, key)
+            ? _denuvoBlocked[key]
+            : null;
+    }
+
+    function _isDenuvoBlocked(appId) {
+        return _denuvoBlockedName(appId) != null;
+    }
+
+    function _showDenuvoBlockedModal(gameName) {
+        var nameEl = document.getElementById('denuvo-blocked-game-name');
+        if (nameEl) nameEl.textContent = gameName || 'Ce jeu';
+        if (typeof Components !== 'undefined' && Components.showModal) {
+            Components.showModal('denuvo-blocked-modal');
+        } else {
+            alert(
+                (gameName || 'Ce jeu') + ' est protégé par Denuvo et non téléchargeable ici. '
+                + 'Consulte Jeux VIP ou Discord.'
+            );
+        }
+    }
+
+    function _bindDenuvoBlockedModal() {
+        if (_denuvoModalBound) return;
+        var modal = document.getElementById('denuvo-blocked-modal');
+        var btnVip = document.getElementById('denuvo-blocked-open-vip');
+        var btnDiscord = document.getElementById('denuvo-blocked-open-discord');
+        if (!modal || !btnVip || !btnDiscord) return;
+        _denuvoModalBound = true;
+        btnVip.addEventListener('click', function () {
+            if (typeof Components !== 'undefined' && Components.hideModal) {
+                Components.hideModal('denuvo-blocked-modal');
+            }
+            if (typeof App !== 'undefined' && App.navigateTo) {
+                App.navigateTo('gamefixes');
+            }
+        });
+        btnDiscord.addEventListener('click', function () {
+            Bridge.onReady(function (py) {
+                if (typeof py.discord_avis_url !== 'function') {
+                    Bridge.call('open_url', 'https://discord.gg/c2pRJKjvgE');
+                    return;
+                }
+                py.discord_avis_url(function (url) {
+                    Bridge.call('open_url', url && url.indexOf('http') === 0 ? url : 'https://discord.gg/c2pRJKjvgE');
+                });
+            });
+        });
     }
 
     function _hideFreeCatalogWaitModal() {
@@ -391,6 +465,7 @@ window.Store = (function () {
         }
         _initTtcListeners();
         _bindFreeUpsellModal();
+        _bindDenuvoBlockedModal();
     }
 
     var _freePlanGuideBound = false;
@@ -662,7 +737,10 @@ window.Store = (function () {
 
         var status = document.getElementById('ttc-status-badge');
         if (status) {
-            if (data.available) {
+            if (data.denuvo_blocked) {
+                status.textContent = '🔒 Denuvo — non téléchargeable ici';
+                status.className   = 'ttc-status unavailable';
+            } else if (data.available) {
                 status.textContent = '✓ Disponible';
                 status.className   = 'ttc-status available';
             } else {
@@ -694,12 +772,20 @@ window.Store = (function () {
 
         var dlBtn    = document.getElementById('ttc-download-btn');
         var depotBtn = document.getElementById('ttc-depot-btn');
-        if (dlBtn)    dlBtn.disabled = !data.available;
-        if (depotBtn) depotBtn.dataset.appid = data.app_id;
+        var blocked  = !!(data.denuvo_blocked || _isDenuvoBlocked(data.app_id));
+        if (dlBtn)    dlBtn.disabled = !data.available || blocked;
+        if (depotBtn) {
+            depotBtn.dataset.appid = data.app_id;
+            depotBtn.disabled = blocked;
+        }
 
         _resetProgress();
         r.classList.remove('hidden');
         _currentAppId = data.app_id;
+
+        if (blocked) {
+            _showDenuvoBlockedModal(data.name || _denuvoBlockedName(data.app_id));
+        }
     }
 
     function _resetProgress() {
@@ -726,6 +812,18 @@ window.Store = (function () {
         var appId = _extractAppId(input.value);
         if (!appId) {
             _showError('Lien Steam invalide ou App ID introuvable. Exemple : https://store.steampowered.com/app/1971870/');
+            return;
+        }
+        if (_isDenuvoBlocked(appId)) {
+            _setLoading(true);
+            _showResult({
+                app_id: appId,
+                available: true,
+                denuvo_blocked: true,
+                name: _denuvoBlockedName(appId) || ('App ' + appId),
+                header_image: _steamHeader(appId),
+                dlc_count: null,
+            });
             return;
         }
         _setLoading(true);
@@ -781,6 +879,10 @@ window.Store = (function () {
         if (dlBtn) {
             dlBtn.addEventListener('click', function() {
                 if (!_currentAppId) return;
+                if (_isDenuvoBlocked(_currentAppId)) {
+                    _showDenuvoBlockedModal(_denuvoBlockedName(_currentAppId));
+                    return;
+                }
                 if (!_isPaidInstallRank(_userRank)) {
                     _showFreePlanUpsellModal();
                     return;
@@ -798,6 +900,10 @@ window.Store = (function () {
                 }
                 var appId = depotBtn.dataset.appid || _currentAppId;
                 if (!appId) return;
+                if (_isDenuvoBlocked(appId)) {
+                    _showDenuvoBlockedModal(_denuvoBlockedName(appId));
+                    return;
+                }
                 Bridge.call('run_game_action', appId, 'download_games');
             });
         }
@@ -816,6 +922,11 @@ window.Store = (function () {
         Bridge.on('task_finished', function(jsonStr) {
             var d; try { d = JSON.parse(jsonStr); } catch(e) { return; }
             if (d.task !== 'download_fastest') return;
+            if (d.denuvo_blocked) {
+                _resetProgress();
+                _showDenuvoBlockedModal(_denuvoBlockedName(d.app_id));
+                return;
+            }
             if (d.success) { _showProgress('✅ Installation terminée !', 100); }
             else           { _showProgress('❌ Échec du téléchargement.', 0); }
         });
@@ -826,6 +937,8 @@ window.Store = (function () {
     function init() {
         if (_initialized) return;
         _initialized = true;
+        _loadDenuvoBlockedList();
+        _bindDenuvoBlockedModal();
         _bindFreeCatalogInstallTaskListener();
         _bindLauncherProfileSync();
     }

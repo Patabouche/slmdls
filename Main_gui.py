@@ -128,6 +128,20 @@ def main():
     app.setApplicationDisplayName(f"SlimeDeals {VERSION}")
     app.setApplicationVersion(VERSION)
 
+    def _qt_excepthook(exc_type, exc_val, exc_tb):
+        import traceback as _tb
+        msg = "".join(_tb.format_exception(exc_type, exc_val, exc_tb))
+        logger.critical("Exception non gérée:\n%s", msg)
+        try:
+            with open("crash.log", "a", encoding="utf-8") as f:
+                f.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+                f.write(msg)
+        except Exception:
+            pass
+
+    import time
+    sys.excepthook = _qt_excepthook
+
     from sff.single_instance import SingleInstanceGuard
     _guard = SingleInstanceGuard()
     if _guard.try_activate_existing():

@@ -67,7 +67,7 @@
     }
 
     function initBubbles() {
-        var count = Math.min(40, Math.floor(W * H / 18000) + 18);
+        var count = Math.min(28, Math.floor(W * H / 22000) + 12);
         bubbles = [];
         for (var i = 0; i < count; i++) {
             bubbles.push(mkBubble(true));
@@ -143,6 +143,10 @@
     document.addEventListener('visibilitychange', function () {
         paused = document.hidden;
         if (!paused && !raf) draw();
+        else if (paused && raf) {
+            cancelAnimationFrame(raf);
+            raf = null;
+        }
     });
 
     resize();

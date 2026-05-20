@@ -523,6 +523,9 @@ window.App = (function() {
         }
 
         content.appendChild(line);
+        while (content.children.length > 300) {
+            content.removeChild(content.firstChild);
+        }
         content.scrollTop = content.scrollHeight;
     }
 

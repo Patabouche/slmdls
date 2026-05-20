@@ -140,9 +140,14 @@ window.Library = (function() {
 
         var searchInp = document.getElementById('library-search');
         if (searchInp) {
+            var _searchDebounce = null;
             searchInp.addEventListener('input', function() {
+                var val = this.value.trim().toLowerCase();
                 _libraryPage = 1;
-                _applyLibraryFilter(this.value.trim().toLowerCase());
+                if (_searchDebounce) clearTimeout(_searchDebounce);
+                _searchDebounce = setTimeout(function() {
+                    _applyLibraryFilter(val);
+                }, 200);
             });
         }
 

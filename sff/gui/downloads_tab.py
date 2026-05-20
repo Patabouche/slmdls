@@ -39,10 +39,10 @@ class DownloadsTab(QWidget):
         super().__init__(parent)
         self._dm = download_manager or DownloadManager()
         self._setup_ui()
-        # refresh timer
+        # Legacy tab masqué — pas de timer actif (évite charge CPU inutile).
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._refresh)
-        self._timer.start(1000)
+        self._timer.setInterval(5000)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)

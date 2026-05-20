@@ -305,6 +305,16 @@ def _cloud_saves_feature_allowed() -> bool:
     return cloud_saves_launcher_allowed_for_rank(saved.get("rank"))
 
 
+def _denuvo_blocked_denial(app_id: str) -> tuple[bool, str]:
+    """Refuse classic download for Denuvo-protected titles (Jeux VIP instead)."""
+    from sff.denuvo_blocked_apps import DENUVO_BLOCK_MESSAGE, denuvo_blocked_info
+
+    info = denuvo_blocked_info(app_id)
+    if info:
+        return False, info.get("message") or DENUVO_BLOCK_MESSAGE
+    return True, ""
+
+
 def _launcher_free_catalog_download_allowed(app_id: str) -> tuple[bool, str]:
     """Compte FREE : un jeu du catalogue gratuit après choix — réclamation serveur OU session locale (pending)."""
     saved = _sync_expire_free_catalog_pending_if_stale()
@@ -470,6 +480,9 @@ class WebBridge(QObject):
         self._api_key = None
         self._store_client = None
         self._workers = []  # prevent GC of running workers
+        self._installed_games_cache: str = ""
+        self._installed_games_cache_ts: float = 0.0
+        self._installed_games_cache_ttl: float = 45.0
         self.request_notify_gen.connect(self._deliver_notify_gen, Qt.ConnectionType.QueuedConnection)
         if ui is not None and hasattr(ui, "post_install_notify"):
             def _post_install_hook(aid: str, br=self) -> None:
@@ -549,16 +562,15 @@ class WebBridge(QObject):
         worker.moveToThread(thread)
 
         def _cleanup(result):
-            thread.quit()
-            thread.wait()
-            if worker in self._workers:
-                self._workers.remove(worker)
-            if on_done:
-                on_done(result)
+            try:
+                if on_done:
+                    on_done(result)
+            finally:
+                if worker in self._workers:
+                    self._workers.remove(worker)
+                thread.quit()
 
         def _on_error(msg):
-            thread.quit()
-            thread.wait()
             if worker in self._workers:
                 self._workers.remove(worker)
             try:
@@ -576,9 +588,12 @@ class WebBridge(QObject):
                 self.task_finished.emit(json.dumps({
                     "task": "unknown", "success": False, "message": safe_msg
                 }))
+            thread.quit()
 
         worker.finished.connect(_cleanup)
         worker.error.connect(_on_error)
+        thread.finished.connect(thread.deleteLater)
+        worker.finished.connect(worker.deleteLater)
         thread.started.connect(worker.run)
         self._workers.append(worker)
         thread.start()
@@ -998,6 +1013,13 @@ class WebBridge(QObject):
             )
         return "https://discord.gg/c2pRJKjvgE"
 
+    @pyqtSlot(result=str)
+    def get_denuvo_blocked_list(self) -> str:
+        """Liste des App ID interdits au téléchargement classique (Denuvo)."""
+        from sff.denuvo_blocked_apps import blocked_apps_json
+
+        return blocked_apps_json()
+
     # ── ASYNC slots — dispatch to QThread ────────────────────────
 
     @pyqtSlot(str)
@@ -1005,8 +1027,23 @@ class WebBridge(QObject):
         """Récupère les infos jeu pour l’onglet Télécharger (métadonnées catalogue).
         Émet ttc_game_info avec un JSON contenant name, header_image, available, dlc_count."""
         def _do():
+            from sff.denuvo_blocked_apps import denuvo_blocked_info
             from sff.launcher_session import apply_verify_to_local_auth, verify_launcher_session
             from sff.lua.endpoints import steam_store_dlc_count, ttc_get_game_info
+
+            blocked = denuvo_blocked_info(str(app_id))
+            if blocked:
+                return {
+                    "app_id": app_id,
+                    "available": False,
+                    "denuvo_blocked": True,
+                    "name": blocked["name"],
+                    "header_image": (
+                        f"https://cdn.cloudflare.steamstatic.com/steam/apps/{app_id}/header.jpg"
+                    ),
+                    "dlc_count": None,
+                    "message": blocked.get("message", ""),
+                }
 
             auth = _load_auth()
             if (auth.get("token") or "").strip():
@@ -1178,6 +1215,17 @@ class WebBridge(QObject):
                     app_id=str(app_id),
                 )
                 return False
+            d_ok, d_deny = _denuvo_blocked_denial(str(app_id))
+            if not d_ok:
+                self._log_ui(f"Refus (Denuvo) : {d_deny}")
+                self._emit_task_result(
+                    "download_fastest",
+                    False,
+                    d_deny,
+                    app_id=str(app_id),
+                    denuvo_blocked=True,
+                )
+                return False
             allow, deny_msg = _launcher_free_catalog_download_allowed(str(app_id))
             if not allow:
                 self._log_ui(f"Refus (plan FREE / catalogue) : {deny_msg}")
@@ -1261,6 +1309,17 @@ class WebBridge(QObject):
                     False,
                     "Connexion ou PC non autorise pour ce compte. Reconnecte-toi ou contacte le support.",
                     app_id=str(app_id),
+                )
+                return False
+            d_ok, d_deny = _denuvo_blocked_denial(str(app_id))
+            if not d_ok:
+                self._log_ui(f"Refus (Denuvo) : {d_deny}")
+                self._emit_task_result(
+                    "download_fastest",
+                    False,
+                    d_deny,
+                    app_id=str(app_id),
+                    denuvo_blocked=True,
                 )
                 return False
             allow, deny_msg = _launcher_free_catalog_download_allowed(str(app_id))
@@ -1586,6 +1645,17 @@ class WebBridge(QObject):
 
         def _do():
             self._log_ui("download_game_version : worker démarré")
+            d_ok, d_deny = _denuvo_blocked_denial(str(app_id))
+            if not d_ok:
+                self._log_ui(f"Refus (Denuvo) : {d_deny}")
+                self._emit_task_result(
+                    "download_version",
+                    False,
+                    d_deny,
+                    app_id=str(app_id),
+                    denuvo_blocked=True,
+                )
+                return False
             try:
                 manifest_override = json.loads(manifest_override_json)
             except (json.JSONDecodeError, TypeError) as ex:
@@ -3376,6 +3446,17 @@ class WebBridge(QObject):
         lua_path: used when source == 'local'
         Emits download_progress + task_finished signals."""
         def _do():
+            d_ok, d_deny = _denuvo_blocked_denial(str(app_id))
+            if not d_ok:
+                self._log_ui(f"Refus (Denuvo) : {d_deny}")
+                self._emit_task_result(
+                    "download_fastest",
+                    False,
+                    d_deny,
+                    app_id=str(app_id),
+                    denuvo_blocked=True,
+                )
+                return (False, d_deny)
             self.download_progress.emit(json.dumps({
                 "app_id": app_id, "status": "Starting DDMod download", "progress": 0
             }))
@@ -3638,133 +3719,151 @@ class WebBridge(QObject):
         except Exception as e:
             return str(e)
 
+    def _invalidate_installed_games_cache(self) -> None:
+        self._installed_games_cache = ""
+        self._installed_games_cache_ts = 0.0
+
+    def _scan_installed_games_json(self) -> str:
+        """Scan disque Steam (coûteux) — résultat JSON."""
+        if not self._steam_path:
+            return "[]"
+        from sff.storage.vdf import get_steam_libs
+        import os
+        libs = list(get_steam_libs(self._steam_path))
+        # Scan étendu A–Z uniquement si demandé (très coûteux sur gros disques).
+        if os.name == "nt" and os.getenv("SLIMEDEALS_SCAN_ALL_DRIVES", "").strip().lower() in (
+            "1", "true", "yes", "on",
+        ):
+            from string import ascii_uppercase
+            for drive_letter in ascii_uppercase:
+                drive = Path(f"{drive_letter}:/")
+                if not drive.exists():
+                    continue
+                for subdir in ("SteamLibrary", "Steam", "Program Files (x86)/Steam",
+                               "Program Files/Steam", "Games/Steam"):
+                    candidate = drive / subdir
+                    steamapps = candidate / "steamapps"
+                    if steamapps.exists() and candidate not in libs:
+                        libs.append(candidate)
+        games = []
+        seen: set[str] = set()
+        sideloaded_entries: list[dict] = []
+        sideloaded_app_ids: set[str] = set()
+        sideloaded_paths: set[str] = set()
+        allow_fixed = triple_exclusive_tools_allowed_for_rank(
+            _load_auth().get("rank")
+        )
+
+        try:
+            from sff.fixed_games import get_sideloaded_games
+
+            for sg in get_sideloaded_games():
+                sg_path = (sg.get("path") or "").strip()
+                if not sg_path or not Path(sg_path).is_dir():
+                    continue
+                sideloaded_entries.append(sg)
+                sg_app_id = sg.get("app_id", 0)
+                if sg_app_id:
+                    sideloaded_app_ids.add(str(sg_app_id))
+                try:
+                    sideloaded_paths.add(str(Path(sg_path).resolve()).lower())
+                except OSError:
+                    sideloaded_paths.add(sg_path.lower())
+        except Exception:
+            pass
+
+        for lib in libs:
+            steamapps = lib / "steamapps"
+            if not steamapps.exists():
+                continue
+            for acf in steamapps.glob("appmanifest_*.acf"):
+                try:
+                    text = acf.read_text(encoding="utf-8", errors="replace")
+                    app_id = ""
+                    name = ""
+                    installdir = ""
+                    for line in text.splitlines():
+                        line = line.strip()
+                        if '"appid"' in line:
+                            app_id = line.split('"')[-2] if '"' in line else ""
+                        elif '"name"' in line and not name:
+                            name = line.split('"')[-2] if '"' in line else ""
+                        elif '"installdir"' in line:
+                            installdir = line.split('"')[-2] if '"' in line else ""
+                    if not app_id or app_id in seen:
+                        continue
+                    if app_id in sideloaded_app_ids:
+                        continue
+                    game_path = steamapps / "common" / installdir if installdir else None
+                    folder_exists = bool(game_path and game_path.is_dir())
+                    if folder_exists:
+                        try:
+                            if str(game_path.resolve()).lower() in sideloaded_paths:
+                                continue
+                        except OSError:
+                            pass
+                    seen.add(app_id)
+                    entry = {
+                        "app_id": int(app_id) if app_id.isdigit() else 0,
+                        "name": name or f"App {app_id}",
+                        "installed": folder_exists,
+                        "path": str(game_path) if game_path else "",
+                        "source": "steam",
+                    }
+                    if not folder_exists:
+                        entry["files_missing"] = True
+                    games.append(entry)
+                except Exception:
+                    continue
+
+        for sg in sideloaded_entries:
+            if not allow_fixed:
+                continue
+            sg_path = sg.get("path", "")
+            sg_app_id = sg.get("app_id", 0)
+            dedupe_key = str(sg_app_id) if sg_app_id else str(sg_path)
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            games.append({
+                "app_id": sg_app_id,
+                "name": sg.get("name") or f"Jeu {sg_app_id}",
+                "installed": True,
+                "path": sg_path,
+                "source": "fixed",
+            })
+
+        try:
+            from sff.premium_manifest_lock import get_locked_library_games
+
+            for locked in get_locked_library_games(self._steam_path, _load_auth().get("rank")):
+                aid = locked.get("app_id", 0)
+                src = locked.get("source") or ""
+                dedupe_key = f"{src}:{aid}" if aid else f"{src}:{locked.get('name', '')}"
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+                games.append(locked)
+        except Exception:
+            logger.debug("get_installed_games locked entries", exc_info=True)
+
+        games.sort(key=lambda g: g.get("name", "").lower())
+        return json.dumps(games)
+
     @pyqtSlot(result=str)
     def get_installed_games(self):
         """Returns JSON array of installed games from ALL Steam library folders."""
         try:
-            if not self._steam_path:
-                return "[]"
-            from sff.storage.vdf import get_steam_libs
-            import os
-            libs = list(get_steam_libs(self._steam_path))
-            # Also scan common Windows drive paths
-            if os.name == 'nt':
-                from string import ascii_uppercase
-                for drive_letter in ascii_uppercase:
-                    drive = Path(f"{drive_letter}:/")
-                    if not drive.exists():
-                        continue
-                    for subdir in ("SteamLibrary", "Steam", "Program Files (x86)/Steam",
-                                   "Program Files/Steam", "Games/Steam"):
-                        candidate = drive / subdir
-                        steamapps = candidate / "steamapps"
-                        if steamapps.exists() and candidate not in libs:
-                            libs.append(candidate)
-            games = []
-            seen: set[str] = set()
-            sideloaded_entries: list[dict] = []
-            sideloaded_app_ids: set[str] = set()
-            sideloaded_paths: set[str] = set()
-            allow_fixed = triple_exclusive_tools_allowed_for_rank(
-                _load_auth().get("rank")
-            )
-
-            try:
-                from sff.fixed_games import get_sideloaded_games
-
-                for sg in get_sideloaded_games():
-                    sg_path = (sg.get("path") or "").strip()
-                    if not sg_path or not Path(sg_path).is_dir():
-                        continue
-                    sideloaded_entries.append(sg)
-                    sg_app_id = sg.get("app_id", 0)
-                    if sg_app_id:
-                        sideloaded_app_ids.add(str(sg_app_id))
-                    try:
-                        sideloaded_paths.add(str(Path(sg_path).resolve()).lower())
-                    except OSError:
-                        sideloaded_paths.add(sg_path.lower())
-            except Exception:
-                pass
-
-            for lib in libs:
-                steamapps = lib / "steamapps"
-                if not steamapps.exists():
-                    continue
-                for acf in steamapps.glob("appmanifest_*.acf"):
-                    try:
-                        text = acf.read_text(encoding="utf-8", errors="replace")
-                        app_id = ""
-                        name = ""
-                        installdir = ""
-                        for line in text.splitlines():
-                            line = line.strip()
-                            if '"appid"' in line:
-                                app_id = line.split('"')[-2] if '"' in line else ""
-                            elif '"name"' in line and not name:
-                                name = line.split('"')[-2] if '"' in line else ""
-                            elif '"installdir"' in line:
-                                installdir = line.split('"')[-2] if '"' in line else ""
-                        if not app_id or app_id in seen:
-                            continue
-                        if app_id in sideloaded_app_ids:
-                            continue
-                        game_path = steamapps / "common" / installdir if installdir else None
-                        folder_exists = bool(game_path and game_path.is_dir())
-                        if folder_exists:
-                            try:
-                                if str(game_path.resolve()).lower() in sideloaded_paths:
-                                    continue
-                            except OSError:
-                                pass
-                        seen.add(app_id)
-                        entry = {
-                            "app_id": int(app_id) if app_id.isdigit() else 0,
-                            "name": name or f"App {app_id}",
-                            "installed": folder_exists,
-                            "path": str(game_path) if game_path else "",
-                            "source": "steam",
-                        }
-                        if not folder_exists:
-                            entry["files_missing"] = True
-                        games.append(entry)
-                    except Exception:
-                        continue
-
-            for sg in sideloaded_entries:
-                if not allow_fixed:
-                    continue
-                sg_path = sg.get("path", "")
-                sg_app_id = sg.get("app_id", 0)
-                dedupe_key = str(sg_app_id) if sg_app_id else str(sg_path)
-                if dedupe_key in seen:
-                    continue
-                seen.add(dedupe_key)
-                games.append({
-                    "app_id": sg_app_id,
-                    "name": sg.get("name") or f"Jeu {sg_app_id}",
-                    "installed": True,
-                    "path": sg_path,
-                    "source": "fixed",
-                })
-
-            try:
-                from sff.premium_manifest_lock import get_locked_library_games
-
-                for locked in get_locked_library_games(self._steam_path, _load_auth().get("rank")):
-                    aid = locked.get("app_id", 0)
-                    src = locked.get("source") or ""
-                    dedupe_key = f"{src}:{aid}" if aid else f"{src}:{locked.get('name', '')}"
-                    if dedupe_key in seen:
-                        continue
-                    seen.add(dedupe_key)
-                    games.append(locked)
-            except Exception:
-                logger.debug("get_installed_games locked entries", exc_info=True)
-
-            games.sort(key=lambda g: g.get("name", "").lower())
-
-            return json.dumps(games)
+            now = time.time()
+            if (
+                self._installed_games_cache
+                and (now - self._installed_games_cache_ts) < self._installed_games_cache_ttl
+            ):
+                return self._installed_games_cache
+            payload = self._scan_installed_games_json()
+            self._installed_games_cache = payload
+            self._installed_games_cache_ts = now
+            return payload
         except Exception:
             return "[]"
 
@@ -4137,6 +4236,8 @@ class WebBridge(QObject):
         def _on_done(result):
             if isinstance(result, tuple) and len(result) == 3:
                 ok, msg, steam_was_running = result
+                if ok:
+                    self._invalidate_installed_games_cache()
                 if ok and steam_was_running:
                     launched, launch_msg = self._launch_steam_client()
                     if launched:
@@ -4146,6 +4247,8 @@ class WebBridge(QObject):
                 self._emit_task_result("delete_game", ok, msg, app_id=app_id)
             elif isinstance(result, tuple) and len(result) == 2:
                 ok, msg = result
+                if ok:
+                    self._invalidate_installed_games_cache()
                 self._emit_task_result("delete_game", ok, msg, app_id=app_id)
             else:
                 self._emit_task_result("delete_game", False, "Suppression échouée", app_id=app_id)

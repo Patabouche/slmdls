@@ -133,7 +133,11 @@ def _copy_vbs_cmd(game_folder: Path) -> bool:
     """Copy VBS.cmd from third_party/hv/ to the game folder."""
     src = get_vbs_cmd_path()
     if not src.exists():
-        print(Fore.YELLOW + f"VBS.cmd not found at {src} — skipping." + Style.RESET_ALL)
+        print(
+            Fore.YELLOW
+            + f"VBS.cmd absent ({src}) — build public ou copie manuelle requise pour HV Auto."
+            + Style.RESET_ALL
+        )
         return False
     dst = game_folder / "VBS.cmd"
     try:

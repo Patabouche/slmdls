@@ -9,6 +9,15 @@ block_cipher = None
 
 spec_root = os.path.abspath(SPECPATH)
 icon_path = os.path.join(spec_root, 'sff.ico')
+_builder_dir = os.path.join(spec_root, 'BUILDER')
+_version_info_path = os.path.join(_builder_dir, 'version_info.py')
+_app_manifest_path = os.path.join(_builder_dir, 'app.manifest')
+
+# Build « public » : exclut les binaires les plus signalés par l’AV du ZIP distribué.
+# Définir SLIMEDEALS_PUBLIC_RELEASE=1 (build_launcher.bat public) ou laisser 0 pour build complet.
+_public_release = os.environ.get('SLIMEDEALS_PUBLIC_RELEASE', '').strip().lower() in (
+    '1', 'true', 'yes', 'public',
+)
 
 def get_win10toast_data():
     try:
@@ -31,11 +40,12 @@ datas = [
 third_party_dir = os.path.join(spec_root, 'third_party')
 if os.path.exists(third_party_dir):
     if sys.platform == 'win32':
-        _third_party_skip_win = frozenset({'gbe_fork_tools_linux', 'linux'})
+        _third_party_skip_win = frozenset({'gbe_fork_tools_linux', 'linux', 'hv'})
         for _tp_entry in sorted(os.listdir(third_party_dir)):
             if _tp_entry in _third_party_skip_win:
                 print(
-                    f"Note: third_party/{_tp_entry} exclu du build Windows GUI (outil Linux uniquement)."
+                    f"Note: third_party/{_tp_entry} exclu du build Windows GUI "
+                    f"({'VBS.cmd très signalé AV' if _tp_entry == 'hv' else 'outil Linux uniquement'})."
                 )
                 continue
             _tp_src = os.path.join(third_party_dir, _tp_entry)
@@ -114,10 +124,15 @@ if os.path.isfile(os.path.join(spec_root, 'sff', '_gc_secrets.py')):
     _hidden_gc_secrets.append('sff._gc_secrets')
     print("PyInstaller: hiddenimport sff._gc_secrets (OAuth embarqué généré par write_gdrive_gc_secrets.py)")
 
-# ROCKSTAR BYPASS — tout le dossier SlimeDealsBPRG (exe + Assets) si présent avant PyInstaller
+# ROCKSTAR BYPASS — SlimeDealsBPRG (build complet uniquement ; très signalé AV en release publique)
 _sdb_dir = os.path.join(spec_root, 'SlimeDealsBPRG')
 _sdb_exe = os.path.join(_sdb_dir, 'SlimeDealsBPRG.exe')
-if os.path.isfile(_sdb_exe):
+if _public_release:
+    print(
+        "Note: build PUBLIC — SlimeDealsBPRG/ exclu (SLIMEDEALS_PUBLIC_RELEASE). "
+        "Utilisez « build_launcher.bat full » pour l’embarquer."
+    )
+elif os.path.isfile(_sdb_exe):
     datas.append((_sdb_dir, 'SlimeDealsBPRG'))
     print(f"Including SlimeDealsBPRG (datas): {_sdb_dir}")
 else:
@@ -126,9 +141,14 @@ else:
         "ou lancez build_simple_gui.bat qui tente un build automatique depuis le dépôt test."
     )
 
-# GreenLuma — archive d'installation auto (méthode B → dossier Steam)
+# GreenLuma — archive d'installation auto (build complet uniquement)
 _gl_rar = os.path.join(spec_root, 'greenlumafix.rar')
-if os.path.isfile(_gl_rar):
+if _public_release:
+    print(
+        "Note: build PUBLIC — greenlumafix.rar exclu (SLIMEDEALS_PUBLIC_RELEASE). "
+        "GreenLuma : installation manuelle ou build « full »."
+    )
+elif os.path.isfile(_gl_rar):
     datas.append((_gl_rar, '.'))
     print(f"Including greenlumafix.rar (datas): {_gl_rar}")
 else:
@@ -266,8 +286,6 @@ a = Analysis(
         'py7zr',
         'rarfile',
         'sff.greenluma_setup',
-        'seleniumbase',
-        'undetected_chromedriver',
         'bs4',
         'bs4.builder',
         'bs4.builder._html5lib',
@@ -294,6 +312,17 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+_version_info = None
+if sys.platform == 'win32' and os.path.isfile(_version_info_path):
+    _version_info = _version_info_path
+    print(f"Including Windows version_info: {_version_info_path}")
+
+_app_manifest = _app_manifest_path if (
+    sys.platform == 'win32' and os.path.isfile(_app_manifest_path)
+) else None
+if _app_manifest:
+    print(f"Including Windows manifest (asInvoker): {_app_manifest_path}")
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -309,6 +338,8 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    version=_version_info,
+    manifest=_app_manifest,
     icon=icon_path if os.path.exists(icon_path) else None,
 )
 

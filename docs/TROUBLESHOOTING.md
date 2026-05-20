@@ -132,6 +132,8 @@ Starting with version 5.3.0, SteaMidra uses the one-dir distribution format. All
 
 If your antivirus still flags files, add your SteaMidra folder (e.g. `C:\SteaMidra\`) to your AV exclusions. The `_internal/` folder contains Python runtime files and bundled tools — none of them are malware.
 
+**Developers / releases :** see `BUILDER/README_TRUST.md` for Authenticode signing, public build mode (`build_launcher.bat public`), and Microsoft false-positive submission.
+
 ---
 
 ## Chrome or ChromeDriver errors (multiplayer fix)

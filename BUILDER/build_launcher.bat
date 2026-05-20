@@ -4,6 +4,19 @@ chcp 65001 >nul
 title SlimeDeals — Build launcher (.exe)
 
 set "HERE=%~dp0"
+set "BUILD_MODE=%~1"
+if /I "%BUILD_MODE%"=="public" (
+    set "SLIMEDEALS_PUBLIC_RELEASE=1"
+    echo [BUILDER] Mode PUBLIC — exclusions AV ^(VBS.cmd, greenlumafix.rar, SlimeDealsBPRG^)
+) else if /I "%BUILD_MODE%"=="full" (
+    set "SLIMEDEALS_PUBLIC_RELEASE=0"
+    echo [BUILDER] Mode FULL — toutes les ressources embarquees
+) else (
+    if "%SLIMEDEALS_PUBLIC_RELEASE%"=="" set "SLIMEDEALS_PUBLIC_RELEASE=1"
+    if "%SLIMEDEALS_PUBLIC_RELEASE%"=="1" (
+        echo [BUILDER] Mode PUBLIC par defaut — utilisez build_launcher_full.bat pour tout embarquer
+    )
+)
 pushd "%HERE%.." >nul 2>&1
 set "SFFROOT=%CD%"
 popd >nul 2>&1
@@ -188,6 +201,20 @@ if not "!BUILD_ERR!"=="0" (
 
 if "!GUI_OUT!"=="" set "GUI_OUT=dist2\SteaMidra_GUI"
 
+REM --- Signature Authenticode optionnelle (certificat code signing) ---
+if not "%SLIMEDEALS_SIGN_PFX%"=="" (
+    echo.
+    echo [BUILDER] Signature Authenticode…
+    call "%HERE%sign_release.bat" "!GUI_OUT!"
+    if errorlevel 1 (
+        echo [BUILDER] Avertissement : signature echouee — livrable non signe.
+    )
+) else (
+    echo.
+    echo [BUILDER] Pas de signature ^(SLIMEDEALS_SIGN_PFX non defini^).
+    echo           Voir BUILDER\README_TRUST.md pour SmartScreen / confiance Windows.
+)
+
 echo ========================================
 echo  Build termine avec succes.
 echo ========================================
@@ -197,6 +224,7 @@ echo    %SFFROOT%\!GUI_OUT!\
 echo  Executable :
 echo    %SFFROOT%\!GUI_OUT!\SteaMidra_GUI.exe
 echo.
+echo  Confiance Windows : BUILDER\README_TRUST.md
 echo  Rappel : client_secret Google non inclus dans le package.
 echo.
 pause

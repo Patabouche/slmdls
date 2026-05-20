@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="css/premium.css">
     <link rel="stylesheet" href="css/pages-slime.css">
     <link rel="stylesheet" href="css/modals-slime.css">
+    <link rel="stylesheet" href="css/design-pro.css">
     <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 </head>
 <body>
@@ -54,9 +55,9 @@
                 <svg class="nav-icon" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg>
                 <span class="nav-label" data-i18n="Cloud Saves">Sauvegardes Cloud</span>
             </button>
-            <button class="nav-item" data-page="gamefixes" data-tooltip="Jeux avec fix et multijoueur — bientôt pour Triple Monstre">
-                <span class="nav-icon nav-icon-emoji" aria-hidden="true">🔥</span>
-                <span class="nav-label" data-i18n="Fixed Games">Jeux fixed</span>
+            <button class="nav-item" data-page="gamefixes" data-tooltip="Sorties rares et récentes — téléchargement direct (Triple Monstre)">
+                <span class="nav-icon nav-icon-emoji" aria-hidden="true">💎</span>
+                <span class="nav-label" data-i18n="Fixed Games">Pépites</span>
             </button>
             </div>
             <div class="sidebar-nav-group">
@@ -105,11 +106,200 @@
                         </div>
                     </div>
                     <div class="home-hero-decoration" aria-hidden="true">
-                        <span class="home-hero-orb home-hero-orb--lime"></span>
-                        <span class="home-hero-orb home-hero-orb--violet"></span>
+                        <div class="hero-slime-wrap">
+                            <!-- Halos de fond -->
+                            <div class="hero-slime-halo hero-slime-halo--outer"></div>
+                            <div class="hero-slime-halo hero-slime-halo--inner"></div>
+                            <!-- Slime SVG -->
+                            <svg class="hero-slime-svg" viewBox="0 0 160 190" fill="none" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+                                <defs>
+                                    <radialGradient id="slimeBodyGrad" cx="42%" cy="38%" r="62%">
+                                        <stop offset="0%" stop-color="#c8f542"/>
+                                        <stop offset="55%" stop-color="#8ab800"/>
+                                        <stop offset="100%" stop-color="#4a6500"/>
+                                    </radialGradient>
+                                    <radialGradient id="slimeGloss" cx="35%" cy="28%" r="38%">
+                                        <stop offset="0%" stop-color="rgba(255,255,255,0.38)"/>
+                                        <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+                                    </radialGradient>
+                                    <!-- Ombre portée dessinée vectoriellement, sans filter rastérisé -->
+                                    <radialGradient id="slimeDropShadow" cx="50%" cy="0%" r="50%">
+                                        <stop offset="0%" stop-color="rgba(30,70,0,0.55)"/>
+                                        <stop offset="100%" stop-color="rgba(30,70,0,0)"/>
+                                    </radialGradient>
+                                </defs>
+
+                                <!-- Ombre portée au sol -->
+                                <ellipse cx="80" cy="178" rx="42" ry="8" fill="rgba(0,0,0,0.28)" class="slime-shadow-ellipse"/>
+                                <!-- Ombre sous le corps (vectorielle) -->
+                                <ellipse cx="82" cy="158" rx="58" ry="18" fill="url(#slimeDropShadow)"/>
+
+                                <!-- Corps principal — sans filter -->
+                                <path class="slime-body" d="
+                                    M 80 22
+                                    C 38 22, 18 52, 18 82
+                                    C 18 108, 26 124, 36 136
+                                    C 42 143, 40 152, 44 158
+                                    C 50 167, 60 168, 68 162
+                                    C 72 159, 75 156, 80 156
+                                    C 85 156, 88 159, 92 162
+                                    C 100 168, 110 167, 116 158
+                                    C 120 152, 118 143, 124 136
+                                    C 134 124, 142 108, 142 82
+                                    C 142 52, 122 22, 80 22 Z
+                                " fill="url(#slimeBodyGrad)"/>
+
+                                <!-- Reflet glossy -->
+                                <ellipse cx="62" cy="55" rx="28" ry="22" fill="url(#slimeGloss)" opacity="0.85"/>
+
+                                <!-- Gouttes sur les côtés -->
+                                <ellipse cx="27" cy="100" rx="6" ry="9" fill="#8ab800" opacity="0.7"/>
+                                <ellipse cx="133" cy="95" rx="5" ry="8" fill="#8ab800" opacity="0.6"/>
+                                <circle cx="24" cy="113" r="3.5" fill="#a5e901" opacity="0.55"/>
+
+                                <!-- Petites gouttes en bas -->
+                                <ellipse cx="58" cy="165" rx="4" ry="6" fill="#7ba800" opacity="0.65"/>
+                                <ellipse cx="104" cy="163" rx="3.5" ry="5.5" fill="#7ba800" opacity="0.6"/>
+
+                                <!-- Yeux blancs (base) -->
+                                <ellipse cx="62" cy="84" rx="14" ry="16" fill="white"/>
+                                <ellipse cx="98" cy="84" rx="14" ry="16" fill="white"/>
+
+                                <!-- Iris violet profond -->
+                                <circle cx="64" cy="86" r="9" fill="#3b0f6e"/>
+                                <circle cx="100" cy="86" r="9" fill="#3b0f6e"/>
+
+                                <!-- Pupilles -->
+                                <circle cx="65" cy="87" r="5.5" fill="#1a0040"/>
+                                <circle cx="101" cy="87" r="5.5" fill="#1a0040"/>
+
+                                <!-- Reflets dans les yeux -->
+                                <circle cx="68" cy="83" r="2.2" fill="white" opacity="0.9"/>
+                                <circle cx="104" cy="83" r="2.2" fill="white" opacity="0.9"/>
+                                <circle cx="62" cy="89" r="1" fill="white" opacity="0.5"/>
+                                <circle cx="98" cy="89" r="1" fill="white" opacity="0.5"/>
+
+                                <!-- Sourire -->
+                                <path d="M 66 106 Q 80 118 94 106" stroke="#2d5a00" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+
+                                <!-- Petites joues roses -->
+                                <ellipse cx="52" cy="103" rx="8" ry="5" fill="rgba(255,140,180,0.28)"/>
+                                <ellipse cx="108" cy="103" rx="8" ry="5" fill="rgba(255,140,180,0.28)"/>
+
+                                <!-- Antennes -->
+                                <path d="M 66 24 Q 58 8 50 4" stroke="#8ab800" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                                <circle cx="49" cy="3.5" r="4" fill="#c8f542"/>
+                                <path d="M 94 24 Q 102 8 110 4" stroke="#8ab800" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                                <circle cx="111" cy="3.5" r="4" fill="#c8f542"/>
+                            </svg>
+
+                            <!-- Particules flottantes -->
+                            <span class="slime-particle slime-particle--1"></span>
+                            <span class="slime-particle slime-particle--2"></span>
+                            <span class="slime-particle slime-particle--3"></span>
+                        </div>
                     </div>
                 </div>
             </header>
+
+            <!-- Section raccourcis navigation — juste sous le hero -->
+            <section class="home-nav-shortcuts" aria-label="Accès rapide aux sections">
+                <div class="home-nav-shortcut-label">Accès rapide</div>
+
+                <!-- ── Rang 1 : boutons principaux ── -->
+                <div class="home-nav-shortcut-cards home-nav-shortcut-cards--main">
+
+                    <!-- Tutoriel -->
+                    <button class="hnsc-card hnsc-card--tutorial" data-page="tutoriel">
+                        <div class="hnsc-glow"></div>
+                        <div class="hnsc-shimmer"></div>
+                        <div class="hnsc-icon-wrap">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="8" x2="12" y2="12"/>
+                                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                        </div>
+                        <div class="hnsc-text">
+                            <span class="hnsc-title">Tutoriel</span>
+                            <span class="hnsc-sub">Guide complet pour débuter</span>
+                        </div>
+                        <div class="hnsc-badge">GUIDE</div>
+                        <svg class="hnsc-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </button>
+
+                    <!-- Jeux gratuits -->
+                    <button class="hnsc-card hnsc-card--freegames" data-page="free-games">
+                        <div class="hnsc-glow"></div>
+                        <div class="hnsc-shimmer"></div>
+                        <div class="hnsc-icon-wrap">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                                <path d="M2 17l10 5 10-5"/>
+                                <path d="M2 12l10 5 10-5"/>
+                            </svg>
+                        </div>
+                        <div class="hnsc-text">
+                            <span class="hnsc-title">Jeux gratuits</span>
+                            <span class="hnsc-sub">Télécharge sans abonnement</span>
+                        </div>
+                        <div class="hnsc-badge hnsc-badge--free">GRATUIT</div>
+                        <svg class="hnsc-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </button>
+                </div>
+
+                <!-- ── Rang 2 : raccourcis secondaires ── -->
+                <div class="home-nav-shortcut-cards home-nav-shortcut-cards--secondary">
+
+                    <!-- Store -->
+                    <button class="hnsc-card hnsc-card--store" data-page="store">
+                        <div class="hnsc-glow"></div>
+                        <div class="hnsc-icon-wrap">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                                <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/>
+                            </svg>
+                        </div>
+                        <div class="hnsc-text">
+                            <span class="hnsc-title">Télécharger des jeux</span>
+                            <span class="hnsc-sub">Catalogue Steam complet</span>
+                        </div>
+                        <svg class="hnsc-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </button>
+
+                    <!-- Library -->
+                    <button class="hnsc-card hnsc-card--library" data-page="library">
+                        <div class="hnsc-glow"></div>
+                        <div class="hnsc-icon-wrap">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                                <line x1="8" y1="21" x2="16" y2="21"/>
+                                <line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                        </div>
+                        <div class="hnsc-text">
+                            <span class="hnsc-title">Mes jeux</span>
+                            <span class="hnsc-sub">Bibliothèque installée</span>
+                        </div>
+                        <svg class="hnsc-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </button>
+
+                    <!-- Pépites -->
+                    <button class="hnsc-card hnsc-card--pepites" data-page="gamefixes">
+                        <div class="hnsc-glow"></div>
+                        <div class="hnsc-icon-wrap">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                        </div>
+                        <div class="hnsc-text">
+                            <span class="hnsc-title">Pépites</span>
+                            <span class="hnsc-sub">Sorties rares &amp; récentes</span>
+                        </div>
+                        <svg class="hnsc-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </button>
+                </div>
+            </section>
 
             <div class="home-panels">
             <section class="home-panel home-panel--game" aria-labelledby="home-panel-game-title">
@@ -274,6 +464,7 @@
             </div>
             </section>
             </div><!-- /.home-panels -->
+
             </div><!-- /.home-actions -->
 
             <!-- Mini live log panel (top-right) -->
@@ -446,61 +637,6 @@
                 <span>Chargement…</span>
             </div>
 
-            <div id="free-plan-upsell-modal" class="modal modal-bprg-premium modal-sd-upsell hidden">
-                <div class="modal-overlay"></div>
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2>Abonnement requis</h2>
-                        <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <p>Pour <strong>générer et installer</strong> le jeu de ton choix depuis cette recherche, profiter des jeux <strong>en ligne</strong> et du reste des fonctionnalités SlimeDeals, un <strong>abonnement</strong> est nécessaire.</p>
-                        <p>Toutes les offres sont sur le site : <strong>slimedeals.fr/#tarifs</strong></p>
-                        <p>Tu peux aussi obtenir un abonnement <strong>gratuitement</strong> en suivant les consignes du salon Discord dédié.</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn modal-cancel">Fermer</button>
-                        <button type="button" class="btn btn-primary" id="free-upsell-open-tarifs">Ouvrir slimedeals.fr/#tarifs</button>
-                        <button type="button" class="btn" id="free-upsell-open-discord">Abonnement gratuit (Discord)</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="free-catalog-steam-wait-modal" class="modal modal-sd-wait hidden">
-                <div class="modal-overlay" data-no-close></div>
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2>Ajout à Steam</h2>
-                    </div>
-                    <div class="modal-body free-catalog-wait-body">
-                        <div class="free-catalog-wait-icon" aria-hidden="true">🎮</div>
-                        <p class="free-catalog-wait-lead">
-                            <strong id="free-catalog-wait-game">—</strong> va être mis dans ta bibliothèque <strong>Steam</strong>.
-                        </p>
-                        <p id="free-catalog-wait-sub" class="text-muted free-catalog-wait-sub">
-                            Merci de <strong>patienter quelques instants</strong> pendant que le téléchargement et l’enregistrement sur Steam se déroulent.
-                        </p>
-                        <div class="ttc-loading free-catalog-wait-spinner">
-                            <div class="ttc-spinner"></div>
-                            <span>Préparation…</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="free-catalog-install-result-modal" class="modal hidden">
-                <div class="modal-overlay"></div>
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2 id="free-catalog-result-title">Résultat</h2>
-                        <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
-                    </div>
-                    <div class="modal-body" id="free-catalog-result-body"></div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-primary modal-cancel">OK</button>
-                    </div>
-                </div>
-            </div>
         </section>
 
         <!-- Page: Library -->
@@ -1034,46 +1170,126 @@
             </div>
         </section>
 
-        <!-- Page: Jeux fixed (teaser Triple Monstre) -->
+        <!-- Page: Jeux fixed -->
         <section id="page-gamefixes" class="page page-gamefixes">
-            <div class="page-header">
-                <h1 data-i18n="Fixed Games Page Title">🔥 Jeux fixed</h1>
-                <p class="page-subtitle" data-i18n="Fixed Games Page Subtitle">Une section dédiée aux titres avec correctifs prêts à l’emploi et au multijoueur — ça arrive très bientôt.</p>
+            <div class="page-header gamefixes-page-header">
+                <h1 data-i18n="Fixed Games Page Title">💎 Pépites</h1>
+                <p class="page-subtitle" data-i18n="Fixed Games Page Subtitle">Sorties rares et récentes — téléchargement direct en un clic depuis le launcher.</p>
             </div>
-            <div class="gamefixes-layout gamefixes-layout--single">
-                <article class="gamefixes-panel gamefixes-panel--fix" aria-labelledby="gamefixes-fix-heading">
-                    <div class="gamefixes-panel-head">
-                        <span class="gamefixes-kicker" data-i18n="Fixed Games Panel Kicker">Bientôt</span>
-                        <h2 id="gamefixes-fix-heading" class="gamefixes-panel-title" data-i18n="Fixed Games Panel Title">Jeux avec fix et multijoueur</h2>
+            <div class="gamefixes-callout gamefixes-callout--top" data-i18n="Fixed Games Triple Badge">📌 Réservé au palier Triple Monstre</div>
+            <p id="gamefixes-status" class="gamefixes-status hidden" role="status"></p>
+            <div id="fixed-install-banner" class="fixed-install-banner hidden" role="status" aria-live="polite">
+                <div class="fixed-install-banner-inner">
+                    <div class="fixed-install-banner-head">
+                        <p class="fixed-install-banner-title"><strong id="fixed-banner-game">—</strong> <span id="fixed-banner-pct">0 %</span></p>
+                        <div class="fixed-install-banner-actions">
+                            <button type="button" class="btn btn-ghost btn-sm" id="fixed-banner-expand">Détails</button>
+                            <button type="button" class="btn btn-ghost btn-sm hidden" id="fixed-banner-dismiss">Fermer</button>
+                        </div>
                     </div>
-                    <p class="gamefixes-lead" data-i18n="Fixed Games Teaser Lead">Ici, tu pourras parcourir plein de jeux avec leur fix intégré, le multijoueur quand c’est prévu, le tout directement depuis le launcher.</p>
-                    <p class="gamefixes-examples" data-i18n="Fixed Games Teaser Examples">Parmi les titres qu’on vise pour l’ouverture : par exemple Crimson Web, Pragmata — la liste s’étoffera régulièrement.</p>
-                    <div class="gamefixes-callout" data-i18n="Fixed Games Triple Badge">📌 Réservé au palier Triple Monstre — ouverture prévue prochainement.</div>
-                    <p class="gamefixes-foot" data-i18n="Fixed Games Teaser Foot">Tu es déjà abonné ou curieux ? Reste connecté sur Discord et sur slimedeals.fr : on annoncera la dispo ici dès que c’est en ligne.</p>
-                </article>
+                    <div class="fixed-install-banner-bar-wrap"><div class="fixed-install-banner-bar" id="fixed-banner-bar" style="width:0%"></div></div>
+                    <p class="fixed-install-banner-status" id="fixed-banner-status">—</p>
+                </div>
             </div>
+            <div id="gamefixes-grid" class="gamefixes-grid" aria-live="polite">
+                <p class="gamefixes-loading">Chargement du catalogue…</p>
+            </div>
+            <p class="gamefixes-foot">Les jeux volumineux peuvent prendre du temps. Choisis ton dossier d’installation — les fichiers sont placés dans <code>steamapps/common</code> ou le dossier que tu sélectionnes. 7-Zip ou WinRAR peut être nécessaire pour certaines archives.</p>
         </section>
 
-        <!-- Page: Abonnement (site + parrainage Discord) -->
+        <!-- Page: Abonnement -->
         <section id="page-subscriptions" class="page page-subscriptions">
-            <div class="page-header">
-                <h1 data-i18n="Subscriptions Page Title">💎 Abonnement</h1>
-                <p class="page-subtitle" data-i18n="Subscriptions Page Subtitle">Tarifs sur le site officiel, gestion de ton offre et astuce parrainage.</p>
+
+            <!-- Hero abonnement -->
+            <div class="subs-hero">
+                <div class="subs-hero-bg" aria-hidden="true"></div>
+                <div class="subs-hero-content">
+                    <p class="subs-hero-kicker">SlimeDeals</p>
+                    <h1 class="subs-hero-title">Choisis ton accès</h1>
+                    <p class="subs-hero-sub">Déverrouille plus de jeux, de fonctionnalités et de pépites rares.</p>
+                </div>
+                <div class="subs-hero-badge-wrap" aria-hidden="true">
+                    <span class="subs-hero-orb subs-hero-orb--1"></span>
+                    <span class="subs-hero-orb subs-hero-orb--2"></span>
+                </div>
             </div>
-            <div class="gamefixes-layout gamefixes-layout--single">
-                <article class="gamefixes-panel gamefixes-panel--subs" aria-labelledby="subscriptions-page-heading">
-                    <div class="gamefixes-panel-head">
-                        <span class="gamefixes-kicker gamefixes-kicker--muted" data-i18n="Subscriptions Panel Kicker">Offres</span>
-                        <h2 id="subscriptions-page-heading" class="gamefixes-panel-title" data-i18n="Subscriptions Panel Heading">SlimeDeals — paliers et paiement</h2>
+
+            <!-- Cards paliers -->
+            <div class="subs-tiers">
+
+                <!-- Free -->
+                <div class="subs-tier-card subs-tier-card--free">
+                    <div class="subs-tier-top">
+                        <span class="subs-tier-icon">🌱</span>
+                        <div>
+                            <div class="subs-tier-name">Gratuit</div>
+                            <div class="subs-tier-price">0 €<span>/mois</span></div>
+                        </div>
                     </div>
-                    <p class="gamefixes-lead" data-i18n="Subscriptions Panel Lead">Découvre les paliers sur le site officiel, compare les offres et gère ton abonnement en quelques clics.</p>
-                    <div class="gamefixes-subs-actions">
-                        <button type="button" class="btn btn-primary" id="subscriptions-open-tarifs" data-i18n="Subscriptions CTA Site">Voir les abonnements sur slimedeals.fr</button>
-                        <button type="button" class="btn" id="subscriptions-open-discord" data-i18n="Subscriptions CTA Discord">Rejoindre le Discord</button>
+                    <ul class="subs-tier-features">
+                        <li class="feat feat--ok">1 jeu au choix offert parmi 4</li>
+                        <li class="feat feat--ok">DLC inclus</li>
+                        <li class="feat feat--no">Rockstar Games · pas d'accès au bypass GTA V &amp; RDR 2</li>
+                        <li class="feat feat--no">Pas de sauvegardes cloud</li>
+                        <li class="feat feat--no">Pas d'accès multijoueur avancé dans le logiciel</li>
+                        <li class="feat feat--no">Autres outils premium</li>
+                        <li class="feat feat--no">Pas d'accès aux jeux lourdement protégés Denuvo (ex. titres AAA récents)</li>
+                    </ul>
+                    <button class="subs-tier-cta subs-tier-cta--secondary" id="subscriptions-open-discord">Rejoindre Discord</button>
+                </div>
+
+                <!-- 24H Pass -->
+                <div class="subs-tier-card subs-tier-card--standard">
+                    <div class="subs-tier-top">
+                        <span class="subs-tier-icon">⚡</span>
+                        <div>
+                            <div class="subs-tier-name">24H Pass</div>
+                            <div class="subs-tier-price">Voir le site<span>/mois</span></div>
+                        </div>
                     </div>
-                    <p class="gamefixes-subs-hint" data-i18n="Subscriptions Referral Hint">Tu peux obtenir un abonnement gratuitement en invitant 5 personnes sur le serveur Discord SlimeDeals — conditions et détails sur le site ou dans le salon #avis.</p>
-                </article>
+                    <ul class="subs-tier-features">
+                        <li class="feat feat--ok">Accès à 8 jeux Steam au choix</li>
+                        <li class="feat feat--ok">DLC inclus · pas de plafond « illimité » (Pass time-boxed)</li>
+                        <li class="feat feat--no">Pas de sauvegardes cloud</li>
+                        <li class="feat feat--no">Pas d'accès multijoueur avancé</li>
+                        <li class="feat feat--no">Pas de bypass Rockstar (GTA V, RDR 2)</li>
+                        <li class="feat feat--no">Pas d'accès Catalogue Denuvo « avancé » (Pragmata, Black Myth: Wukong, Crimson Desert…)</li>
+                    </ul>
+                    <button class="subs-tier-cta subs-tier-cta--secondary" id="subscriptions-open-tarifs-std">Voir les tarifs</button>
+                </div>
+
+                <!-- Triple Monstre -->
+                <div class="subs-tier-card subs-tier-card--triple">
+                    <div class="subs-tier-badge">Recommandé</div>
+                    <div class="subs-tier-top">
+                        <span class="subs-tier-icon">👑</span>
+                        <div>
+                            <div class="subs-tier-name">Triple Monstre</div>
+                            <div class="subs-tier-price">Voir le site<span>/mois</span></div>
+                        </div>
+                    </div>
+                    <ul class="subs-tier-features">
+                        <li class="feat feat--ok">Accès illimité aux jeux Steam de ton choix</li>
+                        <li class="feat feat--ok">☁ Sauvegardes cloud (Google Drive / sync)</li>
+                        <li class="feat feat--ok">👥 Accès multijoueur avancé (jeux compatibles)</li>
+                        <li class="feat feat--ok">🎮 Bypass Rockstar · GTA V &amp; RDR 2</li>
+                        <li class="feat feat--ok">🛡 Prise en charge élargie des jeux Denuvo (ex. Pragmata, Black Myth: Wukong, Crimson Desert…)</li>
+                        <li class="feat feat--ok">🎧 Support prioritaire · avantages communauté</li>
+                    </ul>
+                    <button class="subs-tier-cta subs-tier-cta--primary" id="subscriptions-open-tarifs">Obtenir Triple Monstre</button>
+                </div>
             </div>
+
+            <!-- Section parrainage -->
+            <div class="subs-referral">
+                <div class="subs-referral-icon" aria-hidden="true">🎁</div>
+                <div class="subs-referral-text">
+                    <strong>Obtiens un abonnement gratuitement</strong>
+                    <span>Invite 5 personnes sur le Discord SlimeDeals — conditions dans le salon <code>#avis</code>.</span>
+                </div>
+                <button class="subs-tier-cta subs-tier-cta--ghost" id="subscriptions-open-discord-ref">Discord</button>
+            </div>
+
         </section>
 
         <!-- Page: Settings -->
@@ -1085,7 +1301,13 @@
 
             <div class="settings-section">
                 <h2 class="section-title">Thème</h2>
-                <div id="theme-picker" class="theme-grid"></div>
+                <div class="theme-fixed-notice">
+                    <span class="theme-fixed-dot"></span>
+                    <div>
+                        <strong>Mode sombre</strong>
+                        <span>Thème unique — modifie <code>css/design-pro.css</code> pour personnaliser les couleurs.</span>
+                    </div>
+                </div>
             </div>
 
             <div class="settings-section">
@@ -1365,6 +1587,63 @@
         </section>
     </main>
 
+    <!-- Store page modals - outside .page to keep position:fixed -->
+    <div id="free-plan-upsell-modal" class="modal modal-bprg-premium modal-sd-upsell hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+    <div class="modal-header">
+    <h2>Abonnement requis</h2>
+    <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
+    </div>
+    <div class="modal-body">
+    <p>Pour <strong>générer et installer</strong> le jeu de ton choix depuis cette recherche, profiter des jeux <strong>en ligne</strong> et du reste des fonctionnalités SlimeDeals, un <strong>abonnement</strong> est nécessaire.</p>
+    <p>Toutes les offres sont sur le site : <strong>slimedeals.fr/#tarifs</strong></p>
+    <p>Tu peux aussi obtenir un abonnement <strong>gratuitement</strong> en suivant les consignes du salon Discord dédié.</p>
+    </div>
+    <div class="modal-footer">
+    <button type="button" class="btn modal-cancel">Fermer</button>
+    <button type="button" class="btn btn-primary" id="free-upsell-open-tarifs">Ouvrir slimedeals.fr/#tarifs</button>
+    <button type="button" class="btn" id="free-upsell-open-discord">Abonnement gratuit (Discord)</button>
+    </div>
+    </div>
+    </div>
+
+    <div id="free-catalog-steam-wait-modal" class="modal modal-sd-wait hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+    <div class="modal-header">
+    <h2>Ajout à Steam</h2>
+    </div>
+    <div class="modal-body free-catalog-wait-body">
+    <div class="free-catalog-wait-icon" aria-hidden="true">🎮</div>
+    <p class="free-catalog-wait-lead">
+    <strong id="free-catalog-wait-game">—</strong> va être mis dans ta bibliothèque <strong>Steam</strong>.
+    </p>
+    <p id="free-catalog-wait-sub" class="text-muted free-catalog-wait-sub">
+    Merci de <strong>patienter quelques instants</strong> pendant que le téléchargement et l’enregistrement sur Steam se déroulent.
+    </p>
+    <div class="ttc-loading free-catalog-wait-spinner">
+    <div class="ttc-spinner"></div>
+    <span>Préparation…</span>
+    </div>
+    </div>
+    </div>
+    </div>
+
+    <div id="free-catalog-install-result-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+    <div class="modal-header">
+    <h2 id="free-catalog-result-title">Résultat</h2>
+    <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
+    </div>
+    <div class="modal-body" id="free-catalog-result-body"></div>
+    <div class="modal-footer">
+    <button type="button" class="btn btn-primary modal-cancel">OK</button>
+    </div>
+    </div>
+    </div>
+
     <!-- Download Modal -->
     <div id="download-modal" class="modal hidden">
         <div class="modal-overlay"></div>
@@ -1608,7 +1887,7 @@
                     </button>
                     <button type="button" id="library-delete-full" class="btn btn-danger modal-choice-btn">
                         <strong>Supprimer complètement</strong>
-                        <span class="modal-choice-desc">Retire de l'AppList et supprime définitivement tous les fichiers du jeu. Irréversible.</span>
+                        <span class="modal-choice-desc">Ferme Steam, retire de l'AppList, supprime les fichiers du jeu, puis relance Steam. Irréversible.</span>
                     </button>
                 </div>
             </div>
@@ -1781,6 +2060,32 @@
     </div>
 
     <!-- Plan FREE : ONLINE FIX (bibliothèque) — abonnement + Discord #avis -->
+    <!-- Pépites — upsell plan non Triple Monstre -->
+    <div id="gamefixes-upsell-modal" class="modal modal-bprg-premium hidden" aria-labelledby="gamefixes-upsell-title">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header bprg-upsell-header">
+                <div class="bprg-upsell-heading">
+                    <span class="bprg-upsell-badge" aria-hidden="true">💎</span>
+                    <div>
+                        <p class="bprg-upsell-kicker">Pépites</p>
+                        <h2 id="gamefixes-upsell-title">Triple Monstre requis</h2>
+                    </div>
+                </div>
+                <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
+            </div>
+            <div class="modal-body bprg-upsell-body">
+                <p class="bprg-upsell-lead">Les <strong>Pépites</strong> — jeux rares et récentes sorties — sont réservées au plan <strong>Triple Monstre</strong>.</p>
+                <p class="bprg-upsell-sub">Passe à Triple Monstre pour accéder à ces titres en téléchargement direct depuis le launcher. Tu peux aussi obtenir un accès <strong>gratuitement</strong> via la communauté Discord.</p>
+            </div>
+            <div class="modal-footer bprg-upsell-footer">
+                <button type="button" class="btn modal-cancel">Fermer</button>
+                <button type="button" class="btn btn-primary" id="gamefixes-upsell-tarifs">Voir les offres</button>
+                <button type="button" class="btn bprg-upsell-btn-discord" id="gamefixes-upsell-discord">Abonnement gratuit (Discord)</button>
+            </div>
+        </div>
+    </div>
+
     <div id="library-onlinefix-free-modal" class="modal modal-bprg-premium hidden" aria-labelledby="library-onlinefix-free-title">
         <div class="modal-overlay"></div>
         <div class="modal-content">
@@ -1823,6 +2128,72 @@
         </div>
     </div>
 
+    <!-- Jeux fixed — confirmation installation -->
+    <div id="fixed-game-install-modal" class="modal modal-sd-update hidden" aria-labelledby="fixed-game-install-title">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-sd-md">
+            <div class="modal-header">
+                <h2 id="fixed-game-install-title">Installer le jeu</h2>
+                <button type="button" class="modal-close" data-tooltip="Fermer">&times;</button>
+            </div>
+            <div class="modal-body fixed-install-body">
+                <p class="fixed-install-lead">Tu es sur le point de télécharger et d'installer :</p>
+                <p class="fixed-install-game-name" id="fixed-install-game-name">—</p>
+                <p class="fixed-install-size">Taille estimée : <strong id="fixed-install-size">—</strong></p>
+                <div id="fixed-install-resume-box" class="fixed-install-resume-box hidden">
+                    <span class="fixed-install-resume-icon">⚡</span>
+                    <div class="fixed-install-resume-text">
+                        <strong>Reprise disponible</strong> — <span id="fixed-install-resume-human">—</span> déjà téléchargés (<span id="fixed-install-resume-pct">0</span>%)
+                        <br><span class="fixed-install-resume-hint">Le téléchargement reprendra automatiquement là où il s'est arrêté.</span>
+                    </div>
+                    <div class="fixed-install-resume-bar-wrap"><div class="fixed-install-resume-bar" id="fixed-install-resume-bar" style="width:0%"></div></div>
+                </div>
+                <div class="input-group fixed-install-path-group">
+                    <label for="fixed-install-path-select">Dossier d'installation sur ton PC</label>
+                    <select id="fixed-install-path-select" class="fixed-install-select"></select>
+                    <button type="button" class="btn btn-sm" id="fixed-install-browse">Parcourir un autre dossier…</button>
+                    <p class="fixed-install-path-hint" id="fixed-install-path-display">—</p>
+                </div>
+                <div class="fixed-install-disk" id="fixed-install-disk-box">
+                    <p><strong>Espace disque</strong></p>
+                    <ul class="fixed-install-disk-list">
+                        <li>Installation : <span id="fixed-install-free-install">—</span> libre · besoin ~<span id="fixed-install-need">—</span></li>
+                        <li>Téléchargement (temp) : <span id="fixed-install-free-temp">—</span> libre</li>
+                    </ul>
+                    <p class="fixed-install-disk-warn hidden" id="fixed-install-disk-warn"></p>
+                </div>
+            </div>
+            <div class="modal-footer fixed-install-footer">
+                <button type="button" class="btn modal-cancel">Annuler</button>
+                <button type="button" class="btn btn-primary" id="fixed-install-confirm" disabled>Lancer le téléchargement</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Jeux fixed — progression installation -->
+    <div id="fixed-game-progress-modal" class="modal modal-sd-wait hidden" aria-labelledby="fixed-game-progress-title">
+        <div class="modal-overlay" data-no-close></div>
+        <div class="modal-content modal-sd-md">
+            <div class="modal-header" id="fixed-game-progress-header">
+                <h2 id="fixed-game-progress-title">Installation en cours</h2>
+                <button class="fixed-progress-modal-x" type="button" id="fixed-progress-modal-x" data-tooltip="Réduire" aria-label="Réduire">&times;</button>
+            </div>
+            <div class="modal-body fixed-progress-body">
+                <p class="fixed-progress-game" id="fixed-progress-game-name">—</p>
+                <div class="fixed-progress-bar-wrap">
+                    <div class="fixed-progress-bar" id="fixed-progress-bar" style="width:0%"></div>
+                </div>
+                <p class="fixed-progress-pct" id="fixed-progress-pct">0 %</p>
+                <p class="fixed-progress-status" id="fixed-progress-status">Démarrage…</p>
+                <p class="fixed-progress-error hidden" id="fixed-progress-error" role="alert"></p>
+            </div>
+            <div class="modal-footer fixed-progress-footer">
+                <button type="button" class="btn btn-ghost" id="fixed-progress-minimize">Réduire</button>
+                <button type="button" class="btn btn-primary hidden" id="fixed-progress-close">Fermer</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Mise à jour du launcher -->
     <div id="launcher-update-modal" class="modal modal-sd-update hidden" aria-labelledby="launcher-update-title">
         <div class="modal-overlay"></div>
@@ -1853,6 +2224,9 @@
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
+    <!-- Canvas bulles de fond -->
+    <canvas id="bg-canvas" class="bg-canvas" aria-hidden="true"></canvas>
+
     <!-- Log panel removed — Logs button opens native GlobalLogWindow via bridge -->
 
     <!-- Scripts -->
@@ -1863,11 +2237,13 @@
     <script src="js/i18n.js"></script>
     <script src="js/app.js"></script>
     <script src="js/store.js"></script>
+    <script src="js/gamefixes.js"></script>
     <script src="js/library.js"></script>
     <script src="js/downloads.js"></script>
     <script src="js/fixgame.js"></script>
     <script src="js/tools.js"></script>
     <script src="js/cloudsaves.js"></script>
     <script src="js/settings.js"></script>
+    <script src="js/particles.js"></script>
 </body>
 </html>

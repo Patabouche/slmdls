@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SlimeDeals — Library Page
  * Shows installed/downloaded games from AppList + Steam libraries.
  */
@@ -115,7 +115,11 @@ window.Library = (function() {
                 }
                 if (data.task === 'delete_game') {
                     if (data.success) {
+                        var msg = data.message || 'Jeu supprimé.';
+                        Components.showToast('success', msg);
                         _refreshLibrary();
+                    } else {
+                        Components.showToast('error', data.message || 'Erreur lors de la suppression.');
                     }
                 }
                 if (data.task === 'update_check') {
@@ -137,6 +141,21 @@ window.Library = (function() {
                     if (action === 'fix') {
                         FixGame.preSelect(appId);
                         App.navigateTo('fixgame');
+                    } else if (action === 'delete_sideloaded') {
+                        // Suppression d'un jeu Pépites (pas d'ACF Steam)
+                        var delPath = (btn.dataset.gamepath || '').trim();
+                        var delName = (btn.dataset.gamename || 'ce jeu');
+                        if (!delPath) { Components.showToast('error', 'Chemin introuvable.'); return; }
+                        if (!confirm('Supprimer ' + delName + ' ?\n' + delPath)) return;
+                        Bridge.callWithCallback('delete_sideloaded_game', delPath, function(raw) {
+                            var o = {}; try { o = JSON.parse(raw || '{}'); } catch(e) {}
+                            if (o.ok) {
+                                Components.showToast('success', delName + ' supprimé.');
+                                Library.refresh();
+                            } else {
+                                Components.showToast('error', o.message || 'Suppression impossible.');
+                            }
+                        });
                     } else if (action === 'delete') {
                         _pendingDelete = {
                             appId: appId,
@@ -344,21 +363,54 @@ window.Library = (function() {
         games.forEach(function(game, index) {
             game.installed = true;
             var card = Components.createGameCard(game, { index: index, forceShowImage: true });
+            var isSideloaded = game.source === 'fixed';
+
+            // Badge Pépites pour les jeux installés depuis Pépites
+            if (isSideloaded) {
+                var badge = document.createElement('div');
+                badge.className = 'lib-pepites-badge';
+                badge.title = 'Installé depuis Pépites';
+                badge.textContent = '✦ Pépites';
+                card.style.position = 'relative';
+                card.appendChild(badge);
+            }
 
             // Add library-specific actions
             var safeName = (game.name || '').replace(/"/g, '&quot;');
             var safePath = (game.path || '').replace(/"/g, '&quot;');
             var actions = card.querySelector('.game-card-actions');
             if (actions) {
-                actions.innerHTML =
-                    '<button type="button" class="btn btn-sm" data-action="launch_admin" data-gamepath="' + safePath + '" data-tooltip="Lance l’exécutable principal depuis le dossier d’installation (Windows : avec élévation administrateur via UAC si tu acceptes la fenêtre)">Lancer</button>' +
-                    '<button class="btn btn-sm" data-action="fix" data-appid="' + game.app_id + '" data-tooltip="Fix this game">Fix</button>' +
-                    '<button class="btn btn-sm" data-action="multiplayer" data-appid="' + game.app_id + '" data-tooltip="Applique les patches multijoueur en ligne — compte préconfiguré dans le launcher, aucune saisie">ONLINE FIX</button>' +
-                    '<button class="btn btn-sm" data-action="dlc_check" data-appid="' + game.app_id + '" data-tooltip="Check DLCs">DLC</button>' +
-                    '<button class="btn btn-sm" data-action="workshop" data-appid="' + game.app_id + '" data-tooltip="Open Workshop">Workshop</button>' +
-                    '<button class="btn btn-sm" data-action="lure_fix" data-appid="' + game.app_id + '" data-tooltip="Patch ACF to match Steam CM latest — no download, stops update prompt">Lure Fix</button>' +
-                    '<button class="btn btn-sm" data-action="check_update" data-appid="' + game.app_id + '" data-tooltip="Download latest manifests and patch ACF">Update</button>' +
-                    '<button class="btn btn-sm btn-danger" data-action="delete" data-appid="' + game.app_id + '" data-gamepath="' + safePath + '" data-gamename="' + safeName + '" data-tooltip="Remove this game">\u2715</button>';
+                actions.classList.add('lib-card-actions');
+                if (isSideloaded) {
+                    // Jeux Pépites : juste Lancer + Supprimer (pas d'ACF Steam)
+                    actions.innerHTML =
+                        '<div class="lib-actions-primary">' +
+                            '<button type="button" class="lib-btn lib-btn--launch lib-btn--launch-pepites" data-action="launch_admin" data-gamepath="' + safePath + '" data-tooltip="Lance le jeu (détecte l\'exe automatiquement)">' +
+                                '<svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M8 5v14l11-7z"/></svg> Lancer' +
+                            '</button>' +
+                        '</div>' +
+                        '<div class="lib-actions-tools">' +
+                            '<button class="lib-btn lib-btn--delete" data-action="delete_sideloaded" data-gamepath="' + safePath + '" data-gamename="' + safeName + '" data-tooltip="Supprimer ce jeu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>' +
+                        '</div>';
+                } else {
+                    actions.innerHTML =
+                        '<div class="lib-actions-primary">' +
+                            '<button type="button" class="lib-btn lib-btn--launch" data-action="launch_admin" data-gamepath="' + safePath + '" data-tooltip="Lance le jeu en mode administrateur">' +
+                                '<svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M8 5v14l11-7z"/></svg> Lancer' +
+                            '</button>' +
+                            '<button class="lib-btn lib-btn--fix" data-action="fix" data-appid="' + game.app_id + '" data-tooltip="Applique les correctifs Steam">' +
+                                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg> Fix' +
+                            '</button>' +
+                        '</div>' +
+                        '<div class="lib-actions-tools">' +
+                            '<button class="lib-btn lib-btn--online" data-action="multiplayer" data-appid="' + game.app_id + '" data-tooltip="Patches multijoueur en ligne">Online Fix</button>' +
+                            '<button class="lib-btn lib-btn--dlc" data-action="dlc_check" data-appid="' + game.app_id + '" data-tooltip="Vérifier et déverrouiller les DLCs">DLC</button>' +
+                            '<button class="lib-btn lib-btn--workshop" data-action="workshop" data-appid="' + game.app_id + '" data-tooltip="Télécharger des mods Workshop">Workshop</button>' +
+                            '<button class="lib-btn lib-btn--lure" data-action="lure_fix" data-appid="' + game.app_id + '" data-tooltip="Patch ACF — stoppe les invites de mise à jour">Lure Fix</button>' +
+                            '<button class="lib-btn lib-btn--update" data-action="check_update" data-appid="' + game.app_id + '" data-tooltip="Télécharger les derniers manifests">Update</button>' +
+                            '<button class="lib-btn lib-btn--delete" data-action="delete" data-appid="' + game.app_id + '" data-gamepath="' + safePath + '" data-gamename="' + safeName + '" data-tooltip="Supprimer ce jeu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>' +
+                        '</div>';
+                }
             }
 
             if (grid) grid.appendChild(card);

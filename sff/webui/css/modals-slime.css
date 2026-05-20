@@ -27,9 +27,8 @@ body.sd-modal-open {
 }
 
 .modal-overlay {
-    background: rgba(6, 5, 12, 0.78);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(6, 5, 12, 0.82);
+    /* Pas de backdrop-filter : évite le flou sur tout le contenu derrière */
 }
 
 .modal-content {

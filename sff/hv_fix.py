@@ -72,82 +72,35 @@ def _extract_file_id_from_url(href: str) -> tuple[str, str]:
 
 
 def _download_buzzheavier(file_id: str, temp_dir: Path) -> "Path | None":
-    """Download a file from buzzheavier.com.
-    Two-step flow:
-      1. GET /{file_id}/download with HTMX headers → 204 + Hx-Redirect header (signed CDN URL)
-      2. Stream the file from the CDN URL; derive filename from Content-Disposition.
-    Returns the Path of the downloaded file, or None on failure."""
-    page_url = f"https://buzzheavier.com/{file_id}"
-    trigger_url = f"https://buzzheavier.com/{file_id}/download"
+    """Download a file from buzzheavier.com (délègue à sff.buzzheavier_download)."""
+    from sff.buzzheavier_download import download_buzzheavier
+
     print(Fore.CYAN + f"Downloading from buzzheavier.com ({file_id})..." + Style.RESET_ALL)
+    page_url = f"https://buzzheavier.com/{file_id}"
 
-    htmx_headers = {
-        "User-Agent": _UA,
-        "Accept": "*/*",
-        "HX-Request": "true",
-        "HX-Current-URL": page_url,
-        "Referer": page_url,
-        "Accept-Language": "en-US,en;q=0.9",
-    }
+    def _prog(done: int, total: int, msg: str) -> None:
+        if total and done:
+            pct = int(done / total * 100)
+            print(
+                f"\r  {pct}% ({done // 1048576}MB / {total // 1048576}MB)",
+                end="",
+                flush=True,
+            )
+        elif msg:
+            print(Fore.CYAN + msg + Style.RESET_ALL)
 
-    # Step 1: trigger download to get signed CDN URL
-    try:
-        trigger_resp = httpx.get(trigger_url, headers=htmx_headers, follow_redirects=False, timeout=15)
-    except Exception as e:
-        print(Fore.RED + f"Download error (trigger): {e}" + Style.RESET_ALL)
-        webbrowser.open(page_url)
-        return None
-
-    cdn_url = trigger_resp.headers.get("hx-redirect") or trigger_resp.headers.get("Hx-Redirect")
-    if not cdn_url:
+    result = download_buzzheavier(file_id, temp_dir, on_progress=_prog)
+    if result is None:
         print(
             Fore.YELLOW
             + "buzzheavier did not return a download URL.\n"
-            + "Opening the download page in your browser — download it manually, "
-            "then place the file in the game folder."
+            + "Opening the download page in your browser — download it manually."
             + Style.RESET_ALL
         )
         webbrowser.open(page_url)
         return None
-
-    # Step 2: stream file from CDN URL
-    try:
-        with httpx.stream(
-            "GET",
-            cdn_url,
-            headers={"User-Agent": _UA, "Accept": "*/*"},
-            follow_redirects=True,
-            timeout=None,
-        ) as resp:
-            resp.raise_for_status()
-
-            # Derive filename from Content-Disposition; fall back to {file_id}.7z
-            fname = f"{file_id}.7z"
-            cd = resp.headers.get("content-disposition", "")
-            if cd:
-                m = re.search(r'filename\*?=(?:UTF-8\'\'\'?)?"?([^";]+)"?', cd, re.IGNORECASE)
-                if m:
-                    fname = m.group(1).strip()
-
-            dest_path = temp_dir / fname
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            total = int(resp.headers.get("content-length", 0))
-            downloaded = 0
-            with dest_path.open("wb") as f:
-                for chunk in resp.iter_bytes(chunk_size=524288):
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if total:
-                        pct = int(downloaded / total * 100)
-                        print(f"\r  {pct}% ({downloaded // 1048576}MB / {total // 1048576}MB)", end="", flush=True)
-            print()
-        return dest_path
-    except httpx.HTTPStatusError as e:
-        print(Fore.RED + f"Download failed: HTTP {e.response.status_code}" + Style.RESET_ALL)
-        return None
-    except Exception as e:
-        print(Fore.RED + f"Download error: {e}" + Style.RESET_ALL)
-        return None
+    print()
+    return result
 
 
 def _download_vikingfile(href: str, dest_path: Path) -> bool:

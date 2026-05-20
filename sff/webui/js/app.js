@@ -143,8 +143,12 @@ window.App = (function() {
     }
 
     function _bindSubscriptionsPage() {
-        var btnT = document.getElementById('subscriptions-open-tarifs');
-        var btnD = document.getElementById('subscriptions-open-discord');
+        var btnT    = document.getElementById('subscriptions-open-tarifs');
+        var btnTStd = document.getElementById('subscriptions-open-tarifs-std');
+        var btnD    = document.getElementById('subscriptions-open-discord');
+        var btnDRef = document.getElementById('subscriptions-open-discord-ref');
+        if (btnTStd) btnTStd.addEventListener('click', function() { Bridge.call('open_url', 'https://slimedeals.fr/#tarifs'); });
+        if (btnDRef) btnDRef.addEventListener('click', function() { Bridge.call('open_url', 'https://discord.gg/c2pRJKjvgE'); });
         if (btnT) {
             btnT.addEventListener('click', function() {
                 Bridge.call('open_url', 'https://slimedeals.fr/#tarifs');
@@ -200,9 +204,9 @@ window.App = (function() {
                 }
             });
 
-            // Load theme from backend (overrides localStorage default for fresh installs)
+            // Thème fixé à dark — chargement backend ignoré
             py.get_setting('theme', function(themeId) {
-                if (themeId) {
+                if (false && themeId) {
                     document.documentElement.setAttribute('data-theme', themeId);
                     localStorage.setItem('theme', themeId);
                     var _photoMap = {
@@ -355,17 +359,26 @@ window.App = (function() {
             }
         }
 
-        // Apply saved theme
-        var savedTheme = localStorage.getItem('theme');
-        if (savedTheme) {
-            document.documentElement.setAttribute('data-theme', savedTheme);
-        }
+        // Thème fixé à dark — toujours forcer
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.removeItem('theme');
     }
 
     function _initSidebar() {
-        document.querySelectorAll('.nav-item[data-page]').forEach(function(btn) {
+        document.querySelectorAll('.nav-item[data-page], .hnsc-card[data-page]').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                navigateTo(this.dataset.page);
+                var page = this.dataset.page;
+                if (page === 'tutoriel') {
+                    Bridge.onReady(function(py) {
+                        py.open_url('https://slimedeals.fr/tutoriel');
+                    });
+                    return;
+                }
+                if (page === 'free-games') {
+                    navigateTo('store');
+                    return;
+                }
+                navigateTo(page);
             });
         });
     }
@@ -394,6 +407,10 @@ window.App = (function() {
     }
 
     function _navigateToImpl(pageId) {
+        if (_currentPage === 'gamefixes' && pageId !== 'gamefixes' &&
+            window.GameFixes && typeof GameFixes.onPageLeave === 'function') {
+            GameFixes.onPageLeave();
+        }
         // Hide all pages
         document.querySelectorAll('.page').forEach(function(page) {
             page.classList.remove('active');
@@ -422,6 +439,22 @@ window.App = (function() {
             case 'tools': Tools.onPageEnter(); break;
             case 'cloudsaves': CloudSaves.onPageEnter(); break;
             case 'settings': Settings.onPageEnter(); break;
+            case 'gamefixes': if (window.GameFixes) GameFixes.onPageEnter(); break;
+        }
+
+        // Stagger animation on visible cards after page transition
+        if (target) {
+            var cards = target.querySelectorAll('.game-card, .action-card, .fixedgame-card, .free-catalog-card');
+            cards.forEach(function(card, i) {
+                card.style.animationDelay = (i * 0.04) + 's';
+                card.classList.remove('stagger-in');
+                void card.offsetWidth;
+                card.classList.add('stagger-in');
+                setTimeout(function() {
+                    card.classList.remove('stagger-in');
+                    card.style.animationDelay = '';
+                }, 600 + i * 40);
+            });
         }
     }
 

@@ -85,6 +85,10 @@ webui_dir = os.path.join(spec_root, 'sff', 'webui')
 if os.path.exists(webui_dir):
     datas.append((webui_dir, 'sff/webui'))
 
+fixed_games_data = os.path.join(spec_root, 'sff', 'data')
+if os.path.exists(fixed_games_data):
+    datas.append((fixed_games_data, 'sff/data'))
+
 # Include c/ folder (MIDI player library, soundfont, and MIDI files)
 c_dir = os.path.join(spec_root, 'c')
 if os.path.exists(c_dir):
@@ -120,6 +124,17 @@ else:
     print(
         "Note: SlimeDealsBPRG/SlimeDealsBPRG.exe absent — compilez l'outil (voir SlimeDealsBPRG/README.txt) "
         "ou lancez build_simple_gui.bat qui tente un build automatique depuis le dépôt test."
+    )
+
+# GreenLuma — archive d'installation auto (méthode B → dossier Steam)
+_gl_rar = os.path.join(spec_root, 'greenlumafix.rar')
+if os.path.isfile(_gl_rar):
+    datas.append((_gl_rar, '.'))
+    print(f"Including greenlumafix.rar (datas): {_gl_rar}")
+else:
+    print(
+        "Note: greenlumafix.rar absent — placez l'archive à la racine de launcher/SFF "
+        "avant le build pour l'installation GreenLuma automatique au démarrage."
     )
 
 win10toast_data = get_win10toast_data()

@@ -14,10 +14,12 @@ window.Tooltips = (function() {
         _tooltip = document.createElement('div');
         _tooltip.className = 'tooltip-popup';
         _tooltip.style.cssText =
-            'position:fixed;background:var(--sidebar-bg);border:1px solid var(--border);' +
-            'color:var(--fg);font-size:12px;padding:6px 10px;border-radius:6px;' +
-            'max-width:280px;pointer-events:none;opacity:0;transition:opacity 0.15s;' +
-            'z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);line-height:1.4;';
+            'position:fixed;background:rgba(10,8,22,0.92);backdrop-filter:blur(12px);' +
+            'border:1px solid rgba(165,233,1,0.18);' +
+            'color:#e2e8f0;font-size:11.5px;font-weight:500;padding:6px 11px;border-radius:8px;' +
+            'max-width:280px;pointer-events:none;opacity:0;' +
+            'transition:opacity 0.18s ease,transform 0.18s ease;transform:translateY(4px);' +
+            'z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.45);line-height:1.45;';
         document.body.appendChild(_tooltip);
 
         document.addEventListener('mouseover', _onMouseOver);
@@ -35,6 +37,7 @@ window.Tooltips = (function() {
         _showTimeout = setTimeout(function() {
             _tooltip.textContent = text;
             _tooltip.style.opacity = '1';
+            _tooltip.style.transform = 'translateY(0px)';
             _positionTooltip(el);
         }, SHOW_DELAY);
     }
@@ -44,6 +47,7 @@ window.Tooltips = (function() {
         if (!el) return;
         clearTimeout(_showTimeout);
         _tooltip.style.opacity = '0';
+        _tooltip.style.transform = 'translateY(4px)';
     }
 
     function _positionTooltip(el) {

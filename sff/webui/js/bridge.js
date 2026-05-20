@@ -180,6 +180,39 @@ window.Bridge = (function() {
             set_setting: function() {},
             get_setting: function(key, cb) { if (cb) cb(''); },
             get_steam_libraries: function(cb) { if (cb) cb('[]'); },
+            get_fixed_games_catalog: function(cb) {
+                if (cb) {
+                    cb(JSON.stringify([
+                        {
+                            id: 'pragmata',
+                            name: 'Pragmata',
+                            app_id: '3124140',
+                            size_label: '34,9 Go',
+                            tags: ['Jeu complet', 'Correctifs intégrés']
+                        },
+                        {
+                            id: 'subnautica2',
+                            name: 'Subnautica 2',
+                            app_id: '1962700',
+                            size_label: '13,1 Go',
+                            tags: ['Jeu complet', 'Correctifs intégrés']
+                        }
+                    ]));
+                }
+            },
+            check_fixed_game_install: function(gameId, path, cb) {
+                if (cb) {
+                    cb(JSON.stringify({
+                        ok: true,
+                        install_path: path + '\\steamapps\\common',
+                        free_install_human: '100 Go',
+                        free_temp_human: '50 Go',
+                        required_human: '38 Go',
+                        message: 'Simulation'
+                    }));
+                }
+            },
+            install_fixed_game: function() {},
             set_active_library: function() {},
             open_file_dialog: function(cb) { if (cb) cb(''); },
             open_log_window: function() {},

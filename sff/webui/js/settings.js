@@ -67,6 +67,8 @@ window.Settings = (function() {
     }
 
     function _renderThemePicker() {
+        /* Thème fixé à dark — picker désactivé */
+        return;
         var picker = document.getElementById('theme-picker');
         if (!picker) return;
 
@@ -476,8 +478,8 @@ window.Settings = (function() {
                 var embNotice = document.getElementById('settings-onlinefix-embedded-notice');
                 if (credWrap) credWrap.style.display = emb ? 'none' : '';
                 if (embNotice) embNotice.style.display = emb ? '' : 'none';
-                // Theme
-                if (settings.theme) _applyTheme(settings.theme);
+                // Thème fixé à dark — ne pas appliquer le thème sauvegardé
+                /* if (settings.theme) _applyTheme(settings.theme); */
             } catch(e) {
                 // Fallback: load just steam_path and theme
                 Bridge.callWithCallback('get_setting', 'steam_path', function(val) {

@@ -22,7 +22,7 @@ import sys
 from html import escape as html_escape
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QPoint, QPointF, QRectF, QSize, QThread, QTimer, QUrl, pyqtSignal, Qt
+from PyQt6.QtCore import QObject, QPoint, QPointF, QPropertyAnimation, QEasingCurve, QRectF, QSize, QThread, QTimer, QUrl, pyqtSignal, Qt
 from PyQt6.QtGui import (
     QBrush,
     QDesktopServices,
@@ -172,88 +172,125 @@ def _launcher_top_icon_logout(px: int = 14) -> QIcon:
 
 _TOP_CHROME_STYLE = """
 #topChromeStrip {
-  background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
-    stop:0 rgba(28, 22, 40, 0.99), stop:1 rgba(12, 10, 18, 0.98));
-  border: none;
-  border-bottom: 1px solid rgba(165, 233, 1, 0.14);
+  background: rgba(12, 8, 20, 1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
+
+/* ── Boutons liens ── */
 #topLinkSite, #topLinkDiscord, #topLinkLogout {
-  font-family: "Segoe UI", system-ui, sans-serif;
-}
-#topLinkSite {
-  color: #ecfdf5;
-  font-weight: 700;
+  font-family: "Manrope", "Segoe UI", system-ui, sans-serif;
   font-size: 11px;
-  background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-    stop:0 rgba(97, 31, 176, 0.55), stop:1 rgba(45, 120, 90, 0.45));
-  border: 1px solid rgba(165, 233, 1, 0.35);
-  border-radius: 8px;
-  padding: 4px 12px 4px 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: 99px;
+  padding: 0px 12px 0px 9px;
+}
+
+#topLinkSite {
+  color: #bef264;
+  background: rgba(165, 233, 1, 0.10);
+  border: 1px solid rgba(165, 233, 1, 0.28);
 }
 #topLinkSite:hover {
-  background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-    stop:0 rgba(126, 200, 227, 0.42), stop:1 rgba(165, 233, 1, 0.28));
-  border-color: rgba(165, 233, 1, 0.55);
+  background: rgba(165, 233, 1, 0.18);
+  border-color: rgba(165, 233, 1, 0.50);
+  color: #d9f99d;
 }
-#topLinkSite:pressed { background: rgba(60, 40, 90, 0.75); }
+#topLinkSite:pressed { background: rgba(165, 233, 1, 0.08); }
+
 #topLinkDiscord {
-  color: #eef2ff;
-  font-weight: 700;
-  font-size: 11px;
-  background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-    stop:0 rgba(88, 101, 242, 0.55), stop:1 rgba(67, 56, 202, 0.5));
-  border: 1px solid rgba(165, 180, 255, 0.38);
-  border-radius: 8px;
-  padding: 4px 12px 4px 10px;
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.10);
+  border: 1px solid rgba(99, 102, 241, 0.28);
 }
 #topLinkDiscord:hover {
-  background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-    stop:0 rgba(129, 140, 248, 0.65), stop:1 rgba(88, 101, 242, 0.55));
-  border-color: rgba(199, 210, 254, 0.5);
+  background: rgba(99, 102, 241, 0.20);
+  border-color: rgba(148, 160, 250, 0.50);
+  color: #c7d2fe;
 }
-#topLinkDiscord:pressed { background: rgba(55, 48, 163, 0.7); }
+#topLinkDiscord:pressed { background: rgba(99, 102, 241, 0.08); }
+
 #topLinkLogout {
-  color: #fecdd3;
-  font-weight: 600;
-  font-size: 10px;
-  background: rgba(30, 15, 22, 0.6);
-  border: 1px solid rgba(251, 113, 133, 0.32);
-  border-radius: 8px;
-  padding: 4px 10px 4px 8px;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
 }
 #topLinkLogout:hover {
-  background: rgba(190, 24, 93, 0.28);
-  border-color: rgba(251, 113, 133, 0.5);
-  color: #ffe4e6;
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #fca5a5;
 }
-#topLinkLogout:pressed { background: rgba(127, 29, 29, 0.45); }
+#topLinkLogout:pressed { background: rgba(239, 68, 68, 0.06); }
+
+/* ── Séparateur ── */
 #topChromeDivider {
-  background: rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.08);
   max-width: 1px;
   min-width: 1px;
-  margin: 4px 2px;
+  margin: 8px 2px;
 }
+
+/* ── Carte profil ── */
 #userBarCard {
-  background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-    stop:0 rgba(38, 30, 56, 0.92), stop:1 rgba(24, 20, 36, 0.88));
-  border: 1px solid rgba(165, 233, 1, 0.2);
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 99px;
 }
+#userBarCard:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(165, 233, 1, 0.30);
+}
+
+/* ── Avatar ── */
 #userBarAvatar {
-  background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-    stop:0 rgba(126, 200, 227, 0.35), stop:1 rgba(97, 31, 176, 0.5));
+  background: rgba(97, 31, 176, 0.55);
   border: 1px solid rgba(165, 233, 1, 0.35);
-  border-radius: 13px;
-  color: #f8fafc;
+  border-radius: 99px;
+  color: #f0f4f8;
   font-size: 11px;
   font-weight: 800;
 }
+
+/* ── Séparateur interne ── */
 #userBarSep {
-  background: rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.10);
   max-width: 1px;
   min-width: 1px;
-  margin: 6px 0;
+  margin: 6px 2px;
 }
+
+/* ── Contrôles fenêtre ── */
+#winBtnMin, #winBtnMax, #winBtnClose {
+  font-family: "Segoe UI Symbol", "Segoe UI", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  border-radius: 99px;
+  min-width: 22px;
+  max-width: 22px;
+  min-height: 22px;
+  max-height: 22px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: rgba(148, 163, 184, 0.55);
+}
+#winBtnMin:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #e2e8f0;
+}
+#winBtnMax:hover {
+  background: rgba(165, 233, 1, 0.15);
+  border-color: rgba(165, 233, 1, 0.35);
+  color: #bef264;
+}
+#winBtnClose:hover {
+  background: rgba(239, 68, 68, 0.55);
+  border-color: rgba(239, 68, 68, 0.70);
+  color: #ffffff;
+}
+#winBtnClose:pressed { background: rgba(185, 28, 28, 0.80); }
+#winBtnMin:pressed, #winBtnMax:pressed { background: rgba(255, 255, 255, 0.05); }
 """
 
 
@@ -327,29 +364,25 @@ class GameComboBox(QComboBox):
 
 
 class LauncherNewsTicker(QWidget):
-    """Banderole défilante (annonces serveur) entre Discord et le bloc utilisateur."""
+    """Banderole défilante premium (annonces serveur)."""
 
-    _ICON_W = 26
+    _DOT_W = 32   # zone réservée pour le dot LIVE + séparateur
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._msg = ""
         self._scroll = 0
         self._cycle = 400
+        self._dot_phase = 0          # 0-59 pour l'animation du dot
         self._timer = QTimer(self)
         self._timer.setInterval(28)
         self._timer.timeout.connect(self._tick)
         self.setAutoFillBackground(False)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.setFixedHeight(28)
+        self.setFixedHeight(26)
         self.setMinimumWidth(100)
-        self.setStyleSheet(
-            "LauncherNewsTicker {"
-            "  border-radius: 9px;"
-            "  border: 1px solid rgba(126, 200, 227, 0.22);"
-            "}"
-        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
     def set_message(self, text: str):
         t = (text or "").strip()
@@ -361,12 +394,13 @@ class LauncherNewsTicker(QWidget):
             self.update()
             return
         f = QFont()
-        f.setPointSize(10)
+        f.setFamilies(["Manrope", "Segoe UI", "system-ui"])
+        f.setPointSize(9)
         f.setWeight(QFont.Weight.DemiBold)
         fm = QFontMetrics(f)
-        gap = 72
+        gap = 80
         self._cycle = max(200, fm.horizontalAdvance(t) + gap)
-        self.setMinimumWidth(min(480, 140 + fm.horizontalAdvance(t) // 3))
+        self.setMinimumWidth(min(520, 160 + fm.horizontalAdvance(t) // 3))
         self.setVisible(True)
         if not self._timer.isActive():
             self._timer.start()
@@ -375,6 +409,7 @@ class LauncherNewsTicker(QWidget):
     def _tick(self):
         if self._msg:
             self._scroll = (self._scroll + 1) % self._cycle
+            self._dot_phase = (self._dot_phase + 1) % 60
             self.update()
 
     def paintEvent(self, event):
@@ -386,33 +421,55 @@ class LauncherNewsTicker(QWidget):
         rect = self.rect()
         w, h = rect.width(), rect.height()
 
+        # Fond pill : fondu avec la barre, léger verre sombre
         bg = QLinearGradient(0, 0, w, 0)
-        bg.setColorAt(0.0, QColor(32, 26, 48, 248))
-        bg.setColorAt(0.5, QColor(22, 20, 34, 252))
-        bg.setColorAt(1.0, QColor(32, 26, 48, 248))
+        bg.setColorAt(0.0, QColor(32, 22, 50, 210))
+        bg.setColorAt(0.5, QColor(20, 15, 34, 220))
+        bg.setColorAt(1.0, QColor(28, 20, 44, 210))
         path = QPainterPath()
-        path.addRoundedRect(float(rect.x()), float(rect.y()), float(w), float(h), 8, 8)
+        path.addRoundedRect(0.0, 0.0, float(w), float(h), float(h / 2), float(h / 2))
         p.fillPath(path, QBrush(bg))
 
-        p.setPen(QPen(QColor(165, 233, 1, 90), 2))
-        p.drawLine(self._ICON_W - 2, 5, self._ICON_W - 2, h - 5)
+        # Bordure subtle lime
+        border_pen = QPen(QColor(165, 233, 1, 45), 1)
+        p.setPen(border_pen)
+        p.drawPath(path)
 
-        p.setPen(QPen(QColor(165, 233, 1, 200)))
-        p.setFont(QFont("Segoe UI Emoji", 11))
-        p.drawText(QPoint(7, (h + 10) // 2), "📢")
+        # ── Dot LIVE pulsant ────────────────────────────────────────────
+        dot_cx = 14
+        dot_cy = h // 2
+        dot_r = 3
+        # Pulsation : opacité oscille entre 140 et 255
+        pulse = 140 + int(115 * abs((self._dot_phase - 30) / 30))
+        # Halo extérieur
+        halo_color = QColor(165, 233, 1, max(0, pulse - 100))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(halo_color))
+        p.drawEllipse(QPointF(dot_cx, dot_cy), dot_r + 2.5, dot_r + 2.5)
+        # Dot core
+        p.setBrush(QBrush(QColor(165, 233, 1, pulse)))
+        p.drawEllipse(QPointF(dot_cx, dot_cy), dot_r, dot_r)
 
-        text_left = self._ICON_W + 4
-        text_w = max(1, w - text_left - 8)
+        # Séparateur vertical fin
+        p.setPen(QPen(QColor(165, 233, 1, 40), 1))
+        p.drawLine(self._DOT_W - 2, 5, self._DOT_W - 2, h - 5)
+
+        # ── Texte défilant ─────────────────────────────────────────────
+        text_left = self._DOT_W + 2
+        text_w = max(1, w - text_left - 10)
         clip = QPainterPath()
-        clip.addRoundedRect(float(text_left), 1.0, float(text_w), float(h - 2), 6, 6)
+        clip.addRect(float(text_left), 0.0, float(text_w), float(h))
         p.setClipPath(clip)
 
-        f = QFont("Segoe UI", 10)
+        f = QFont()
+        f.setFamilies(["Manrope", "Segoe UI", "system-ui"])
+        f.setPointSize(9)
         f.setWeight(QFont.Weight.DemiBold)
+        f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0.4)
         p.setFont(f)
         fm = p.fontMetrics()
         baseline = (h + fm.ascent() - fm.descent()) // 2
-        p.setPen(QColor("#e2e8f0"))
+        p.setPen(QColor(203, 213, 225, 215))
         cy = max(1, self._cycle)
         off = self._scroll % cy
         x = float(text_left - off)
@@ -421,15 +478,19 @@ class LauncherNewsTicker(QWidget):
             x += cy
         p.setClipping(False)
 
+        # Estompage aux bords (couleur matching le fond de la barre)
+        fade_bg = QColor(13, 9, 22)
         fade_w = min(28, text_w // 4)
-        for side, x0, x1 in ((0, text_left, text_left + fade_w), (1, w - fade_w, w)):
+        for side, x0, x1 in ((0, text_left, text_left + fade_w), (1, w - fade_w - 8, w - 8)):
             grad = QLinearGradient(x0, 0, x1, 0)
+            c0 = QColor(fade_bg.red(), fade_bg.green(), fade_bg.blue(), 0)
+            c1 = QColor(fade_bg.red(), fade_bg.green(), fade_bg.blue(), 200)
             if side == 0:
-                grad.setColorAt(0.0, QColor(22, 20, 34, 240))
-                grad.setColorAt(1.0, QColor(22, 20, 34, 0))
+                grad.setColorAt(0.0, c1)
+                grad.setColorAt(1.0, c0)
             else:
-                grad.setColorAt(0.0, QColor(22, 20, 34, 0))
-                grad.setColorAt(1.0, QColor(22, 20, 34, 240))
+                grad.setColorAt(0.0, c0)
+                grad.setColorAt(1.0, c1)
             p.fillRect(x0, 0, x1 - x0, h, QBrush(grad))
 
 
@@ -475,23 +536,39 @@ class SFFMainWindow(QMainWindow):
         self._stream_emitter.text_written.connect(self._log_window.append_text)
         self._worker = None
         self._worker_thread = None
+        self._drag_pos: QPoint | None = None
+        self._is_maximized = False
         self.setWindowTitle(f"SlimeDeals — {VERSION}")
         self.setMinimumSize(960, 700)
         self.resize(1020, 780)
+        self.setWindowFlags(
+            Qt.WindowType.Window |
+            Qt.WindowType.FramelessWindowHint
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        # Bordure fine autour de la fenêtre frameless
+        self.setStyleSheet(
+            "SFFMainWindow {"
+            "  border: 1px solid rgba(165, 233, 1, 0.14);"
+            "  background: #131020;"
+            "}"
+        )
         from sff.gui.gui_prompts import update_parent
         update_parent(self)
         central = QWidget()
         self.setCentralWidget(central)
         root_layout = QVBoxLayout(central)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
 
-        # ── Barre supérieure (liens, annonces, compte) ──
+        # ── Barre supérieure (drag, liens, annonces, compte, contrôles fenêtre) ──
         top_wrap = QFrame()
         top_wrap.setObjectName("topChromeStrip")
-        top_wrap.setFixedHeight(42)
+        top_wrap.setFixedHeight(40)
         top_wrap.setStyleSheet(_TOP_CHROME_STYLE)
         toggle_bar = QHBoxLayout(top_wrap)
-        toggle_bar.setContentsMargins(10, 5, 10, 5)
-        toggle_bar.setSpacing(10)
+        toggle_bar.setContentsMargins(10, 5, 8, 5)
+        toggle_bar.setSpacing(6)
 
         site_btn = QPushButton("  SlimeDeals")
         site_btn.setObjectName("topLinkSite")
@@ -499,7 +576,8 @@ class SFFMainWindow(QMainWindow):
         site_btn.setIconSize(QSize(16, 16))
         site_btn.setToolTip("Ouvrir slimedeals.fr")
         site_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        site_btn.setFixedHeight(28)
+        site_btn.setFlat(True)
+        site_btn.setFixedHeight(26)
         site_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://slimedeals.fr")))
 
         discord_btn = QPushButton("  Discord")
@@ -508,7 +586,8 @@ class SFFMainWindow(QMainWindow):
         discord_btn.setIconSize(QSize(16, 16))
         discord_btn.setToolTip("Rejoindre le serveur Discord SlimeDeals")
         discord_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        discord_btn.setFixedHeight(28)
+        discord_btn.setFlat(True)
+        discord_btn.setFixedHeight(26)
         discord_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://discord.gg/c2pRJKjvgE")))
 
         links_div = QFrame()
@@ -521,7 +600,8 @@ class SFFMainWindow(QMainWindow):
         self._logout_btn.setIconSize(QSize(14, 14))
         self._logout_btn.setToolTip("Se déconnecter du compte SlimeDeals")
         self._logout_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._logout_btn.setFixedHeight(28)
+        self._logout_btn.setFlat(True)
+        self._logout_btn.setFixedHeight(26)
         self._logout_btn.setVisible(False)
         self._logout_btn.clicked.connect(self._do_logout)
 
@@ -530,13 +610,13 @@ class SFFMainWindow(QMainWindow):
         self._user_bar_widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._user_bar_widget.setFixedHeight(30)
         card_outer = QHBoxLayout(self._user_bar_widget)
-        card_outer.setContentsMargins(8, 0, 10, 0)
-        card_outer.setSpacing(8)
+        card_outer.setContentsMargins(5, 2, 8, 2)
+        card_outer.setSpacing(5)
 
         self._user_emoji_lbl = QLabel("?")
         self._user_emoji_lbl.setObjectName("userBarAvatar")
         self._user_emoji_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._user_emoji_lbl.setFixedSize(26, 26)
+        self._user_emoji_lbl.setFixedSize(24, 24)
 
         self._user_name_btn = QPushButton()
         self._user_name_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -544,16 +624,18 @@ class SFFMainWindow(QMainWindow):
         self._user_name_btn.setToolTip("Profil du compte — abonnement et facturation")
         self._user_name_btn.setStyleSheet(
             "QPushButton {"
-            "  font-family: 'Segoe UI', system-ui, sans-serif;"
+            "  font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;"
             "  font-size: 12px;"
             "  font-weight: 700;"
+            "  letter-spacing: -0.01em;"
             "  border: none;"
             "  background: transparent;"
-            "  padding: 0 2px;"
-            "  color: #f8fafc;"
+            "  padding: 0 3px;"
+            "  color: #f0f4f8;"
             "  text-align: left;"
             "}"
             "QPushButton:hover { color: #a5e901; }"
+            "QPushButton:pressed { color: #d9f99d; }"
         )
         self._user_name_btn.clicked.connect(self._show_account_profile_dialog)
         self._user_name_btn.setSizePolicy(
@@ -569,20 +651,32 @@ class SFFMainWindow(QMainWindow):
         self._user_quota_lbl = QLabel()
         self._user_quota_lbl.setStyleSheet(
             "QLabel {"
-            "  font-size: 9px;"
+            "  font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;"
+            "  font-size: 10px;"
             "  font-weight: 700;"
-            "  background: rgba(15, 23, 42, 0.55);"
+            "  background: rgba(255, 255, 255, 0.08);"
             "  color: #cbd5e1;"
-            "  padding: 2px 8px;"
-            "  border-radius: 10px;"
+            "  padding: 2px 10px;"
+            "  border-radius: 99px;"
             "  border: 1px solid rgba(148, 163, 184, 0.28);"
+            "  letter-spacing: 0.03em;"
             "}"
         )
-        self._user_quota_lbl.setMaximumHeight(22)
+        self._user_quota_lbl.setMaximumHeight(20)
         self._user_quota_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
 
         self._user_rank_lbl = QLabel()
-        self._user_rank_lbl.setMaximumHeight(22)
+        self._user_rank_lbl.setStyleSheet(
+            "QLabel {"
+            "  font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;"
+            "  font-size: 10px;"
+            "  font-weight: 800;"
+            "  padding: 2px 11px;"
+            "  border-radius: 99px;"
+            "  letter-spacing: 0.06em;"
+            "}"
+        )
+        self._user_rank_lbl.setMaximumHeight(20)
         self._user_rank_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
 
         card_outer.addWidget(self._user_emoji_lbl, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -652,12 +746,70 @@ class SFFMainWindow(QMainWindow):
 
         self._news_ticker = LauncherNewsTicker()
         self._last_banner_key = None
+
+        # ── Séparateur + boutons de contrôle de fenêtre ──────────────
+        win_sep = QFrame()
+        win_sep.setObjectName("topChromeDivider")
+        win_sep.setFixedWidth(1)
+
+        btn_min = QPushButton("─")
+        btn_min.setObjectName("winBtnMin")
+        btn_min.setToolTip("Réduire")
+        btn_min.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_min.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn_min.setFlat(True)
+        btn_min.setFixedSize(22, 22)
+
+        def _do_minimize():
+            def _after():
+                self.showMinimized()
+                self.setWindowOpacity(1.0)
+            self._fade_then(160, 0.0, _after)
+
+        btn_min.clicked.connect(_do_minimize)
+
+        btn_max = QPushButton("□")
+        btn_max.setObjectName("winBtnMax")
+        btn_max.setToolTip("Agrandir / Restaurer")
+        btn_max.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_max.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn_max.setFlat(True)
+        btn_max.setFixedSize(22, 22)
+
+        def _toggle_maximize():
+            if self.isMaximized():
+                self.showNormal()
+                btn_max.setText("□")
+            else:
+                self.showMaximized()
+                btn_max.setText("❐")
+        btn_max.clicked.connect(_toggle_maximize)
+
+        btn_close = QPushButton("✕")
+        btn_close.setObjectName("winBtnClose")
+        btn_close.setToolTip("Fermer")
+        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_close.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn_close.setFlat(True)
+        btn_close.setFixedSize(22, 22)
+
+        def _do_close():
+            self._fade_then(200, 0.0, self.close)
+
+        btn_close.clicked.connect(_do_close)
+
         toggle_bar.addWidget(site_btn)
         toggle_bar.addWidget(discord_btn)
         toggle_bar.addWidget(links_div)
         toggle_bar.addWidget(self._news_ticker, 1)
+        toggle_bar.addSpacing(4)
         toggle_bar.addWidget(self._user_bar_widget)
         toggle_bar.addWidget(self._logout_btn)
+        toggle_bar.addWidget(win_sep)
+        toggle_bar.addSpacing(2)
+        toggle_bar.addWidget(btn_min)
+        toggle_bar.addWidget(btn_max)
+        toggle_bar.addWidget(btn_close)
         root_layout.addWidget(top_wrap)
 
         self._launcher_banner_payload.connect(self._apply_launcher_banner_payload)
@@ -999,8 +1151,42 @@ class SFFMainWindow(QMainWindow):
         self._save_watcher_timer = QTimer(self)
         self._save_watcher_timer.timeout.connect(self._run_background_save_watcher)
         self._start_save_watcher()
+        if sys.platform == "win32":
+            QTimer.singleShot(800, self._run_greenluma_auto_setup)
 
-    # ── Path / game source helpers ───────────────────────────────
+    def _run_greenluma_auto_setup(self) -> None:
+        """Installation / vérif GreenLuma — après init du journal WebUI."""
+        steam_path = getattr(self, "steam_path", None)
+        if not steam_path:
+            return
+
+        def _do() -> None:
+            import logging
+
+            log = logging.getLogger("sff")
+            try:
+                from sff.greenluma_setup import ensure_greenluma_installed
+                from sff.storage.settings import set_setting
+                from sff.structs import Settings
+
+                log.info("[GreenLuma] Démarrage vérification / installation automatique…")
+                result = ensure_greenluma_installed(steam_path)
+                if result.get("ok") and result.get("applist_path"):
+                    set_setting(Settings.APPLIST_FOLDER, result["applist_path"])
+                    log.info(
+                        "[GreenLuma] AppList enregistré dans les paramètres : %s",
+                        result["applist_path"],
+                    )
+                if not result.get("ok"):
+                    log.warning(
+                        "[GreenLuma] Installation auto non effectuée : %s",
+                        result.get("message", "erreur inconnue"),
+                    )
+            except Exception:
+                log.exception("[GreenLuma] Erreur inattendue lors de l'installation auto")
+
+        import threading
+        threading.Thread(target=_do, daemon=True).start()
 
     def _browse_path(self):
         path = QFileDialog.getExistingDirectory(self, "Select game folder")
@@ -1188,11 +1374,15 @@ class SFFMainWindow(QMainWindow):
         self._user_quota_lbl.setText(quota_txt)
         self._user_quota_lbl.setVisible(bool(quota_txt))
         self._user_bar_sep.setVisible(True)
+        _badge = (
+            "font-family: 'Manrope','Segoe UI',system-ui,sans-serif;"
+            "font-size: 9px; font-weight: 700; padding: 1px 8px;"
+            "border-radius: 99px; letter-spacing: 0.06em;"
+        )
         if quota_txt:
             self._user_quota_lbl.setStyleSheet(
-                "QLabel { font-size: 9px; font-weight: 700; background: rgba(15, 23, 42, 0.55); "
-                "color: #e2e8f0; padding: 2px 8px; border-radius: 10px; "
-                "border: 1px solid rgba(148, 163, 184, 0.28); }"
+                f"QLabel {{ {_badge} background: rgba(255,255,255,0.07); "
+                "color: #94a3b8; border: 1px solid rgba(255,255,255,0.12); }"
             )
 
         if bucket == "free":
@@ -1202,9 +1392,8 @@ class SFFMainWindow(QMainWindow):
             self._user_name_btn_style("#4ade80")
             self._user_rank_lbl.setText("FREE")
             self._user_rank_lbl.setStyleSheet(
-                "QLabel { font-size: 9px; font-weight: 800; background: rgba(74, 222, 128, 0.18); "
-                "color: #bbf7d0; padding: 2px 9px; border-radius: 10px; "
-                "border: 1px solid rgba(74, 222, 128, 0.4); letter-spacing: 0.06em; }"
+                f"QLabel {{ {_badge} background: rgba(74,222,128,0.12); "
+                "color: #86efac; border: 1px solid rgba(74,222,128,0.30); }"
             )
         elif bucket == "triple":
             self._user_bar_widget.setToolTip(
@@ -1216,9 +1405,8 @@ class SFFMainWindow(QMainWindow):
             self._user_triple_anim_timer.start(420)
             self._user_rank_lbl.setText("TRIPLE MONSTRE")
             self._user_rank_lbl.setStyleSheet(
-                "QLabel { font-size: 9px; font-weight: 800; background: rgba(196, 181, 253, 0.2); "
-                "color: #ede9fe; padding: 2px 9px; border-radius: 10px; "
-                "border: 1px solid rgba(167, 139, 250, 0.45); letter-spacing: 0.06em; }"
+                f"QLabel {{ {_badge} background: rgba(167,139,250,0.14); "
+                "color: #c4b5fd; border: 1px solid rgba(167,139,250,0.32); }"
             )
         elif bucket == "pass24h":
             self._user_bar_widget.setToolTip(
@@ -1229,9 +1417,8 @@ class SFFMainWindow(QMainWindow):
             self._user_name_btn_style("#5eead4")
             self._user_rank_lbl.setText("24H PASS")
             self._user_rank_lbl.setStyleSheet(
-                "QLabel { font-size: 9px; font-weight: 800; background: rgba(45, 212, 191, 0.18); "
-                "color: #99f6e4; padding: 2px 9px; border-radius: 10px; "
-                "border: 1px solid rgba(45, 212, 191, 0.42); letter-spacing: 0.05em; }"
+                f"QLabel {{ {_badge} background: rgba(45,212,191,0.12); "
+                "color: #5eead4; border: 1px solid rgba(45,212,191,0.30); }"
             )
         else:
             # bucket == "monstre" (ou rang payant non reconnu, traite comme Monstre)
@@ -1243,9 +1430,8 @@ class SFFMainWindow(QMainWindow):
             self._user_name_btn_style("#fdba74")
             self._user_rank_lbl.setText("MONSTRE")
             self._user_rank_lbl.setStyleSheet(
-                "QLabel { font-size: 9px; font-weight: 800; background: rgba(251, 146, 60, 0.18); "
-                "color: #fed7aa; padding: 2px 9px; border-radius: 10px; "
-                "border: 1px solid rgba(251, 146, 60, 0.42); letter-spacing: 0.04em; }"
+                f"QLabel {{ {_badge} background: rgba(251,146,60,0.12); "
+                "color: #fdba74; border: 1px solid rgba(251,146,60,0.30); }"
             )
 
     def _on_auth_success(self, username: str, rank: str = "free"):
@@ -2095,6 +2281,72 @@ class SFFMainWindow(QMainWindow):
         if self._tray is not None:
             self._tray.minimize_to_tray = False
         self.close()
+
+    # ── Fenêtre frameless — drag & contrôles ─────────────────────────
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            top_bar = self.findChild(QFrame, "topChromeStrip")
+            if top_bar and top_bar.geometry().contains(event.pos()):
+                self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_pos is not None and (event.buttons() & Qt.MouseButton.LeftButton):
+            if not self.isMaximized():
+                self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
+        super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            top_bar = self.findChild(QFrame, "topChromeStrip")
+            if top_bar and top_bar.geometry().contains(event.pos()):
+                if self.isMaximized():
+                    self.showNormal()
+                else:
+                    self.showMaximized()
+                return
+        super().mouseDoubleClickEvent(event)
+
+    # ── Animations fenêtre ──────────────────────────────────────────
+
+    def changeEvent(self, event):
+        """Fade-in quand la fenêtre est restaurée depuis l'état minimisé."""
+        from PyQt6.QtCore import QEvent
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.WindowStateChange:
+            if not self.isMinimized() and self.windowOpacity() < 0.5:
+                QTimer.singleShot(0, self._fade_restore)
+
+    def _fade_then(self, duration_ms: int, end_opacity: float, callback):
+        """Anime l'opacité de la fenêtre de 1.0 → end_opacity puis appelle callback."""
+        anim = QPropertyAnimation(self, b"windowOpacity", self)
+        anim.setDuration(duration_ms)
+        anim.setStartValue(1.0)
+        anim.setEndValue(end_opacity)
+        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        anim.finished.connect(callback)
+        anim.start()
+        # Garder une référence pour éviter le GC
+        self._anim_ref = anim
+
+    def _fade_restore(self):
+        """Remonte l'opacité à 1 après restore depuis minimize."""
+        anim = QPropertyAnimation(self, b"windowOpacity", self)
+        anim.setDuration(180)
+        anim.setStartValue(0.0)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        anim.start()
+        self._anim_ref = anim
 
     def closeEvent(self, event):
         if self._tray is not None and self._tray.minimize_to_tray:

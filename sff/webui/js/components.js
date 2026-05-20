@@ -66,7 +66,7 @@ window.Components = (function() {
             badgesHtml += '<span class="badge badge-available">Available</span>';
         }
         if (game.installed) {
-            badgesHtml += '<span class="badge badge-downloaded">Installed</span>';
+            badgesHtml += '<span class="badge badge-installed"><span class="badge-dot"></span>Installé</span>';
         }
 
         var lastUpdated = game.last_updated ? '<div class="game-card-meta">Updated: ' + game.last_updated + '</div>' : '';

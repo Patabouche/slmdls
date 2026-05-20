@@ -28,7 +28,12 @@ import shutil
 import zipfile
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger("sff")
+
+
+def _gl(msg: str) -> None:
+    """Journal launcher — préfixe [GreenLuma]."""
+    log.info("[GreenLuma] %s", msg)
 
 _UNRAR_CANDIDATES = [
     r"C:\Program Files\WinRAR\UnRAR.exe",
@@ -201,23 +206,27 @@ def find_ini_in_dir(dir_path: str) -> str:
 
 
 def patch_dll_injector_ini(ini_path: str, steam_exe: str, dll_path: str) -> None:
-    """Patch DLLInjector.ini with the correct Exe and Dll paths, line by line."""
+    """Patch DLLInjector.ini — équivalent GreenLumaSettings option 2 (chemins complets)."""
     p = Path(ini_path)
     try:
         text = p.read_text(encoding="utf-8", errors="replace")
     except Exception:
         text = ""
 
+    steam_exe = str(Path(steam_exe).resolve())
+    dll_path = str(Path(dll_path).resolve())
+
     if not text:
-        # Write a minimal config
         text = (
             f"[{_DLL_INI_SECTION}]\r\n"
-            f'Exe = "{steam_exe}"\r\n'
-            f'Dll = "{dll_path}"\r\n'
+            "AllowMultipleInstancesOfDLLInjector = 0\r\n"
+            "UseFullPathsFromIni = 1\r\n"
+            f"Exe = {steam_exe}\r\n"
+            "CommandLine = -inhibitbootstrap\r\n"
+            f"Dll = {dll_path}\r\n"
+            "WaitForProcessTermination = 1\r\n"
             "CreateFiles = 1\r\n"
             "FileToCreate_1 = NoQuestion.bin\r\n"
-            "AllowMultipleInstancesOfDLLInjector = 0\r\n"
-            "WaitForProcessTermination = 0\r\n"
         )
         p.write_text(text, encoding="utf-8")
         return
@@ -227,12 +236,15 @@ def patch_dll_injector_ini(ini_path: str, steam_exe: str, dll_path: str) -> None
     for line in lines:
         stripped = line.strip()
         key = stripped.split("=")[0].strip() if "=" in stripped else stripped
-        if key == "Exe":
+        if key == "UseFullPathsFromIni":
             indent = line[: len(line) - len(line.lstrip())]
-            result.append(f'{indent}Exe = "{steam_exe}"\r\n')
+            result.append(f"{indent}UseFullPathsFromIni = 1\r\n")
+        elif key == "Exe":
+            indent = line[: len(line) - len(line.lstrip())]
+            result.append(f"{indent}Exe = {steam_exe}\r\n")
         elif key == "Dll":
             indent = line[: len(line) - len(line.lstrip())]
-            result.append(f'{indent}Dll = "{dll_path}"\r\n')
+            result.append(f"{indent}Dll = {dll_path}\r\n")
         elif key == "CreateFiles":
             indent = line[: len(line) - len(line.lstrip())]
             result.append(f"{indent}CreateFiles = 1\r\n")
@@ -242,6 +254,221 @@ def patch_dll_injector_ini(ini_path: str, steam_exe: str, dll_path: str) -> None
         else:
             result.append(line)
     p.write_text("".join(result), encoding="utf-8")
+
+
+def apply_greenluma_settings_option2(steam_dir: str | Path) -> tuple[bool, str]:
+    """
+    Applique la config GreenLumaSettings option 2 (chemins exe/dll complets).
+    Équivalent à lancer GreenLumaSettings_2025.exe → 2 → steam.exe → dll.
+    """
+    root = Path(steam_dir)
+    steam_exe = root / "steam.exe"
+    if not steam_exe.is_file():
+        return False, f"steam.exe introuvable : {steam_exe}"
+
+    dll = _installed_gl_dll_path(root)
+    if not dll:
+        return False, f"DLL GreenLuma introuvable dans {root}"
+
+    ini_hits = list(root.glob("DLLInjector.ini")) + list(root.rglob("DLLInjector.ini"))
+    if not ini_hits:
+        return False, f"DLLInjector.ini introuvable dans {root}"
+
+    ini_path = ini_hits[0]
+    try:
+        patch_dll_injector_ini(str(ini_path), str(steam_exe), dll)
+    except Exception as exc:
+        return False, f"Échec patch DLLInjector.ini : {exc}"
+
+    _gl(
+        f"GreenLumaSettings (option 2) appliqué — "
+        f"Exe={steam_exe} | Dll={dll} | INI={ini_path}"
+    )
+    return True, str(ini_path)
+
+
+def _read_dll_injector_ini(ini_path: Path) -> dict[str, str]:
+    vals: dict[str, str] = {}
+    try:
+        text = ini_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return vals
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith(";") or "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        vals[key.strip()] = val.strip().strip('"')
+    return vals
+
+
+def verify_greenluma_configuration(steam_dir: str | Path) -> dict:
+    """Vérifie l'état GreenLuma + DLLInjector.ini et journalise un résumé lisible."""
+    root = Path(steam_dir)
+    steam_exe = root / "steam.exe"
+    dll = _installed_gl_dll_path(root)
+    applist = root / "AppList"
+    installed = is_greenluma_installed_in_steam(root)
+
+    _gl("——— Résumé GreenLuma ———")
+    _gl(f"Installé dans Steam : {'oui' if installed else 'non'}")
+    _gl(f"steam.exe : {steam_exe if steam_exe.is_file() else 'introuvable'}")
+    _gl(f"DLL GreenLuma : {dll or 'introuvable'}")
+    _gl(f"AppList : {applist} ({'existe' if applist.is_dir() else 'absent'})")
+
+    ini_hits = list(root.glob("DLLInjector.ini")) + list(root.rglob("DLLInjector.ini"))
+    if not ini_hits:
+        _gl("DLLInjector.ini : introuvable")
+        return {"ok": False, "installed": installed}
+
+    ini_path = ini_hits[0]
+    vals = _read_dll_injector_ini(ini_path)
+    use_full = vals.get("UseFullPathsFromIni", "")
+    ini_exe = vals.get("Exe", "")
+    ini_dll = vals.get("Dll", "")
+
+    expected_exe = str(steam_exe.resolve()) if steam_exe.is_file() else ""
+    expected_dll = str(Path(dll).resolve()) if dll else ""
+
+    def _norm(p: str) -> str:
+        return str(Path(p).resolve()).lower() if p else ""
+
+    exe_ok = _norm(ini_exe) == _norm(expected_exe) and bool(expected_exe)
+    dll_ok = _norm(ini_dll) == _norm(expected_dll) and bool(expected_dll)
+    full_ok = use_full in ("1", "true", "True")
+
+    _gl(f"DLLInjector.ini : {ini_path}")
+    _gl(f"  UseFullPathsFromIni = {use_full or '?'} {'OK' if full_ok else 'KO'}")
+    _gl(f"  Exe = {ini_exe or '?'} {'OK' if exe_ok else 'KO'}")
+    _gl(f"  Dll = {ini_dll or '?'} {'OK' if dll_ok else 'KO'}")
+
+    all_ok = installed and exe_ok and dll_ok and full_ok
+    _gl(f"Configuration globale : {'OK' if all_ok else 'KO — vérifie les chemins ci-dessus'}")
+    _gl("———————————————————————")
+
+    return {
+        "ok": all_ok,
+        "installed": installed,
+        "ini_path": str(ini_path),
+        "use_full_paths_ok": full_ok,
+        "exe_ok": exe_ok,
+        "dll_ok": dll_ok,
+    }
+
+
+def is_greenluma_installed_in_steam(steam_path: str | Path) -> bool:
+    """True si la DLL GreenLuma est déjà présente dans le dossier Steam."""
+    root = Path(steam_path)
+    if not root.is_dir():
+        return False
+    for pattern in _GL_DLL_PATTERNS:
+        if (root / pattern).is_file():
+            return True
+    found = find_dll_in_dir(str(root))
+    return bool(found)
+
+
+def _installed_gl_dll_path(steam_path: str | Path) -> str | None:
+    root = Path(steam_path)
+    for pattern in _GL_DLL_PATTERNS:
+        p = root / pattern
+        if p.is_file():
+            return str(p)
+    return find_dll_in_dir(str(root)) or None
+
+
+def find_bundled_greenluma_archive() -> str | None:
+    """Localise greenlumafix.rar livré avec le launcher (exe ou bundle dev)."""
+    from sff.utils import root_folder
+
+    names = ("greenlumafix.rar", "GreenLumaFix.rar", "greenluma.rar")
+    bases: list[Path] = []
+    for outside in (True, False):
+        try:
+            base = Path(root_folder(outside_internal=outside))
+            if base not in bases:
+                bases.append(base)
+        except Exception:
+            pass
+    for base in bases:
+        for name in names:
+            for candidate in (base / name, base / "GreenLuma" / name):
+                if candidate.is_file():
+                    return str(candidate.resolve())
+    return None
+
+
+def ensure_greenluma_installed(steam_path: str | Path) -> dict:
+    """
+    Installe GreenLuma dans Steam (méthode B) si absent.
+    Utilise greenlumafix.rar à côté du launcher.
+    """
+    import sys
+
+    steam = Path(steam_path)
+    _gl(f"Vérification installation auto — dossier Steam : {steam}")
+
+    if sys.platform != "win32":
+        _gl("Installation auto ignorée (hors Windows).")
+        return {
+            "ok": True,
+            "message": "GreenLuma auto-setup ignoré (hors Windows).",
+            "applist_path": "",
+            "skipped": True,
+        }
+
+    steam_exe = steam / "steam.exe"
+    applist = steam / "AppList"
+
+    if is_greenluma_installed_in_steam(steam):
+        dll = _installed_gl_dll_path(steam)
+        applist.mkdir(parents=True, exist_ok=True)
+        _gl(f"Déjà installé — DLL : {dll or '?'} | AppList : {applist}")
+        ok_cfg, msg_cfg = apply_greenluma_settings_option2(steam)
+        if not ok_cfg:
+            _gl(f"GreenLumaSettings (option 2) : {msg_cfg}")
+        verify_greenluma_configuration(steam)
+        return {
+            "ok": True,
+            "message": "GreenLuma déjà installé.",
+            "applist_path": str(applist),
+            "skipped": True,
+        }
+
+    _gl("GreenLuma absent — recherche de l'archive greenlumafix.rar…")
+    archive = find_bundled_greenluma_archive()
+    if not archive:
+        _gl("Échec : greenlumafix.rar introuvable à côté du launcher.")
+        return {
+            "ok": False,
+            "message": "Archive greenlumafix.rar introuvable à côté du launcher.",
+            "applist_path": "",
+            "skipped": False,
+        }
+
+    size_mb = Path(archive).stat().st_size / (1024 * 1024)
+    _gl(f"Archive trouvée : {archive} ({size_mb:.2f} Mo) — installation dans Steam…")
+
+    result = auto_gl_setup(
+        method="B",
+        archive_path=archive,
+        steam_exe_path=str(steam_exe if steam_exe.is_file() else steam / "steam.exe"),
+    )
+    result["skipped"] = False
+
+    if result.get("ok"):
+        ok_cfg, msg_cfg = apply_greenluma_settings_option2(steam)
+        if not ok_cfg:
+            log.warning("[GreenLuma] GreenLumaSettings (option 2) : %s", msg_cfg)
+        verify_greenluma_configuration(steam)
+        _gl(
+            f"Installation terminée — AppList : {result.get('applist_path') or applist} "
+            f"| {result.get('message', '')}"
+        )
+    else:
+        log.warning("[GreenLuma] Installation échouée : %s", result.get("message", "erreur inconnue"))
+
+    return result
 
 
 def auto_gl_setup(method: str, archive_path: str, steam_exe_path: str) -> dict:
@@ -257,19 +484,22 @@ def auto_gl_setup(method: str, archive_path: str, steam_exe_path: str) -> dict:
 
     archive_path = str(Path(archive_path).resolve())
     if not Path(archive_path).exists():
+        _gl(f"Archive introuvable : {archive_path}")
         return {"ok": False, "message": f"Archive not found: {archive_path}", "applist_path": ""}
 
     steam_exe = Path(steam_exe_path)
     if not steam_exe.exists():
-        logger.warning("steam.exe not found at %s — patching anyway", steam_exe_path)
+        _gl(f"steam.exe introuvable à {steam_exe_path} — poursuite quand même")
 
     # Determine destination directory
     if method == "B":
         dest_dir = steam_exe.parent if steam_exe.exists() else Path(r"C:\Program Files (x86)\Steam")
+        _gl(f"Méthode B — cible : {dest_dir}")
     else:
         # Method A: GreenLuma subfolder next to the launcher .exe
         app_dir = root_folder()
         dest_dir = Path(app_dir) / "GreenLuma"
+        _gl(f"Méthode A — cible : {dest_dir}")
 
     dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -277,7 +507,7 @@ def auto_gl_setup(method: str, archive_path: str, steam_exe_path: str) -> dict:
     import tempfile
     tmp = Path(tempfile.mkdtemp(prefix="slimedeals_gl_"))
     try:
-        logger.info("Extracting %s -> %s", archive_path, tmp)
+        _gl(f"Extraction {Path(archive_path).name} → dossier temporaire…")
         extract_archive(archive_path, str(tmp))
 
         # Find DLL and INI
@@ -285,24 +515,31 @@ def auto_gl_setup(method: str, archive_path: str, steam_exe_path: str) -> dict:
         ini_path = find_ini_in_dir(str(tmp))
 
         if not dll_path:
+            _gl("Échec : DLL GreenLuma absente de l'archive.")
             return {"ok": False, "message": "GreenLuma DLL not found in archive.", "applist_path": ""}
+        _gl(f"DLL trouvée : {Path(dll_path).name}")
         if not ini_path:
-            logger.warning("DLLInjector.ini not found in archive — will create one")
+            _gl("DLLInjector.ini absent — création d'un fichier minimal")
+        else:
+            _gl(f"INI trouvé : {Path(ini_path).name}")
 
         # Copy all extracted files into dest_dir
+        copied = 0
         for item in Path(tmp).rglob("*"):
             if item.is_file():
                 rel = item.relative_to(tmp)
                 target = dest_dir / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(item, target)
+                copied += 1
+        _gl(f"{copied} fichier(s) copié(s) vers {dest_dir}")
 
         # Resolve final paths
         final_dll = str(dest_dir / Path(dll_path).relative_to(tmp))
         final_ini_path = str(dest_dir / Path(ini_path).relative_to(tmp)) if ini_path else str(dest_dir / "DLLInjector.ini")
 
-        # Patch the INI
-        patch_dll_injector_ini(final_ini_path, str(steam_exe), final_dll)
+        # GreenLumaSettings option 2 — chemins exe/dll complets dans DLLInjector.ini
+        apply_greenluma_settings_option2(dest_dir)
 
         # AppList folder — must be next to DLLInjector.exe (GL reads it relative to itself)
         dllinjector_hits = list(dest_dir.rglob("DLLInjector.exe"))
@@ -311,15 +548,15 @@ def auto_gl_setup(method: str, archive_path: str, steam_exe_path: str) -> dict:
         else:
             applist_dir = dest_dir / "AppList"
         applist_dir.mkdir(parents=True, exist_ok=True)
+        _gl(f"Dossier AppList prêt : {applist_dir}")
 
-        logger.info("GreenLuma setup complete in %s", dest_dir)
         return {
             "ok": True,
             "message": f"GreenLuma installed to {dest_dir}. Edit AppList and run DLLInjector.exe.",
             "applist_path": str(applist_dir),
         }
     except Exception as exc:
-        logger.error("GreenLuma setup failed: %s", exc)
+        log.exception("[GreenLuma] Setup failed: %s", exc)
         return {"ok": False, "message": f"Setup failed: {exc}", "applist_path": ""}
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

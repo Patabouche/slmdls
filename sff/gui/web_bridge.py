@@ -492,6 +492,19 @@ class WebBridge(QObject):
         except Exception:
             logger.info("[Téléchargement] %s", safe)
 
+    def _log_fixed(self, msg: str) -> None:
+        """Journal détaillé pour les jeux fixed (débogage téléchargement / extraction)."""
+        try:
+            safe = redact_sensitive_log_text(msg)
+        except Exception:
+            safe = msg
+        try:
+            ts = time.strftime("%H:%M:%S")
+            self.log_message.emit(f"[{ts}] [Jeux fixed] {safe}")
+        except Exception:
+            logger.info("[Jeux fixed] %s", safe)
+        logger.info("[Jeux fixed] %s", safe)
+
     @pyqtSlot(str)
     def _deliver_notify_gen(self, app_id: str) -> None:
         self._log_ui("Préparation de la notification d’activité sur Discord…")
@@ -3052,6 +3065,190 @@ class WebBridge(QObject):
         """Sets the library path for the next download."""
         self._active_library = path
 
+    @pyqtSlot(str, result=str)
+    def get_fixed_games_catalog(self, force: str = "0") -> str:
+        """Catalogue des jeux fixed (BuzzHeavier) pour l’onglet Jeux fixed."""
+        from sff.fixed_games import load_fixed_games_catalog
+
+        try:
+            refresh = str(force or "0").strip().lower() in ("1", "true", "yes")
+            return json.dumps(
+                load_fixed_games_catalog(force=refresh),
+                ensure_ascii=False,
+            )
+        except Exception:
+            return "[]"
+
+    @pyqtSlot(result=str)
+    def get_fixed_games_partials(self) -> str:
+        """Retourne un objet JSON {game_id: {partial_bytes, partial_pct, partial_human}} pour tous les jeux avec un partiel."""
+        from sff.fixed_games import get_all_partials
+        try:
+            return json.dumps(get_all_partials(), ensure_ascii=False)
+        except Exception:
+            return "{}"
+
+    @pyqtSlot(str, str, result=str)
+    def check_fixed_game_install(self, game_id: str, install_target: str) -> str:
+        """Vérifie espace disque + renvoie le chemin d'installation résolu (JSON)."""
+        from sff.fixed_games import check_install_requirements, format_bytes
+
+        gid = (game_id or "").strip()
+        target = (install_target or "").strip()
+        if not gid or not target:
+            return json.dumps({"ok": False, "message": "Paramètres manquants."})
+        try:
+            info = check_install_requirements(gid, target)
+            info["required_human"] = format_bytes(info.get("required_with_margin_bytes", 0))
+            info["free_install_human"] = format_bytes(info.get("free_install_bytes", 0))
+            info["free_temp_human"] = format_bytes(info.get("free_temp_bytes", 0))
+            self._log_fixed(
+                f"Vérif pré-install {gid!r} → ok={info.get('ok')} "
+                f"install_libre={info.get('free_install_human')} "
+                f"temp_libre={info.get('free_temp_human')} "
+                f"requis={info.get('required_human')}"
+            )
+            return json.dumps(info, ensure_ascii=False)
+        except Exception as e:
+            self._log_fixed(f"Vérif pré-install exception : {e!r}")
+            return json.dumps({"ok": False, "message": str(e)})
+
+    @pyqtSlot(str, str)
+    def install_fixed_game(self, game_id: str, install_target: str) -> None:
+        """Télécharge + extrait un jeu fixed (install_target = biblio Steam ou dossier)."""
+        gid = (game_id or "").strip()
+        lib = (install_target or "").strip()
+        saved = _load_auth()
+        rank = saved.get("rank", "free")
+        if not triple_exclusive_tools_allowed_for_rank(rank):
+            self._emit_task_result(
+                "install_fixed_game",
+                False,
+                "Les jeux fixed sont réservés au palier Triple Monstre.",
+                app_id=gid,
+            )
+            return
+        if not lib:
+            self._emit_task_result(
+                "install_fixed_game",
+                False,
+                "Choisis une bibliothèque Steam d’installation.",
+                app_id=gid,
+            )
+            return
+
+        from sff.fixed_games import get_fixed_game, install_fixed_game_by_id
+
+        entry = get_fixed_game(gid)
+        display = (entry.get("name") if entry else None) or gid
+        task_id = f"fixed_game:{gid}"
+        from sff.fixed_games import required_bytes_for_game
+
+        expected_dl = required_bytes_for_game(entry)
+
+        def _do():
+            _last_journal_pct = [-1]
+
+            def _prog(done: int, total: int, msg: str) -> None:
+                from sff.fixed_games import sanitize_user_message
+
+                eff_total = total if total > 0 else expected_dl
+                if done and eff_total:
+                    pct = int(done / eff_total * 100)
+                    if pct >= _last_journal_pct[0] + 5 or pct >= 99:
+                        _last_journal_pct[0] = pct
+                        self._log_fixed(
+                            f"Progression fichier : {pct} % ({done:,} / {eff_total:,} o)"
+                        )
+
+                clean = sanitize_user_message(msg)
+                pct = 5
+                phase = "prepare"
+                low = clean.lower()
+                ui_status = clean
+                if "extraction" in low:
+                    phase = "extract"
+                    pct = 94
+                    ui_status = "Extraction des fichiers du jeu…"
+                elif done and eff_total:
+                    phase = "download"
+                    pct = min(99, max(1, int(done * 100 / eff_total)))
+                    mb_d = done // 1048576
+                    mb_t = eff_total // 1048576
+                    ui_status = f"{mb_d:,} / {mb_t:,} Mo".replace(",", " ")
+                elif "téléchargement" in low or "connexion" in low:
+                    phase = "download"
+                    pct = max(pct, 6)
+                    ui_status = "Connexion au serveur de fichiers…"
+                elif done and expected_dl:
+                    phase = "download"
+                    pct = min(99, max(1, int(done * 100 / expected_dl)))
+                self.download_progress.emit(
+                    json.dumps(
+                        {
+                            "id": task_id,
+                            "app_id": gid,
+                            "name": display,
+                            "status": ui_status,
+                            "progress": pct,
+                            "phase": phase,
+                            "done_bytes": done,
+                            "total_bytes": eff_total if eff_total else expected_dl,
+                        },
+                        ensure_ascii=False,
+                    )
+                )
+
+            self._log_fixed(f"Démarrage installation jeu={gid!r} nom={display!r}")
+            self._log_fixed(f"Cible : {lib}")
+            ok, message = install_fixed_game_by_id(
+                gid, lib, on_progress=_prog, ui_log=self._log_fixed
+            )
+            if ok:
+                self._log_fixed(f"Succès : {message}")
+            else:
+                self._log_fixed(f"Échec : {message}")
+            if ok:
+                self.download_progress.emit(
+                    json.dumps(
+                        {
+                            "id": task_id,
+                            "app_id": gid,
+                            "name": display,
+                            "status": "Installation terminée",
+                            "progress": 100,
+                        }
+                    )
+                )
+            return ok, message
+
+        def _on_done(result):
+            from sff.fixed_games import sanitize_user_message
+
+            ok, message = (False, "Erreur inconnue")
+            if isinstance(result, tuple) and len(result) >= 2:
+                ok, message = bool(result[0]), sanitize_user_message(str(result[1] or ""))
+            self._log_fixed(
+                f"Tâche terminée ok={ok} message={message!r}"
+            )
+            self._emit_task_result(
+                "install_fixed_game",
+                ok,
+                message,
+                app_id=gid,
+            )
+
+        def _on_error(msg: str) -> None:
+            self._log_fixed(f"Exception critique worker : {msg}")
+            self._emit_task_result(
+                "install_fixed_game",
+                False,
+                "Erreur interne pendant l’installation. Consulte le journal.",
+                app_id=gid,
+            )
+
+        self._run_async(_do, on_done=_on_done, on_error=_on_error)
+
     @pyqtSlot(result=str)
     def open_file_dialog(self):
         """Opens native QFileDialog, returns selected path."""
@@ -3454,6 +3651,29 @@ class WebBridge(QObject):
                     except Exception:
                         continue
             games.sort(key=lambda g: g.get("name", "").lower())
+
+            # Ajoute les jeux Pépites installés (registre local sideloaded_games.json)
+            try:
+                from sff.fixed_games import get_sideloaded_games
+                for sg in get_sideloaded_games():
+                    sg_path = sg.get("path", "")
+                    sg_app_id = sg.get("app_id", 0)
+                    if not sg_path or not Path(sg_path).is_dir():
+                        continue
+                    # Ne pas dupliquer si déjà dans la liste Steam (même app_id)
+                    if sg_app_id and str(sg_app_id) in seen:
+                        continue
+                    seen.add(str(sg_app_id))
+                    games.append({
+                        "app_id": sg_app_id,
+                        "name": sg.get("name") or f"Jeu {sg_app_id}",
+                        "installed": True,
+                        "path": sg_path,
+                        "source": "fixed",
+                    })
+            except Exception:
+                pass
+
             return json.dumps(games)
         except Exception:
             return "[]"
@@ -3656,6 +3876,31 @@ class WebBridge(QObject):
 
         return _fail("Plateforme non supportée pour ce lancement.")
 
+    @pyqtSlot(str, result=str)
+    def delete_sideloaded_game(self, game_path: str) -> str:
+        """Supprime un jeu Pépites : dossier sur disque + entrée du registre sideloaded."""
+        from sff.fixed_games import get_sideloaded_games, _sideloaded_registry_path
+        gpath = (game_path or "").strip()
+        if not gpath:
+            return json.dumps({"ok": False, "message": "Chemin manquant."})
+        p = Path(gpath)
+        try:
+            if p.exists():
+                import shutil as _shutil
+                _shutil.rmtree(str(p), ignore_errors=True)
+        except Exception as e:
+            return json.dumps({"ok": False, "message": f"Suppression impossible : {e}"})
+        # Retirer du registre sideloaded
+        try:
+            registry = get_sideloaded_games()
+            registry = [e for e in registry if e.get("path") != gpath]
+            _sideloaded_registry_path().write_text(
+                json.dumps(registry, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except Exception:
+            pass
+        return json.dumps({"ok": True, "message": "Jeu supprimé."})
+
     @pyqtSlot(str, str, str)
     def delete_game(self, app_id, game_path, mode):
         """Remove a game from the AppList and optionally delete its files.
@@ -3707,6 +3952,26 @@ class WebBridge(QObject):
                 return (True, "Removed from AppList")
 
             # --- Delete game files (mode='full') ---
+            # Steam must be closed first so it releases file handles and doesn't
+            # reload the ACF on shutdown. We kill it, delete, then signal the UI
+            # to restart Steam.
+            import time as _time
+            from sff.processes import is_proc_running
+
+            steam_was_running = is_proc_running("steam.exe")
+            if steam_was_running:
+                try:
+                    import subprocess as _sp
+                    _sp.run(
+                        ["taskkill", "/F", "/IM", "steam.exe"],
+                        capture_output=True, timeout=10,
+                    )
+                    deadline = _time.time() + 10
+                    while is_proc_running("steam.exe") and _time.time() < deadline:
+                        _time.sleep(0.3)
+                except Exception as e:
+                    logger.warning("delete_game: could not kill Steam: %s", e)
+
             files_deleted = False
 
             # Delete the ACF manifest
@@ -3733,11 +3998,30 @@ class WebBridge(QObject):
                         logger.warning("delete_game: folder removal failed: %s", e)
 
             if files_deleted:
-                return (True, "Game removed from AppList and deleted from disk")
-            return (True, "Removed from AppList (game folder not found or already gone)")
+                return (True, "deleted_full", steam_was_running)
+            return (True, "applist_only", steam_was_running)
 
         def _on_done(result):
-            if isinstance(result, tuple):
+            if isinstance(result, tuple) and len(result) == 3:
+                ok, action, steam_was_running = result
+                # Restart Steam automatically so the deletion takes effect immediately
+                if ok and steam_was_running:
+                    try:
+                        import subprocess as _sp
+                        import time as _t
+                        from sff.processes import is_proc_running
+                        if not is_proc_running("steam.exe") and self._steam_path:
+                            steam_exe = Path(self._steam_path) / "steam.exe"
+                            if steam_exe.exists():
+                                _sp.Popen(
+                                    [str(steam_exe)],
+                                    creationflags=getattr(_sp, "DETACHED_PROCESS", 0),
+                                )
+                    except Exception as e:
+                        logger.warning("delete_game: Steam restart failed: %s", e)
+                msg = "Jeu supprimé — Steam relancé." if steam_was_running else "Jeu supprimé."
+                self._emit_task_result("delete_game", ok, msg, app_id=app_id)
+            elif isinstance(result, tuple) and len(result) == 2:
                 ok, msg = result
                 self._emit_task_result("delete_game", ok, msg, app_id=app_id)
             else:

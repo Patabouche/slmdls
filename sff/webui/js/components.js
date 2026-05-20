@@ -65,7 +65,7 @@ window.Components = (function() {
         if (game.status === 'available') {
             badgesHtml += '<span class="badge badge-available">Available</span>';
         }
-        if (game.installed) {
+        if (game.installed && !options.hideInstalledBadge) {
             badgesHtml += '<span class="badge badge-installed"><span class="badge-dot"></span>Installé</span>';
         }
 
@@ -458,6 +458,67 @@ window.Components = (function() {
         _hideImages = !!val;
     }
 
+    var PAGE_SIZE = 20;
+
+    function paginateSlice(items, page, pageSize) {
+        items = items || [];
+        pageSize = pageSize || PAGE_SIZE;
+        var total = items.length;
+        var totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+        var p = Math.max(1, Math.min(page || 1, totalPages));
+        var start = (p - 1) * pageSize;
+        return {
+            items: items.slice(start, start + pageSize),
+            page: p,
+            totalPages: totalPages,
+            total: total,
+            pageSize: pageSize
+        };
+    }
+
+    function renderGridPagination(container, state, onPageChange) {
+        var el = typeof container === 'string' ? document.getElementById(container) : container;
+        if (!el) return;
+        el.innerHTML = '';
+        if (!state || state.totalPages <= 1) {
+            el.classList.add('hidden');
+            return;
+        }
+        el.classList.remove('hidden');
+
+        var wrap = document.createElement('div');
+        wrap.className = 'grid-pagination-inner';
+
+        var prev = document.createElement('button');
+        prev.type = 'button';
+        prev.className = 'btn btn-ghost btn-sm grid-pagination-btn';
+        prev.textContent = '← Précédent';
+        prev.disabled = state.page <= 1;
+        prev.addEventListener('click', function() {
+            if (state.page > 1 && onPageChange) onPageChange(state.page - 1);
+        });
+
+        var info = document.createElement('span');
+        info.className = 'grid-pagination-info';
+        info.textContent =
+            'Page ' + state.page + ' / ' + state.totalPages +
+            ' · ' + state.total + ' jeu' + (state.total > 1 ? 'x' : '');
+
+        var next = document.createElement('button');
+        next.type = 'button';
+        next.className = 'btn btn-ghost btn-sm grid-pagination-btn';
+        next.textContent = 'Suivant →';
+        next.disabled = state.page >= state.totalPages;
+        next.addEventListener('click', function() {
+            if (state.page < state.totalPages && onPageChange) onPageChange(state.page + 1);
+        });
+
+        wrap.appendChild(prev);
+        wrap.appendChild(info);
+        wrap.appendChild(next);
+        el.appendChild(wrap);
+    }
+
     return {
         getCoverUrls: getCoverUrls,
         getLibraryCoverUrl: getLibraryCoverUrl,
@@ -472,6 +533,9 @@ window.Components = (function() {
         escapeHtml: escapeHtml,
         initModals: initModals,
         CustomSelect: CustomSelect,
-        setHideImages: setHideImages
+        setHideImages: setHideImages,
+        PAGE_SIZE: PAGE_SIZE,
+        paginateSlice: paginateSlice,
+        renderGridPagination: renderGridPagination
     };
 })();

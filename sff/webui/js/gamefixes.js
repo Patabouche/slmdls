@@ -1,5 +1,5 @@
 /**
- * SlimeDeals — Jeux fixed (téléchargement + installation Steam)
+ * SlimeDeals — Jeux VIP (téléchargement + installation)
  */
 window.GameFixes = (function() {
     'use strict';
@@ -13,7 +13,10 @@ window.GameFixes = (function() {
     var _customInstallPath = '';
     var _activeProgressGameId = null;
     var _partials = {};  // {game_id: {partial_bytes, partial_pct, partial_human}}
+    var _installedIds = {};  // {catalog_id: true}
     var _progressModalOpen = false;
+    var _vipPage = 1;
+    var _vipSearch = '';
     var EL = 'd' + 'iv';
 
     var _UI_BLOCKLIST = /\b(buzzheavier|steamrip|steam\s*rip|repack|fafda\.to)\b/gi;
@@ -96,12 +99,53 @@ window.GameFixes = (function() {
         el.classList.toggle('gamefixes-status--error', !!isError);
     }
 
+    function _trimDecimal(s) {
+        if (s.indexOf('.') >= 0) {
+            s = s.replace(/0+$/, '').replace(/\.$/, '');
+        }
+        return s;
+    }
+
     function _fmtBytes(b) {
         b = Number(b) || 0;
-        if (b >= 1e12) return (b / 1e12).toFixed(1) + ' To';
-        if (b >= 1e9) return (b / 1e9).toFixed(1) + ' Go';
-        if (b >= 1e6) return (b / 1e6).toFixed(0) + ' Mo';
-        return (b / 1e3).toFixed(0) + ' Ko';
+        var GB = 1024 * 1024 * 1024;
+        var MB = 1024 * 1024;
+        var KB = 1024;
+        if (b >= GB) {
+            var v = b / GB;
+            if (v >= 100) return Math.round(v) + ' Go';
+            if (v >= 10) return _trimDecimal(v.toFixed(1)) + ' Go';
+            return _trimDecimal(v.toFixed(2)) + ' Go';
+        }
+        if (b >= MB) {
+            var v = b / MB;
+            if (v >= 100) return Math.round(v) + ' Mo';
+            return _trimDecimal(v.toFixed(1)) + ' Mo';
+        }
+        if (b >= KB) return Math.round(b / KB) + ' Ko';
+        return Math.round(b) + ' o';
+    }
+
+    function _fmtProgress(done, total) {
+        done = Number(done) || 0;
+        total = Number(total) || 0;
+        if (total <= 0) return _fmtBytes(done);
+        var GB = 1024 * 1024 * 1024;
+        var MB = 1024 * 1024;
+        function fmtGb(v) {
+            var x = v / GB;
+            if (x >= 10) return _trimDecimal(x.toFixed(1)) + ' Go';
+            if (x >= 1) return _trimDecimal(x.toFixed(1)) + ' Go';
+            return _trimDecimal(x.toFixed(2)) + ' Go';
+        }
+        function fmtMb(v) {
+            var x = v / MB;
+            if (x >= 100) return Math.round(x) + ' Mo';
+            return _trimDecimal(x.toFixed(1)) + ' Mo';
+        }
+        if (total >= GB) return fmtGb(done) + ' / ' + fmtGb(total);
+        if (total >= MB) return fmtMb(done) + ' / ' + fmtMb(total);
+        return _fmtBytes(done) + ' / ' + _fmtBytes(total);
     }
 
     function _getGameById(gameId) {
@@ -116,6 +160,61 @@ window.GameFixes = (function() {
         var sel = document.getElementById('fixed-install-path-select');
         if (!sel || !sel.value) return '';
         return sel.value;
+    }
+
+    function _goToLibrary() {
+        Components.hideModal('fixed-game-success-modal');
+        Components.hideModal('fixed-game-progress-modal');
+        _progressModalOpen = false;
+        if (window.App && typeof App.navigateTo === 'function') {
+            App.navigateTo('library');
+        }
+    }
+
+    function _showInstallSuccessModal(gameName) {
+        var nameEl = document.getElementById('fixed-game-success-name');
+        if (nameEl) nameEl.textContent = gameName || 'Le jeu';
+        Components.showModal('fixed-game-success-modal');
+    }
+
+    function _bindSuccessModal() {
+        var root = document.getElementById('fixed-game-success-modal');
+        if (!root || root.dataset.bound) return;
+        root.dataset.bound = '1';
+
+        function dismiss() {
+            Components.hideModal('fixed-game-success-modal');
+        }
+
+        var libBtn = document.getElementById('fixed-game-success-library');
+        var dismissBtn = document.getElementById('fixed-game-success-dismiss');
+        var closeX = document.getElementById('fixed-game-success-close-x');
+        var overlay = root.querySelector('.modal-overlay');
+
+        if (libBtn) libBtn.addEventListener('click', _goToLibrary);
+        if (dismissBtn) dismissBtn.addEventListener('click', dismiss);
+        if (closeX) closeX.addEventListener('click', dismiss);
+        if (overlay) overlay.addEventListener('click', dismiss);
+    }
+
+    function _loadInstalled(cb) {
+        Bridge.callWithCallback('get_fixed_games_installed', function(json) {
+            _installedIds = {};
+            try {
+                var d = JSON.parse(json || '{}');
+                (d.installed_ids || []).forEach(function(id) {
+                    if (id) _installedIds[id] = true;
+                });
+            } catch (e) {
+                _installedIds = {};
+            }
+            _renderCards();
+            if (typeof cb === 'function') cb();
+        });
+    }
+
+    function _isGameInstalled(gameId) {
+        return !!_installedIds[gameId];
     }
 
     function _progressModalEls() {
@@ -167,10 +266,7 @@ window.GameFixes = (function() {
     function _progressDetailText(prog) {
         if (!prog) return 'En cours…';
         if (prog.doneBytes && prog.totalBytes) {
-            var mbD = Math.floor(prog.doneBytes / 1048576);
-            var mbT = Math.max(1, Math.floor(prog.totalBytes / 1048576));
-            var pct = Math.max(0, Math.min(100, Math.round(prog.doneBytes / prog.totalBytes * 100)));
-            return pct + ' % — ' + mbD + ' / ' + mbT + ' Mo';
+            return _fmtProgress(prog.doneBytes, prog.totalBytes);
         }
         return _statusFromProgressData({ status: prog.status, phase: prog.phase });
     }
@@ -305,6 +401,7 @@ window.GameFixes = (function() {
         if (!els.header || !els.title) return;
         els.header.classList.remove('fixed-progress-header--ok', 'fixed-progress-header--fail');
         els.title.textContent = 'Installation en cours';
+        if (els.closeBtn) els.closeBtn.textContent = 'Fermer';
     }
 
     function _openProgressModal(game) {
@@ -362,13 +459,19 @@ window.GameFixes = (function() {
             if (els.bar) els.bar.style.width = '100%';
             if (els.pct) els.pct.textContent = '100 %';
             if (els.status) {
-                els.status.textContent = clean || 'Le jeu a été installé avec succès.';
+                els.status.textContent =
+                    'Installé — retrouve ce jeu dans la Bibliothèque du launcher.';
             }
             if (els.error) {
                 els.error.classList.add('hidden');
                 els.error.textContent = '';
             }
+            if (els.closeBtn) {
+                els.closeBtn.textContent = 'Voir dans la bibliothèque';
+                els.closeBtn.classList.remove('hidden');
+            }
         } else {
+            if (els.closeBtn) els.closeBtn.textContent = 'Fermer';
             if (els.header) els.header.classList.add('fixed-progress-header--fail');
             if (els.title) els.title.textContent = 'Installation échouée';
             if (els.status) els.status.textContent = 'Une erreur est survenue.';
@@ -399,6 +502,12 @@ window.GameFixes = (function() {
         }
 
         function onCloseFinished() {
+            var gid = _activeProgressGameId;
+            var prog = gid && _progress[gid];
+            if (prog && prog.success) {
+                _goToLibrary();
+                return;
+            }
             Components.hideModal('fixed-game-progress-modal');
             _progressModalOpen = false;
             _dismissInstallBanner();
@@ -619,22 +728,43 @@ window.GameFixes = (function() {
         }
     }
 
+    function _getFilteredCatalog() {
+        var q = (_vipSearch || '').trim().toLowerCase();
+        if (!q) return _catalog.slice();
+        return _catalog.filter(function(g) {
+            var name = (g.name || g.id || '').toLowerCase();
+            return name.indexOf(q) !== -1;
+        });
+    }
+
     function _renderCards() {
         var grid = document.getElementById('gamefixes-grid');
         if (!grid) return;
 
         if (!_catalog.length) {
             grid.innerHTML = '<p class="gamefixes-empty">Aucun jeu dans le catalogue pour le moment.</p>';
+            Components.renderGridPagination('gamefixes-pagination', null);
             return;
         }
 
+        var filtered = _getFilteredCatalog();
+        if (!filtered.length) {
+            grid.innerHTML = '<p class="gamefixes-empty">Aucun jeu ne correspond à ta recherche.</p>';
+            Components.renderGridPagination('gamefixes-pagination', null);
+            return;
+        }
+
+        var pageState = Components.paginateSlice(filtered, _vipPage);
+        _vipPage = pageState.page;
+
         grid.innerHTML = '';
-        _catalog.forEach(function(g) {
+        pageState.items.forEach(function(g) {
             var id = g.id || '';
             var name = g.name || id;
             var size = g.size_label || '';
             var tags = Array.isArray(g.tags) ? g.tags : [];
             var prog = _progress[id];
+            var isInstalled = _isGameInstalled(id);
 
             var card = document.createElement(EL);
             card.className = 'fixed-game-card';
@@ -677,6 +807,13 @@ window.GameFixes = (function() {
                 body.appendChild(tagP);
             }
 
+            if (isInstalled) {
+                var installedBadge = document.createElement('p');
+                installedBadge.className = 'fixed-game-installed-badge';
+                installedBadge.textContent = '✓ Jeu installé';
+                body.appendChild(installedBadge);
+            }
+
             if (prog && prog.active) {
                 var wrap = document.createElement(EL);
                 wrap.className = 'fixed-game-progress';
@@ -694,25 +831,46 @@ window.GameFixes = (function() {
             var btn = document.createElement('button');
             btn.type = 'button';
             var isLocked = !_tripleAllowed();
-            btn.className = 'btn ' + (isLocked ? 'fixed-game-download-btn--locked' : 'btn-primary') + ' fixed-game-download-btn';
-            btn.setAttribute('data-game-id', id);
-            if (isLocked) {
-                btn.textContent = '🔒 Triple Monstre requis';
-                btn.setAttribute('data-tooltip', 'Réservé au plan Triple Monstre — clique pour voir les offres');
+            if (isInstalled) {
+                btn.className = 'btn btn-secondary fixed-game-download-btn fixed-game-download-btn--installed';
+                btn.setAttribute('data-game-id', id);
+                btn.textContent = 'Voir dans la bibliothèque';
+                btn.addEventListener('click', function() { _goToLibrary(); });
             } else {
-                btn.textContent = (prog && prog.active) ? 'Installation en cours…' : 'Télécharger et installer';
-                if (prog && prog.active) btn.disabled = true;
+                btn.className = 'btn ' + (isLocked ? 'fixed-game-download-btn--locked' : 'btn-primary') + ' fixed-game-download-btn';
+                btn.setAttribute('data-game-id', id);
+                if (isLocked) {
+                    btn.textContent = '🔒 Triple Monstre requis';
+                    btn.setAttribute('data-tooltip', 'Réservé au plan Triple Monstre — clique pour voir les offres');
+                } else {
+                    btn.textContent = (prog && prog.active) ? 'Installation en cours…' : 'Télécharger et installer';
+                    if (prog && prog.active) btn.disabled = true;
+                }
+                btn.addEventListener('click', function() { _startInstall(id); });
             }
-            btn.addEventListener('click', function() { _startInstall(id); });
             body.appendChild(btn);
 
             card.appendChild(body);
             grid.appendChild(card);
         });
+
+        Components.renderGridPagination('gamefixes-pagination', pageState, function(p) {
+            _vipPage = p;
+            _renderCards();
+            if (grid) {
+                grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+
+        _applyPartialsToCards();
     }
 
     function _startInstall(gameId) {
         if (!gameId) return;
+        if (_isGameInstalled(gameId)) {
+            _goToLibrary();
+            return;
+        }
         if (!_tripleAllowed()) {
             Components.showModal('gamefixes-upsell-modal');
             return;
@@ -723,6 +881,7 @@ window.GameFixes = (function() {
 
     function _applyPartialsToCards() {
         Object.keys(_partials).forEach(function(gid) {
+            if (_isGameInstalled(gid)) return;
             var p = _partials[gid];
             if (!p || !p.partial_bytes) return;
             var card = document.querySelector('.fixed-game-card[data-game-id="' + gid + '"]');
@@ -836,6 +995,17 @@ window.GameFixes = (function() {
         _bindInstallModal();
         _bindProgressModal();
         _bindUpsellModal();
+        _bindSuccessModal();
+
+        var searchInp = document.getElementById('gamefixes-search');
+        if (searchInp && !searchInp.dataset.bound) {
+            searchInp.dataset.bound = '1';
+            searchInp.addEventListener('input', function() {
+                _vipSearch = this.value;
+                _vipPage = 1;
+                _renderCards();
+            });
+        }
 
         Bridge.on('download_progress', function(json) {
             try {
@@ -859,11 +1029,15 @@ window.GameFixes = (function() {
                 if (!_progressModalOpen) {
                     _updateInstallBanner(gid);
                 }
-                _renderCards();
                 if (data.success) {
-                    Components.showToast('success', msg || 'Installation terminée.');
-                    _setStatus(msg || 'Installation terminée.', false);
+                    var game = _getGameById(gid);
+                    var gname = (game && game.name) || gid;
+                    _loadInstalled(function() {
+                        _showInstallSuccessModal(gname);
+                    });
+                    _setStatus('', false);
                 } else {
+                    _renderCards();
                     Components.showToast('error', msg || 'Installation échouée.');
                     _setStatus(msg || 'Installation échouée.', true);
                 }
@@ -876,6 +1050,7 @@ window.GameFixes = (function() {
         _refreshRank();
         Bridge.call('sync_launcher_profile');
         _loadCatalog(true);
+        _loadInstalled();
         _startCatalogPoll();
         if (_activeProgressGameId && _progress[_activeProgressGameId] && !_progressModalOpen) {
             _updateInstallBanner(_activeProgressGameId);

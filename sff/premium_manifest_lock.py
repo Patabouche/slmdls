@@ -13,7 +13,10 @@ from pathlib import Path
 from typing import Any
 
 # Dépendances ciblées : vdf (storage.vdf, utils.enter_path) — pas writer → http_utils → keyring.
-from sff.launcher_ranks import launcher_rank_bucket, paid_install_slot_cap_for_bucket
+from sff.launcher_ranks import (
+    launcher_rank_bucket,
+    paid_install_slot_cap_for_bucket,
+)
 from sff.lua.parse_lua import parse_lua_contents
 from sff.steam_tools_compat import sync_manifest_to_config_depotcache
 from sff.storage.vdf import VDFLoadAndDumper, get_steam_libs
@@ -138,6 +141,103 @@ def paid_apps_dict_for_steam(steam_path: Path | str | None) -> dict[str, Any]:
 
 def paid_distinct_game_count_for_steam(steam_path: Path | str | None) -> int:
     return len(paid_apps_dict_for_steam(steam_path))
+
+
+def _name_from_acf_file(acf_path: Path) -> str:
+    try:
+        text = acf_path.read_text(encoding="utf-8", errors="replace")
+        for line in text.splitlines():
+            line = line.strip()
+            if '"name"' in line and '"' in line:
+                return line.split('"')[-2].strip()
+    except Exception:
+        pass
+    return ""
+
+
+def get_locked_library_games(steam_path: Path | str | None, rank_raw: str) -> list[dict]:
+    """
+    Jeux en quarantaine (sans abonnement actif) — affichés verrouillés dans la bibliothèque.
+    """
+    out: list[dict] = []
+    seen: set[str] = set()
+    bucket = launcher_rank_bucket(rank_raw)
+
+    if bucket != "triple":
+        try:
+            from sff.fixed_games import _FIXED_GAMES_BACKUP_INDEX
+
+            if _FIXED_GAMES_BACKUP_INDEX.is_file():
+                stored = json.loads(_FIXED_GAMES_BACKUP_INDEX.read_text(encoding="utf-8"))
+                if isinstance(stored, dict):
+                    for slug, entry in stored.items():
+                        if not isinstance(entry, dict):
+                            continue
+                        aid = entry.get("app_id") or 0
+                        key = f"fixed:{aid or slug}"
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        out.append({
+                            "app_id": int(aid) if str(aid).isdigit() else 0,
+                            "name": entry.get("name") or f"Jeu {aid or slug}",
+                            "installed": False,
+                            "locked": True,
+                            "lock_reason": (
+                                "Ce jeu Pépite nécessite un abonnement Triple Monstre actif."
+                            ),
+                            "lock_label": "Triple Monstre requis",
+                            "source": "fixed",
+                            "path": entry.get("backup_path") or entry.get("original_path") or "",
+                        })
+        except Exception as e:
+            logger.debug("get_locked_library_games fixed: %s", e)
+
+    if bucket == "free" and steam_path:
+        try:
+            sp = Path(steam_path)
+            if sp.exists():
+                sk = _steam_key(sp)
+                qroot = _BACKUP_ROOT / sk
+                reg = _load_json(_REGISTRY_FILE, {})
+                apps = (reg.get("per_steam") or {}).get(sk, {}).get("apps") or {}
+                skip_id = _free_claimed_app_id()
+                candidates: set[str] = {str(k) for k in apps.keys()}
+                if qroot.is_dir():
+                    for sub in qroot.iterdir():
+                        if sub.is_dir() and sub.name.isdigit():
+                            candidates.add(sub.name)
+                for sid in sorted(candidates, key=lambda x: int(x) if x.isdigit() else 0):
+                    if skip_id and sid == skip_id and sid in _LAUNCHER_FREE_CATALOG_IDS:
+                        continue
+                    qdir = qroot / sid
+                    if not qdir.is_dir():
+                        continue
+                    acf = qdir / f"appmanifest_{sid}.acf"
+                    lua = qdir / f"{sid}.lua"
+                    if not acf.is_file() and not lua.is_file():
+                        continue
+                    key = f"steam:{sid}"
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    nm = _name_from_acf_file(acf) if acf.is_file() else ""
+                    out.append({
+                        "app_id": int(sid) if sid.isdigit() else 0,
+                        "name": nm or f"App {sid}",
+                        "installed": False,
+                        "locked": True,
+                        "lock_reason": (
+                            "Ce jeu nécessite un abonnement payant actif pour être relancé."
+                        ),
+                        "lock_label": "Abonnement requis",
+                        "source": "steam_paid",
+                        "path": "",
+                    })
+        except Exception as e:
+            logger.debug("get_locked_library_games steam: %s", e)
+
+    return out
 
 
 def monstre_new_install_allowed(
@@ -439,6 +539,40 @@ def _restore_one_app(steam_path: Path, app_id: str) -> None:
             logger.warning("premium lock: ACF restore failed: %s", e)
 
 
+def purge_app_from_launcher_registry(steam_path: Path | str, app_id: str) -> None:
+    """Retire un jeu du registre premium et supprime sa sauvegarde Manifests_Backup."""
+    aid = str(app_id)
+    sp = Path(steam_path)
+    reg = _load_json(_REGISTRY_FILE, {})
+    sk = _steam_key(sp)
+    per = reg.setdefault("per_steam", {})
+    bucket = dict(per.get(sk) or {})
+    apps = dict(bucket.get("apps") or {})
+    entry = apps.pop(aid, None)
+    if entry is not None:
+        bucket["apps"] = apps
+        per[sk] = bucket
+        reg["per_steam"] = per
+        _save_json(_REGISTRY_FILE, reg)
+    if isinstance(entry, dict):
+        for name in entry.get("manifest_names") or []:
+            if not name:
+                continue
+            for cache in _all_depotcache_dirs(sp):
+                try:
+                    mf = cache / name
+                    if mf.is_file():
+                        mf.unlink()
+                except OSError as e:
+                    logger.debug("purge_app manifest %s: %s", name, e)
+    qdir = _quarantine_dir(sp, aid)
+    if qdir.is_dir():
+        try:
+            shutil.rmtree(qdir, ignore_errors=True)
+        except Exception as e:
+            logger.warning("purge_app backup dir %s: %s", qdir, e)
+
+
 def _quarantine_all(steam_path: Path | None) -> int:
     if not steam_path or not steam_path.exists():
         logger.info("premium lock: quarantine skipped (no steam path)")
@@ -493,20 +627,19 @@ def _restore_all(steam_path: Path | None) -> None:
     logger.info("premium lock: restauration terminée pour Steam courant")
 
 
-def _close_steam_to_refresh_library() -> None:
+def _restart_steam_to_refresh_library(steam_path: Path | str | None) -> None:
     """
-    Steam garde la bibliotheque en memoire : sans fermer le processus, Play peut
-    rester disponible. Fermeture automatique = pas de redemarrage manuel par l'utilisateur.
+    Steam garde la bibliothèque en mémoire : fermeture + relance pour appliquer
+    quarantaine / restauration sans action manuelle de l'utilisateur.
     """
+    if not steam_path:
+        return
     try:
-        from sff.processes import force_close_steam_client
+        from sff.processes import restart_steam_for_library_refresh
 
-        if force_close_steam_client():
-            logger.info(
-                "premium lock: Steam was closed so the subscription lock applies immediately"
-            )
+        restart_steam_for_library_refresh(steam_path)
     except Exception as e:
-        logger.warning("premium lock: could not close Steam: %s", e)
+        logger.warning("premium lock: could not restart Steam: %s", e)
 
 
 def apply_rank_transition(steam_path: Path | str | None, new_rank_raw: str) -> dict[str, Any]:
@@ -535,6 +668,10 @@ def apply_rank_transition(steam_path: Path | str | None, new_rank_raw: str) -> d
 
     paid_old = _norm_rank(old_norm) != "free"
     paid_new = new_norm != "free"
+    old_bucket = launcher_rank_bucket(old_norm)
+    new_bucket = launcher_rank_bucket(new_norm)
+    old_triple = old_bucket == "triple"
+    new_triple = new_bucket == "triple"
 
     if paid_old and not paid_new:
         if not sp or not sp.exists():
@@ -548,8 +685,15 @@ def apply_rank_transition(steam_path: Path | str | None, new_rank_raw: str) -> d
         state["quarantine_active"] = True
         out["action"] = "quarantine"
         out["apps_quarantined"] = nq
-        if nq > 0:
-            _close_steam_to_refresh_library()
+        try:
+            from sff.fixed_games import quarantine_sideloaded_fixed_games
+
+            nf = quarantine_sideloaded_fixed_games()
+            out["fixed_games_quarantined"] = nf
+        except Exception as e:
+            logger.warning("premium lock: quarantaine Pépites (FREE): %s", e)
+        if nq > 0 or out.get("fixed_games_quarantined"):
+            _restart_steam_to_refresh_library(sp)
     elif not paid_old and paid_new:
         if not sp or not sp.exists():
             logger.warning(
@@ -560,7 +704,36 @@ def apply_rank_transition(steam_path: Path | str | None, new_rank_raw: str) -> d
         _restore_all(sp)
         state["quarantine_active"] = False
         out["action"] = "restore"
-        _close_steam_to_refresh_library()
+        if new_triple:
+            try:
+                from sff.fixed_games import restore_sideloaded_fixed_games
+
+                out["fixed_games_restored"] = restore_sideloaded_fixed_games()
+            except Exception as e:
+                logger.warning("premium lock: restauration Pépites: %s", e)
+        _restart_steam_to_refresh_library(sp)
+    elif old_triple and not new_triple:
+        try:
+            from sff.fixed_games import quarantine_sideloaded_fixed_games
+
+            nf = quarantine_sideloaded_fixed_games()
+            out["fixed_games_quarantined"] = nf
+            if nf > 0:
+                out["action"] = "fixed_quarantine"
+                _restart_steam_to_refresh_library(sp)
+        except Exception as e:
+            logger.warning("premium lock: quarantaine Pépites (hors Triple): %s", e)
+    elif not old_triple and new_triple:
+        try:
+            from sff.fixed_games import restore_sideloaded_fixed_games
+
+            nf = restore_sideloaded_fixed_games()
+            out["fixed_games_restored"] = nf
+            if nf > 0:
+                out["action"] = "fixed_restore"
+                _restart_steam_to_refresh_library(sp)
+        except Exception as e:
+            logger.warning("premium lock: restauration Pépites (Triple): %s", e)
 
     state["last_norm_rank"] = new_norm
     _save_json(_STATE_FILE, state)
@@ -572,9 +745,22 @@ def run_startup_check(steam_path: Path | str | None) -> dict[str, Any]:
     À chaque ouverture du launcher (après auth) : si le compte est en quarantaine
     active (passage payant → FREE) mais des .lua réapparaissent dans stplug-in,
     les renvoie dans Manifests_Backup (copie manuelle / sync outil tiers).
+    Vérifie aussi que les jeux Pépites ne restent pas actifs hors Triple Monstre.
     """
+    fixed_pepite = 0
+    try:
+        from sff.fixed_games import enforce_sideloaded_rank_policy
+
+        fixed_pepite = enforce_sideloaded_rank_policy(_load_auth_rank())
+        if fixed_pepite > 0:
+            _restart_steam_to_refresh_library(steam_path)
+    except Exception as e:
+        logger.debug("premium lock fixed leak repair: %s", e)
+
     state = _load_json(_STATE_FILE, {})
     if _norm_rank(state.get("last_norm_rank")) != "free":
+        if fixed_pepite > 0:
+            return {"action": "fixed_leak_repair", "count": fixed_pepite}
         return {"action": "skip", "reason": "not_free_plan"}
     if not state.get("quarantine_active"):
         return {"action": "skip", "reason": "not_quarantined"}
@@ -597,5 +783,7 @@ def run_startup_check(steam_path: Path | str | None) -> dict[str, Any]:
             _quarantine_one_app(sp, sid, entry if isinstance(entry, dict) else {})
             fixed += 1
     if fixed > 0:
-        _close_steam_to_refresh_library()
+        _restart_steam_to_refresh_library(sp)
+    if fixed_pepite > 0:
+        return {"action": "fixed_leak_repair", "count": fixed_pepite}
     return {"action": "leak_repair", "count": fixed}

@@ -319,23 +319,60 @@ def required_bytes_for_game(entry: dict | None) -> int:
 
 
 
+def _trim_decimal(value: str) -> str:
+    if "." in value:
+        value = value.rstrip("0").rstrip(".")
+    return value
+
+
 def format_bytes(n: int) -> str:
-
     n = max(0, int(n))
+    gb, mb, kb = 1024**3, 1024**2, 1024
+    if n >= gb:
+        v = n / gb
+        if v >= 100:
+            return f"{v:.0f} Go"
+        if v >= 10:
+            return f"{_trim_decimal(f'{v:.1f}')} Go"
+        return f"{_trim_decimal(f'{v:.2f}')} Go"
+    if n >= mb:
+        v = n / mb
+        if v >= 100:
+            return f"{v:.0f} Mo"
+        return f"{_trim_decimal(f'{v:.1f}')} Mo"
+    if n >= kb:
+        return f"{n / kb:.0f} Ko"
+    return f"{n} o"
 
-    if n >= 1024**4:
 
-        return f"{n / 1024**4:.1f} To"
+def format_progress_bytes(done: int, total: int) -> str:
+    """Affiche une progression lisible, ex. « 0,26 Go / 13,1 Go »."""
+    done = max(0, int(done))
+    total = max(0, int(total))
+    if total <= 0:
+        return format_bytes(done)
 
-    if n >= 1024**3:
+    gb, mb = 1024**3, 1024**2
 
-        return f"{n / 1024**3:.1f} Go"
+    def _fmt_gb(v: int) -> str:
+        x = v / gb
+        if x >= 10:
+            return f"{_trim_decimal(f'{x:.1f}')} Go"
+        if x >= 1:
+            return f"{_trim_decimal(f'{x:.1f}')} Go"
+        return f"{_trim_decimal(f'{x:.2f}')} Go"
 
-    if n >= 1024**2:
+    def _fmt_mb(v: int) -> str:
+        x = v / mb
+        if x >= 100:
+            return f"{x:.0f} Mo"
+        return f"{_trim_decimal(f'{x:.1f}')} Mo"
 
-        return f"{n / 1024**2:.0f} Mo"
-
-    return f"{n / 1024:.0f} Ko"
+    if total >= gb:
+        return f"{_fmt_gb(done)} / {_fmt_gb(total)}"
+    if total >= mb:
+        return f"{_fmt_mb(done)} / {_fmt_mb(total)}"
+    return f"{format_bytes(done)} / {format_bytes(total)}"
 
 
 
@@ -726,6 +763,167 @@ def _register_sideloaded_game(app_id: str | int, name: str, game_folder: Path) -
         log.warning(f"_register_sideloaded_game: {e}")
 
 
+def get_installed_fixed_catalog_ids() -> list[str]:
+    """IDs catalogue (ex. subnautica2) des Pépites déjà installées (registre sideloaded)."""
+    app_to_catalog: dict[str, str] = {}
+    for entry in load_fixed_games_catalog():
+        cid = (entry.get("id") or "").strip()
+        aid = str(entry.get("app_id") or "").strip()
+        if cid and aid.isdigit():
+            app_to_catalog[aid] = cid
+    installed: list[str] = []
+    seen: set[str] = set()
+    for sg in get_sideloaded_games():
+        aid = str(sg.get("app_id") or "").strip()
+        cid = app_to_catalog.get(aid)
+        if cid and cid not in seen:
+            seen.add(cid)
+            installed.append(cid)
+    return installed
+
+
+_FIXED_GAMES_BACKUP_ROOT = Path.home() / ".slimedeals" / "FixedGames_Backup"
+_FIXED_GAMES_BACKUP_INDEX = _FIXED_GAMES_BACKUP_ROOT / "index.json"
+
+
+def _sideload_path_key(path: str | Path) -> str:
+    try:
+        return str(Path(path).resolve()).lower()
+    except OSError:
+        return str(path or "").strip().lower()
+
+
+def is_registered_sideloaded_path(folder: str | Path) -> bool:
+    """True si le dossier correspond à un jeu Pépite enregistré localement."""
+    target = _sideload_path_key(folder)
+    if not target:
+        return False
+    for sg in get_sideloaded_games():
+        sg_path = (sg.get("path") or "").strip()
+        if sg_path and _sideload_path_key(sg_path) == target:
+            return True
+    return False
+
+
+def quarantine_sideloaded_fixed_games() -> int:
+    """
+    Retire les jeux Pépites du disque actif (backup + registre vide).
+    Appelé quand l'abonnement Triple Monstre n'est plus actif.
+    """
+    registry = get_sideloaded_games()
+    if not registry:
+        return 0
+
+    _FIXED_GAMES_BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
+    stored: dict = {}
+    if _FIXED_GAMES_BACKUP_INDEX.is_file():
+        try:
+            raw = json.loads(_FIXED_GAMES_BACKUP_INDEX.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                stored = raw
+        except Exception:
+            stored = {}
+
+    count = 0
+    for entry in registry:
+        path_str = (entry.get("path") or "").strip()
+        if not path_str:
+            continue
+        src = Path(path_str)
+        app_id = str(entry.get("app_id") or "").strip()
+        slug = app_id or re.sub(r"[^a-z0-9]+", "", (entry.get("name") or "game").lower()) or "game"
+        dest = _FIXED_GAMES_BACKUP_ROOT / slug
+        if src.is_dir():
+            try:
+                if dest.exists():
+                    shutil.rmtree(dest, ignore_errors=True)
+                shutil.move(str(src), str(dest))
+            except OSError:
+                try:
+                    shutil.copytree(src, dest, dirs_exist_ok=True)
+                    shutil.rmtree(src, ignore_errors=True)
+                except OSError as e:
+                    log.warning("quarantine_sideloaded_fixed_games move %s: %s", src, e)
+                    dest = src
+        stored[slug] = {
+            **entry,
+            "backup_path": str(dest),
+            "original_path": path_str,
+        }
+        count += 1
+
+    try:
+        _FIXED_GAMES_BACKUP_INDEX.write_text(
+            json.dumps(stored, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        _sideloaded_registry_path().write_text("[]", encoding="utf-8")
+    except Exception as e:
+        log.warning("quarantine_sideloaded_fixed_games index: %s", e)
+    return count
+
+
+def restore_sideloaded_fixed_games() -> int:
+    """Restaure les jeux Pépites depuis le backup (retour Triple Monstre)."""
+    if not _FIXED_GAMES_BACKUP_INDEX.is_file():
+        return 0
+    try:
+        stored = json.loads(_FIXED_GAMES_BACKUP_INDEX.read_text(encoding="utf-8"))
+    except Exception:
+        return 0
+    if not isinstance(stored, dict) or not stored:
+        return 0
+
+    registry: list[dict] = []
+    count = 0
+    for slug, entry in stored.items():
+        if not isinstance(entry, dict):
+            continue
+        backup_path = Path(str(entry.get("backup_path") or ""))
+        original_path = Path(str(entry.get("original_path") or backup_path))
+        if backup_path.is_dir():
+            try:
+                original_path.parent.mkdir(parents=True, exist_ok=True)
+                if original_path.exists():
+                    shutil.rmtree(original_path, ignore_errors=True)
+                if backup_path.resolve() != original_path.resolve():
+                    shutil.move(str(backup_path), str(original_path))
+            except OSError as e:
+                log.warning("restore_sideloaded_fixed_games %s: %s", backup_path, e)
+                continue
+        registry.append({
+            "app_id": entry.get("app_id") or 0,
+            "name": entry.get("name") or slug,
+            "path": str(original_path),
+            "source": "fixed",
+        })
+        count += 1
+
+    if registry:
+        try:
+            _sideloaded_registry_path().write_text(
+                json.dumps(registry, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as e:
+            log.warning("restore_sideloaded_fixed_games registry: %s", e)
+    try:
+        _FIXED_GAMES_BACKUP_INDEX.unlink(missing_ok=True)
+    except OSError:
+        pass
+    return count
+
+
+def enforce_sideloaded_rank_policy(rank: str | None) -> int:
+    """Quarantaine auto si le rang ne permet plus les Pépites (Triple Monstre)."""
+    from sff.launcher_ranks import triple_exclusive_tools_allowed_for_rank
+
+    if triple_exclusive_tools_allowed_for_rank(rank):
+        return 0
+    if not get_sideloaded_games():
+        return 0
+    return quarantine_sideloaded_fixed_games()
+
 
 
 
@@ -876,10 +1074,13 @@ def install_fixed_game_from_url(
     )
 
     if archive is None or not archive.is_file():
-
         _fixed_log(ui_log, "Archive absente après téléchargement")
-
-        return False, "Téléchargement échoué ou annulé.", None, None
+        return (
+            False,
+            "Téléchargement BuzzHeavier échoué (lien inaccessible ou bloqué par Cloudflare). "
+            "Réessaie dans quelques minutes.",
+            None,
+        )
 
 
 

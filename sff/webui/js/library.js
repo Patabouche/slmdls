@@ -7,7 +7,54 @@ window.Library = (function() {
     'use strict';
 
     var _initialized = false;
-    var _pendingDelete = null; // { appId, gamePath }
+    var _pendingDelete = null; // { appId, gamePath, gameName, kind: 'steam'|'sideloaded' }
+
+    function _openDeleteConfirm(payload) {
+        _pendingDelete = payload;
+        var nameEl = document.getElementById('library-delete-game-name');
+        var descEl = document.getElementById('library-delete-desc');
+        if (nameEl) nameEl.textContent = payload.gameName || ('App ' + (payload.appId || ''));
+        if (descEl) {
+            descEl.textContent = payload.kind === 'sideloaded'
+                ? 'Le dossier du jeu sera supprimé du disque et retiré de la bibliothèque du launcher. Cette action est irréversible.'
+                : 'Steam sera fermé, le jeu sera retiré de ta bibliothèque Steam et supprimé du disque. Cette action est irréversible.';
+        }
+        Components.showModal('library-delete-modal');
+    }
+
+    function _cancelDeleteConfirm() {
+        _pendingDelete = null;
+        Components.hideModal('library-delete-modal');
+    }
+
+    function _confirmDelete() {
+        if (!_pendingDelete) return;
+        var pending = _pendingDelete;
+        _pendingDelete = null;
+        Components.hideModal('library-delete-modal');
+
+        if (pending.kind === 'sideloaded') {
+            var delPath = (pending.gamePath || '').trim();
+            var delName = pending.gameName || 'ce jeu';
+            if (!delPath) {
+                Components.showToast('error', 'Chemin introuvable.');
+                return;
+            }
+            Bridge.callWithCallback('delete_sideloaded_game', delPath, function(raw) {
+                var o = {};
+                try { o = JSON.parse(raw || '{}'); } catch (e) {}
+                if (o.ok) {
+                    Components.showToast('success', delName + ' supprimé.');
+                    Library.refresh();
+                } else {
+                    Components.showToast('error', o.message || 'Suppression impossible.');
+                }
+            });
+            return;
+        }
+
+        Bridge.call('delete_game', pending.appId, pending.gamePath, 'full');
+    }
 
     /** Aligné sur App._normLauncherRank / plan FREE */
     function _normLauncherRank(r) {
@@ -94,6 +141,7 @@ window.Library = (function() {
         var searchInp = document.getElementById('library-search');
         if (searchInp) {
             searchInp.addEventListener('input', function() {
+                _libraryPage = 1;
                 _applyLibraryFilter(this.value.trim().toLowerCase());
             });
         }
@@ -141,29 +189,35 @@ window.Library = (function() {
                     if (action === 'fix') {
                         FixGame.preSelect(appId);
                         App.navigateTo('fixgame');
+                    } else if (action === 'launch_locked') {
+                        Components.showToast(
+                            'error',
+                            btn.dataset.lockmsg || 'Abonnement requis pour lancer ce jeu.'
+                        );
+                    } else if (action === 'launch_missing') {
+                        Components.showToast(
+                            'error',
+                            btn.dataset.missingmsg || 'Fichiers du jeu absents sur le disque.'
+                        );
                     } else if (action === 'delete_sideloaded') {
-                        // Suppression d'un jeu Pépites (pas d'ACF Steam)
-                        var delPath = (btn.dataset.gamepath || '').trim();
-                        var delName = (btn.dataset.gamename || 'ce jeu');
-                        if (!delPath) { Components.showToast('error', 'Chemin introuvable.'); return; }
-                        if (!confirm('Supprimer ' + delName + ' ?\n' + delPath)) return;
-                        Bridge.callWithCallback('delete_sideloaded_game', delPath, function(raw) {
-                            var o = {}; try { o = JSON.parse(raw || '{}'); } catch(e) {}
-                            if (o.ok) {
-                                Components.showToast('success', delName + ' supprimé.');
-                                Library.refresh();
-                            } else {
-                                Components.showToast('error', o.message || 'Suppression impossible.');
-                            }
+                        var sideloadPath = (btn.dataset.gamepath || '').trim();
+                        if (!sideloadPath) {
+                            Components.showToast('error', 'Chemin introuvable.');
+                            return;
+                        }
+                        _openDeleteConfirm({
+                            appId: appId || '',
+                            gamePath: sideloadPath,
+                            gameName: btn.dataset.gamename || 'ce jeu',
+                            kind: 'sideloaded'
                         });
                     } else if (action === 'delete') {
-                        _pendingDelete = {
+                        _openDeleteConfirm({
                             appId: appId,
-                            gamePath: btn.dataset.gamepath || ''
-                        };
-                        var nameEl = document.getElementById('library-delete-game-name');
-                        if (nameEl) nameEl.textContent = btn.dataset.gamename || ('App ' + appId);
-                        Components.showModal('library-delete-modal');
+                            gamePath: btn.dataset.gamepath || '',
+                            gameName: btn.dataset.gamename || ('App ' + appId),
+                            kind: 'steam'
+                        });
                     } else if (action === 'check_update') {
                         btn.disabled = true;
                         btn.textContent = 'Vérification...';
@@ -217,35 +271,15 @@ window.Library = (function() {
             });
         }
 
-        // Delete modal buttons
-        var btnApplist = document.getElementById('library-delete-applist');
-        if (btnApplist) {
-            btnApplist.addEventListener('click', function() {
-                if (_pendingDelete) {
-                    Bridge.call('delete_game', _pendingDelete.appId, _pendingDelete.gamePath, 'applist');
-                    _pendingDelete = null;
-                    Components.hideModal('library-delete-modal');
-                }
-            });
-        }
-
-        var btnFull = document.getElementById('library-delete-full');
-        if (btnFull) {
-            btnFull.addEventListener('click', function() {
-                if (_pendingDelete) {
-                    Bridge.call('delete_game', _pendingDelete.appId, _pendingDelete.gamePath, 'full');
-                    _pendingDelete = null;
-                    Components.hideModal('library-delete-modal');
-                }
-            });
+        var btnConfirmDelete = document.getElementById('library-delete-confirm');
+        if (btnConfirmDelete) {
+            btnConfirmDelete.addEventListener('click', _confirmDelete);
         }
 
         ['library-delete-cancel', 'library-delete-cancel-footer'].forEach(function(id) {
             var btn = document.getElementById(id);
             if (btn) {
-                btn.addEventListener('click', function() {
-                    _pendingDelete = null;
-                });
+                btn.addEventListener('click', _cancelDeleteConfirm);
             }
         });
     }
@@ -330,12 +364,26 @@ window.Library = (function() {
     }
 
     var _libraryGames = [];
+    var _libraryPage = 1;
 
     function _renderLibrary(games) {
         _libraryGames = games || [];
+        _libraryPage = 1;
         var searchInp = document.getElementById('library-search');
         var filter = searchInp ? searchInp.value.trim().toLowerCase() : '';
         _applyLibraryFilter(filter);
+    }
+
+    function _isPepiteGame(game) {
+        return !!(game && (game.source === 'fixed' || game.is_fixed === true));
+    }
+
+    function _isLockedGame(game) {
+        return !!(game && game.locked);
+    }
+
+    function _isGhostGame(game) {
+        return !!(game && game.files_missing);
     }
 
     function _applyLibraryFilter(filter) {
@@ -349,28 +397,60 @@ window.Library = (function() {
             });
         }
 
+        var pageState = Components.paginateSlice(games, _libraryPage);
+        _libraryPage = pageState.page;
+
         if (grid) grid.innerHTML = '';
 
         if (games.length === 0) {
             if (grid) grid.classList.add('hidden');
             if (empty) empty.classList.remove('hidden');
+            Components.renderGridPagination('library-pagination', null);
             return;
         }
 
         if (grid) grid.classList.remove('hidden');
         if (empty) empty.classList.add('hidden');
 
-        games.forEach(function(game, index) {
-            game.installed = true;
-            var card = Components.createGameCard(game, { index: index, forceShowImage: true });
-            var isSideloaded = game.source === 'fixed';
+        pageState.items.forEach(function(game, index) {
+            var isLocked = _isLockedGame(game);
+            var isGhost = !isLocked && _isGhostGame(game);
+            game.installed = !isLocked && !isGhost;
+            var isPepite = !isLocked && !isGhost && _isPepiteGame(game);
+            var card = Components.createGameCard(game, {
+                index: index,
+                forceShowImage: true,
+                hideInstalledBadge: isPepite || isLocked || isGhost
+            });
+            if (isLocked) {
+                card.classList.add('game-card--locked');
+            } else if (isGhost) {
+                card.classList.add('game-card--ghost');
+            }
+            if (isPepite) {
+                card.classList.add('game-card--pepite');
+                card.dataset.source = 'fixed';
+            }
 
-            // Badge Pépites pour les jeux installés depuis Pépites
-            if (isSideloaded) {
+            if (isLocked) {
+                var lockBadge = document.createElement('div');
+                lockBadge.className = 'lib-locked-badge';
+                lockBadge.title = game.lock_reason || 'Abonnement requis';
+                lockBadge.textContent = game.lock_label || 'Sans abonnement';
+                card.style.position = 'relative';
+                card.appendChild(lockBadge);
+            } else if (isGhost) {
+                var ghostBadge = document.createElement('div');
+                ghostBadge.className = 'lib-ghost-badge';
+                ghostBadge.title = 'Visible dans Steam mais fichiers absents sur le disque';
+                ghostBadge.textContent = 'Fichiers manquants';
+                card.style.position = 'relative';
+                card.appendChild(ghostBadge);
+            } else if (isPepite) {
                 var badge = document.createElement('div');
                 badge.className = 'lib-pepites-badge';
-                badge.title = 'Installé depuis Pépites';
-                badge.textContent = '✦ Pépites';
+                badge.title = 'Jeu VIP';
+                badge.textContent = '(VIP)';
                 card.style.position = 'relative';
                 card.appendChild(badge);
             }
@@ -378,14 +458,36 @@ window.Library = (function() {
             // Add library-specific actions
             var safeName = (game.name || '').replace(/"/g, '&quot;');
             var safePath = (game.path || '').replace(/"/g, '&quot;');
+            var lockMsg = (game.lock_reason || 'Abonnement requis pour lancer ce jeu.')
+                .replace(/"/g, '&quot;');
+            var missingMsg = 'Les fichiers de ce jeu ne sont plus sur le disque. Réinstalle-le ou supprime-le pour le retirer de Steam.'
+                .replace(/"/g, '&quot;');
             var actions = card.querySelector('.game-card-actions');
             if (actions) {
                 actions.classList.add('lib-card-actions');
-                if (isSideloaded) {
-                    // Jeux Pépites : juste Lancer + Supprimer (pas d'ACF Steam)
+                if (isLocked) {
+                    actions.innerHTML =
+                        '<p class="lib-locked-msg">' + (game.lock_reason || 'Abonnement requis pour lancer ce jeu.') + '</p>' +
+                        '<div class="lib-actions-primary">' +
+                            '<button type="button" class="lib-btn lib-btn--launch lib-btn--locked" data-action="launch_locked" data-lockmsg="' + lockMsg + '" data-tooltip="Renouvelle ton abonnement pour relancer">' +
+                                '<svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M8 5v14l11-7z"/></svg> Lancer' +
+                            '</button>' +
+                        '</div>';
+                } else if (isGhost) {
+                    actions.innerHTML =
+                        '<p class="lib-ghost-msg">Ce jeu apparaît dans Steam mais son dossier d\'installation est absent. Tu peux le supprimer pour le retirer de Steam, ou le réinstaller depuis l\'accueil.</p>' +
+                        '<div class="lib-actions-primary">' +
+                            '<button type="button" class="lib-btn lib-btn--launch lib-btn--ghost" data-action="launch_missing" data-missingmsg="' + missingMsg + '" data-tooltip="Fichiers absents">' +
+                                '<svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M8 5v14l11-7z"/></svg> Lancer' +
+                            '</button>' +
+                        '</div>' +
+                        '<div class="lib-actions-tools">' +
+                            '<button class="lib-btn lib-btn--delete" data-action="delete" data-appid="' + game.app_id + '" data-gamepath="' + safePath + '" data-gamename="' + safeName + '" data-tooltip="Retirer de Steam et supprimer les traces SlimeDeals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>' +
+                        '</div>';
+                } else if (isPepite) {
                     actions.innerHTML =
                         '<div class="lib-actions-primary">' +
-                            '<button type="button" class="lib-btn lib-btn--launch lib-btn--launch-pepites" data-action="launch_admin" data-gamepath="' + safePath + '" data-tooltip="Lance le jeu (détecte l\'exe automatiquement)">' +
+                            '<button type="button" class="lib-btn lib-btn--launch lib-btn--launch-pepites" data-action="launch_admin" data-gamepath="' + safePath + '" data-tooltip="Lancer le jeu">' +
                                 '<svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M8 5v14l11-7z"/></svg> Lancer' +
                             '</button>' +
                         '</div>' +
@@ -416,7 +518,13 @@ window.Library = (function() {
             if (grid) grid.appendChild(card);
         });
 
-
+        Components.renderGridPagination('library-pagination', pageState, function(p) {
+            _libraryPage = p;
+            _applyLibraryFilter(filter);
+            if (grid) {
+                grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
     }
 
     function _onUpdateCheckResult(data) {

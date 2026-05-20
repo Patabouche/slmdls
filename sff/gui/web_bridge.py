@@ -2523,39 +2523,65 @@ class WebBridge(QObject):
         self._run_async(_do, on_done=_on_done)
 
     @pyqtSlot()
+    def repair_steam_ui(self):
+        """Répare l'interface Steam bloquée (cache UI + profil), sans restaurer la quarantaine."""
+        def _do():
+            from sff.steam_ui_repair import repair_steam_ui as _repair
+
+            ok, msg = _repair(self._steam_path, rank_raw=_load_auth().get("rank"))
+            return (ok, msg)
+
+        def _on_done(result):
+            if isinstance(result, tuple):
+                success, msg = result
+            else:
+                success, msg = bool(result), "Réparation Steam terminée" if result else "Échec"
+            self._emit_task_result("repair_steam_ui", success, msg)
+
+        self._run_async(_do, on_done=_on_done)
+
+    @pyqtSlot()
     def restart_steam(self):
         """Restart or launch Steam."""
         def _do():
             if sys.platform == "win32":
                 import time
                 import subprocess
-                from sff.processes import SteamProcess, is_proc_running
+                from sff.processes import SteamProcess, is_proc_running, kill_steam_client_completely
 
                 if not self._steam_path:
-                    return (False, "Steam path not set")
+                    return (False, "Chemin Steam non configuré")
 
                 applist_folder = None
                 if hasattr(self._ui, 'app_list_man') and self._ui.app_list_man:
                     applist_folder = self._ui.app_list_man.applist_folder
                 if not applist_folder:
-                    return (False, "AppList folder not found")
+                    return (False, "Dossier AppList introuvable")
+
+                # Kill Steam + webhelper + DLLInjector (UAC si Steam tournait en admin)
+                if is_proc_running("steam.exe") or is_proc_running("steamwebhelper.exe") or is_proc_running("DLLInjector.exe"):
+                    print("Killing Steam...", end="", flush=True)
+                    closed = kill_steam_client_completely(try_elevated=True, wait_seconds=14.0)
+                    if not closed:
+                        return (
+                            False,
+                            "Steam n'a pas pu être fermé (accès refusé). "
+                            "Ferme tous les processus Steam / steamwebhelper / DLLInjector "
+                            "dans le Gestionnaire des tâches, puis réessaie."
+                        )
+                    print(" Done!")
+                    time.sleep(1.0)
+                    try:
+                        import shutil
+                        cache = Path.home() / "AppData" / "Local" / "Steam" / "htmlcache"
+                        if cache.is_dir():
+                            shutil.rmtree(cache, ignore_errors=True)
+                    except Exception:
+                        pass
 
                 steam_proc = SteamProcess(self._steam_path, applist_folder)
 
-                # Kill Steam if running
-                if is_proc_running(steam_proc.exe_name):
-                    print("Killing Steam...", end="", flush=True)
-                    steam_proc.kill()
-                    max_wait = 10
-                    waited = 0
-                    while is_proc_running(steam_proc.exe_name) and waited < max_wait:
-                        time.sleep(0.5)
-                        waited += 0.5
-                    if is_proc_running(steam_proc.exe_name):
-                        return (False, "Steam did not close in time — try again")
-                    print(" Done!")
-
-                # Find injector: prefer DLLInjector.exe, fallback to steam.exe
+                # Relance via injecteur GreenLuma (AppList)
                 injector = steam_proc.injector_dir / "DLLInjector.exe"
                 if not injector.exists():
                     injector = self._steam_path / "steam.exe"
@@ -3088,6 +3114,19 @@ class WebBridge(QObject):
         except Exception:
             return "{}"
 
+    @pyqtSlot(result=str)
+    def get_fixed_games_installed(self) -> str:
+        """IDs catalogue des jeux Pépites déjà installés (registre sideloaded)."""
+        from sff.fixed_games import get_installed_fixed_catalog_ids
+
+        try:
+            return json.dumps(
+                {"installed_ids": get_installed_fixed_catalog_ids()},
+                ensure_ascii=False,
+            )
+        except Exception:
+            return json.dumps({"installed_ids": []})
+
     @pyqtSlot(str, str, result=str)
     def check_fixed_game_install(self, game_id: str, install_target: str) -> str:
         """Vérifie espace disque + renvoie le chemin d'installation résolu (JSON)."""
@@ -3173,9 +3212,9 @@ class WebBridge(QObject):
                 elif done and eff_total:
                     phase = "download"
                     pct = min(99, max(1, int(done * 100 / eff_total)))
-                    mb_d = done // 1048576
-                    mb_t = eff_total // 1048576
-                    ui_status = f"{mb_d:,} / {mb_t:,} Mo".replace(",", " ")
+                    from sff.fixed_games import format_progress_bytes
+
+                    ui_status = format_progress_bytes(done, eff_total)
                 elif "téléchargement" in low or "connexion" in low:
                     phase = "download"
                     pct = max(pct, 6)
@@ -3246,6 +3285,13 @@ class WebBridge(QObject):
                 "Erreur interne pendant l’installation. Consulte le journal.",
                 app_id=gid,
             )
+
+        steam_app_id = str((entry or {}).get("app_id") or "").strip()
+        if steam_app_id.isdigit() and sys.platform == "win32":
+            self._log_fixed(
+                f"Notification Discord activité (démarrage téléchargement) app_id={steam_app_id}"
+            )
+            self.request_notify_gen.emit(steam_app_id)
 
         self._run_async(_do, on_done=_on_done, on_error=_on_error)
 
@@ -3615,7 +3661,32 @@ class WebBridge(QObject):
                         if steamapps.exists() and candidate not in libs:
                             libs.append(candidate)
             games = []
-            seen = set()
+            seen: set[str] = set()
+            sideloaded_entries: list[dict] = []
+            sideloaded_app_ids: set[str] = set()
+            sideloaded_paths: set[str] = set()
+            allow_fixed = triple_exclusive_tools_allowed_for_rank(
+                _load_auth().get("rank")
+            )
+
+            try:
+                from sff.fixed_games import get_sideloaded_games
+
+                for sg in get_sideloaded_games():
+                    sg_path = (sg.get("path") or "").strip()
+                    if not sg_path or not Path(sg_path).is_dir():
+                        continue
+                    sideloaded_entries.append(sg)
+                    sg_app_id = sg.get("app_id", 0)
+                    if sg_app_id:
+                        sideloaded_app_ids.add(str(sg_app_id))
+                    try:
+                        sideloaded_paths.add(str(Path(sg_path).resolve()).lower())
+                    except OSError:
+                        sideloaded_paths.add(sg_path.lower())
+            except Exception:
+                pass
+
             for lib in libs:
                 steamapps = lib / "steamapps"
                 if not steamapps.exists():
@@ -3636,43 +3707,62 @@ class WebBridge(QObject):
                                 installdir = line.split('"')[-2] if '"' in line else ""
                         if not app_id or app_id in seen:
                             continue
-                        # Skip if game folder doesn't exist
-                        if installdir:
-                            game_path = steamapps / "common" / installdir
-                            if not game_path.exists():
-                                continue
+                        if app_id in sideloaded_app_ids:
+                            continue
+                        game_path = steamapps / "common" / installdir if installdir else None
+                        folder_exists = bool(game_path and game_path.is_dir())
+                        if folder_exists:
+                            try:
+                                if str(game_path.resolve()).lower() in sideloaded_paths:
+                                    continue
+                            except OSError:
+                                pass
                         seen.add(app_id)
-                        games.append({
+                        entry = {
                             "app_id": int(app_id) if app_id.isdigit() else 0,
                             "name": name or f"App {app_id}",
-                            "installed": True,
-                            "path": str(steamapps / "common" / installdir) if installdir else "",
-                        })
+                            "installed": folder_exists,
+                            "path": str(game_path) if game_path else "",
+                            "source": "steam",
+                        }
+                        if not folder_exists:
+                            entry["files_missing"] = True
+                        games.append(entry)
                     except Exception:
                         continue
-            games.sort(key=lambda g: g.get("name", "").lower())
 
-            # Ajoute les jeux Pépites installés (registre local sideloaded_games.json)
+            for sg in sideloaded_entries:
+                if not allow_fixed:
+                    continue
+                sg_path = sg.get("path", "")
+                sg_app_id = sg.get("app_id", 0)
+                dedupe_key = str(sg_app_id) if sg_app_id else str(sg_path)
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+                games.append({
+                    "app_id": sg_app_id,
+                    "name": sg.get("name") or f"Jeu {sg_app_id}",
+                    "installed": True,
+                    "path": sg_path,
+                    "source": "fixed",
+                })
+
             try:
-                from sff.fixed_games import get_sideloaded_games
-                for sg in get_sideloaded_games():
-                    sg_path = sg.get("path", "")
-                    sg_app_id = sg.get("app_id", 0)
-                    if not sg_path or not Path(sg_path).is_dir():
+                from sff.premium_manifest_lock import get_locked_library_games
+
+                for locked in get_locked_library_games(self._steam_path, _load_auth().get("rank")):
+                    aid = locked.get("app_id", 0)
+                    src = locked.get("source") or ""
+                    dedupe_key = f"{src}:{aid}" if aid else f"{src}:{locked.get('name', '')}"
+                    if dedupe_key in seen:
                         continue
-                    # Ne pas dupliquer si déjà dans la liste Steam (même app_id)
-                    if sg_app_id and str(sg_app_id) in seen:
-                        continue
-                    seen.add(str(sg_app_id))
-                    games.append({
-                        "app_id": sg_app_id,
-                        "name": sg.get("name") or f"Jeu {sg_app_id}",
-                        "installed": True,
-                        "path": sg_path,
-                        "source": "fixed",
-                    })
+                    seen.add(dedupe_key)
+                    games.append(locked)
             except Exception:
-                pass
+                logger.debug("get_installed_games locked entries", exc_info=True)
+
+            games.sort(key=lambda g: g.get("name", "").lower())
 
             return json.dumps(games)
         except Exception:
@@ -3819,6 +3909,18 @@ class WebBridge(QObject):
             return _fail("Le dossier d'installation du jeu est introuvable.")
 
         try:
+            from sff.fixed_games import is_registered_sideloaded_path
+
+            if is_registered_sideloaded_path(game_r) and not triple_exclusive_tools_allowed_for_rank(
+                _load_auth().get("rank")
+            ):
+                return _fail(
+                    "Les jeux Pépites nécessitent un abonnement Triple Monstre actif."
+                )
+        except Exception:
+            logger.debug("launch_game_as_admin sideloaded rank check", exc_info=True)
+
+        try:
             from sff.fix_game.goldberg_applier import GoldbergApplier
         except Exception as exc:
             logger.warning("launch_game_as_admin: GoldbergApplier — %s", exc)
@@ -3901,19 +4003,65 @@ class WebBridge(QObject):
             pass
         return json.dumps({"ok": True, "message": "Jeu supprimé."})
 
+    def _launch_steam_client(self) -> tuple[bool, str]:
+        """Relance Steam (injecteur GreenLuma ou steam.exe) après une opération disque."""
+        if sys.platform != "win32":
+            from sff.linux.steam_process import start_steam
+
+            result = start_steam()
+            if result == "SUCCESS":
+                return True, "Steam relancé."
+            return False, f"Échec relance Steam : {result}"
+
+        import subprocess
+        import time
+        from sff.processes import SteamProcess, is_proc_running
+
+        if not self._steam_path:
+            return False, "Chemin Steam inconnu."
+
+        applist_folder = None
+        if hasattr(self._ui, "app_list_man") and self._ui.app_list_man:
+            applist_folder = self._ui.app_list_man.applist_folder
+        if not applist_folder:
+            steam_exe = Path(self._steam_path) / "steam.exe"
+            if steam_exe.exists():
+                subprocess.Popen([str(steam_exe)], cwd=str(self._steam_path))
+                return True, "Steam relancé."
+            return False, "Dossier AppList introuvable."
+
+        steam_proc = SteamProcess(self._steam_path, applist_folder)
+        injector = steam_proc.injector_dir / "DLLInjector.exe"
+        if not injector.exists():
+            injector = Path(self._steam_path) / "steam.exe"
+        if not injector.exists():
+            return False, "steam.exe introuvable."
+
+        try:
+            import ctypes as _ctypes
+
+            already_admin = bool(_ctypes.windll.shell32.IsUserAnAdmin())
+            if already_admin:
+                subprocess.Popen([str(injector)], cwd=str(self._steam_path))
+                return True, "Steam relancé."
+            ret = _ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", str(injector), None, str(self._steam_path), 1
+            )
+            if ret > 32:
+                return True, "Steam relancé."
+            subprocess.Popen([str(injector)], cwd=str(self._steam_path))
+            return True, "Steam relancé."
+        except Exception as e:
+            logger.warning("_launch_steam_client: %s", e)
+            return False, f"Relance Steam impossible : {e}"
+
     @pyqtSlot(str, str, str)
     def delete_game(self, app_id, game_path, mode):
-        """Remove a game from the AppList and optionally delete its files.
-        mode='applist' removes from AppList folder + all profiles only.
-        mode='full' also deletes the ACF manifest and the game folder from disk.
-        """
+        """Retire un jeu de l'AppList et, en mode full, de Steam (lua/ACF/manifests)."""
         def _do():
-            import shutil
             app_id_int = int(app_id) if str(app_id).isdigit() else None
             if app_id_int is None:
-                return (False, "Invalid App ID")
-
-            removed_from_applist = False
+                return (False, "App ID invalide", False)
 
             # --- Remove from AppList folder ---
             if hasattr(self._ui, 'app_list_man') and self._ui.app_list_man:
@@ -3924,19 +4072,17 @@ class WebBridge(QObject):
                     try:
                         if f.read_text(encoding="utf-8").strip() == str(app_id_int):
                             f.unlink()
-                            removed_from_applist = True
                             break
                     except OSError:
                         pass
-                if removed_from_applist:
-                    remaining = sorted(
-                        [f for f in folder.glob("*.txt") if f.stem.isdigit()],
-                        key=lambda f: int(f.stem),
-                    )
-                    for i, f in enumerate(remaining):
-                        target = folder / f"{i}.txt"
-                        if f != target:
-                            f.rename(target)
+                remaining = sorted(
+                    [f for f in folder.glob("*.txt") if f.stem.isdigit()],
+                    key=lambda f: int(f.stem),
+                )
+                for i, f in enumerate(remaining):
+                    target = folder / f"{i}.txt"
+                    if f != target:
+                        f.rename(target)
 
             # --- Remove from all saved profiles ---
             try:
@@ -3949,83 +4095,60 @@ class WebBridge(QObject):
                 logger.warning("delete_game: profile update failed: %s", e)
 
             if mode != "full":
-                return (True, "Removed from AppList")
+                return (True, "Retiré de l'AppList.", False)
 
-            # --- Delete game files (mode='full') ---
-            # Steam must be closed first so it releases file handles and doesn't
-            # reload the ACF on shutdown. We kill it, delete, then signal the UI
-            # to restart Steam.
-            import time as _time
-            from sff.processes import is_proc_running
+            from sff.processes import force_close_steam_client
 
-            steam_was_running = is_proc_running("steam.exe")
-            if steam_was_running:
-                try:
-                    import subprocess as _sp
-                    _sp.run(
-                        ["taskkill", "/F", "/IM", "steam.exe"],
-                        capture_output=True, timeout=10,
-                    )
-                    deadline = _time.time() + 10
-                    while is_proc_running("steam.exe") and _time.time() < deadline:
-                        _time.sleep(0.3)
-                except Exception as e:
-                    logger.warning("delete_game: could not kill Steam: %s", e)
+            steam_was_running = force_close_steam_client(wait_seconds=18.0)
 
-            files_deleted = False
-
-            # Delete the ACF manifest
+            removed_any = False
             if self._steam_path:
                 try:
-                    from sff.storage.vdf import get_steam_libs
-                    for lib in get_steam_libs(self._steam_path):
-                        acf = lib / "steamapps" / f"appmanifest_{app_id_int}.acf"
-                        if acf.exists():
-                            acf.unlink()
-                            files_deleted = True
-                            break
-                except Exception as e:
-                    logger.warning("delete_game: ACF removal failed: %s", e)
+                    from sff.steam_tools_compat import full_remove_game_from_steam
 
-            # Delete the game folder
-            if game_path:
+                    stats = full_remove_game_from_steam(
+                        self._steam_path,
+                        app_id_int,
+                        game_folder=game_path,
+                    )
+                    removed_any = bool(
+                        stats.get("acf_removed")
+                        or stats.get("folder_removed")
+                        or stats.get("registry_purged")
+                        or stats.get("lua_removed")
+                    )
+                except Exception as e:
+                    logger.exception("delete_game full_remove_game_from_steam")
+                    return (False, f"Suppression Steam échouée : {e}", steam_was_running)
+            elif game_path:
+                import shutil
                 p = Path(game_path)
                 if p.exists() and p.is_dir():
                     try:
                         shutil.rmtree(p, ignore_errors=False)
-                        files_deleted = True
+                        removed_any = True
                     except Exception as e:
                         logger.warning("delete_game: folder removal failed: %s", e)
 
-            if files_deleted:
-                return (True, "deleted_full", steam_was_running)
-            return (True, "applist_only", steam_was_running)
+            if removed_any:
+                return (True, "Jeu retiré de Steam et du disque.", steam_was_running)
+            return (False, "Aucune trace Steam trouvée pour ce jeu (ACF, lua, dossier).", steam_was_running)
 
         def _on_done(result):
             if isinstance(result, tuple) and len(result) == 3:
-                ok, action, steam_was_running = result
-                # Restart Steam automatically so the deletion takes effect immediately
+                ok, msg, steam_was_running = result
                 if ok and steam_was_running:
-                    try:
-                        import subprocess as _sp
-                        import time as _t
-                        from sff.processes import is_proc_running
-                        if not is_proc_running("steam.exe") and self._steam_path:
-                            steam_exe = Path(self._steam_path) / "steam.exe"
-                            if steam_exe.exists():
-                                _sp.Popen(
-                                    [str(steam_exe)],
-                                    creationflags=getattr(_sp, "DETACHED_PROCESS", 0),
-                                )
-                    except Exception as e:
-                        logger.warning("delete_game: Steam restart failed: %s", e)
-                msg = "Jeu supprimé — Steam relancé." if steam_was_running else "Jeu supprimé."
+                    launched, launch_msg = self._launch_steam_client()
+                    if launched:
+                        msg = "Jeu supprimé — Steam relancé."
+                    else:
+                        msg = f"Jeu supprimé — relance Steam manuelle : {launch_msg}"
                 self._emit_task_result("delete_game", ok, msg, app_id=app_id)
             elif isinstance(result, tuple) and len(result) == 2:
                 ok, msg = result
                 self._emit_task_result("delete_game", ok, msg, app_id=app_id)
             else:
-                self._emit_task_result("delete_game", False, "Delete failed", app_id=app_id)
+                self._emit_task_result("delete_game", False, "Suppression échouée", app_id=app_id)
 
         self._run_async(_do, on_done=_on_done)
 

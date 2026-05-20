@@ -825,6 +825,49 @@
     margin-bottom: 16px;
 }
 
+.page-gamefixes .gamefixes-callout--library {
+    margin-bottom: 16px;
+    background: rgba(52, 152, 219, 0.12);
+    border-color: rgba(52, 152, 219, 0.35);
+    color: var(--text-primary, #e8e8e8);
+    line-height: 1.45;
+}
+
+.fixed-game-installed-badge {
+    margin: 0 0 10px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #7dcea0;
+    background: rgba(39, 174, 96, 0.15);
+    border: 1px solid rgba(39, 174, 96, 0.35);
+    display: inline-block;
+}
+
+.fixed-game-download-btn--installed {
+    border-color: rgba(52, 152, 219, 0.45);
+}
+
+.fixed-game-download-btn--installed:hover {
+    filter: brightness(1.08);
+}
+
+.fixed-success-lead {
+    margin: 0 0 12px;
+    font-size: 1.05rem;
+}
+
+.fixed-success-hint {
+    margin: 0;
+    opacity: 0.88;
+    line-height: 1.5;
+}
+
+.fixed-success-header h2 {
+    color: #7dcea0;
+}
+
 .page-gamefixes .gamefixes-status {
     margin-bottom: 14px;
     padding: 10px 14px;
@@ -839,6 +882,51 @@
     background: rgba(239, 68, 68, 0.12);
     border-color: rgba(248, 113, 113, 0.35);
     color: #fecaca;
+}
+
+.gamefixes-toolbar {
+    margin-bottom: 16px;
+    max-width: 420px;
+}
+
+.gamefixes-search {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.25);
+    color: inherit;
+    font-size: 14px;
+}
+
+.gamefixes-search:focus {
+    outline: none;
+    border-color: rgba(165, 233, 1, 0.45);
+    box-shadow: 0 0 0 2px rgba(165, 233, 1, 0.12);
+}
+
+.grid-pagination {
+    margin: 8px 0 20px;
+}
+
+.grid-pagination-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px 16px;
+}
+
+.grid-pagination-info {
+    font-size: 13px;
+    opacity: 0.85;
+    min-width: 140px;
+    text-align: center;
+}
+
+.grid-pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .gamefixes-grid {

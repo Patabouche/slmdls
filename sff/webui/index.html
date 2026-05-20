@@ -43,6 +43,10 @@
                 <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
                 <span class="nav-label" data-i18n="Library">Bibliothèque</span>
             </button>
+            <button class="nav-item" data-page="gamefixes" data-tooltip="Jeux VIP — sorties rares et récentes (Triple Monstre)">
+                <span class="nav-icon nav-icon-emoji" aria-hidden="true">👑</span>
+                <span class="nav-label" data-i18n="Fixed Games">Jeux VIP</span>
+            </button>
             <button class="nav-item" data-page="fixgame" data-tooltip="Appliquer des émulateurs, supprimer le DRM, gérer les DLC">
                 <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
                 <span class="nav-label" data-i18n="Fix Game">Patcher un jeu</span>
@@ -54,10 +58,6 @@
             <button class="nav-item" data-page="cloudsaves" data-tooltip="Sauvegarder et restaurer les sauvegardes Steam Cloud">
                 <svg class="nav-icon" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg>
                 <span class="nav-label" data-i18n="Cloud Saves">Sauvegardes Cloud</span>
-            </button>
-            <button class="nav-item" data-page="gamefixes" data-tooltip="Sorties rares et récentes — téléchargement direct (Triple Monstre)">
-                <span class="nav-icon nav-icon-emoji" aria-hidden="true">💎</span>
-                <span class="nav-label" data-i18n="Fixed Games">Pépites</span>
             </button>
             </div>
             <div class="sidebar-nav-group">
@@ -81,6 +81,10 @@
             </div>
         </div>
         <div class="sidebar-bottom">
+            <button class="nav-item" id="btn-repair-steam-ui" data-tooltip="Réparer Steam bloqué sur « chargement des données du compte »">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+                <span class="nav-label">Réparer Steam</span>
+            </button>
             <button class="nav-item" id="btn-restart-steam" data-tooltip="Redémarrer le processus Steam">
                 <svg class="nav-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
                 <span class="nav-label" data-i18n="Restart Steam">Redémarrer Steam</span>
@@ -284,7 +288,7 @@
                         <svg class="hnsc-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                     </button>
 
-                    <!-- Pépites -->
+                    <!-- Jeux VIP -->
                     <button class="hnsc-card hnsc-card--pepites" data-page="gamefixes">
                         <div class="hnsc-glow"></div>
                         <div class="hnsc-icon-wrap">
@@ -293,7 +297,7 @@
                             </svg>
                         </div>
                         <div class="hnsc-text">
-                            <span class="hnsc-title">Pépites</span>
+                            <span class="hnsc-title">Jeux VIP</span>
                             <span class="hnsc-sub">Sorties rares &amp; récentes</span>
                         </div>
                         <svg class="hnsc-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -699,6 +703,7 @@
                     </div>
                     <div class="library-panel-body library-panel-body--grid">
                         <div id="library-grid" class="game-grid library-game-grid"></div>
+                        <div id="library-pagination" class="grid-pagination hidden" aria-label="Pagination bibliothèque"></div>
                         <div id="library-empty" class="empty-state library-empty-state">
                             <span class="empty-icon" aria-hidden="true"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></span>
                             <p>Aucun jeu trouvé. Télécharge des jeux depuis l’onglet <strong>Télécharger</strong>.</p>
@@ -1170,13 +1175,15 @@
             </div>
         </section>
 
-        <!-- Page: Jeux fixed -->
+        <!-- Page: Jeux VIP -->
         <section id="page-gamefixes" class="page page-gamefixes">
             <div class="page-header gamefixes-page-header">
-                <h1 data-i18n="Fixed Games Page Title">💎 Pépites</h1>
+                <h1 data-i18n="Fixed Games Page Title">👑 Jeux VIP</h1>
                 <p class="page-subtitle" data-i18n="Fixed Games Page Subtitle">Sorties rares et récentes — téléchargement direct en un clic depuis le launcher.</p>
             </div>
-            <div class="gamefixes-callout gamefixes-callout--top" data-i18n="Fixed Games Triple Badge">📌 Réservé au palier Triple Monstre</div>
+            <div class="gamefixes-callout gamefixes-callout--library">
+                📚 Les jeux installés depuis cette page apparaissent dans la <strong>Bibliothèque</strong> du launcher (menu latéral). Ils ne s’affichent pas dans le client Steam — lance-les depuis la Bibliothèque SlimeDeals.
+            </div>
             <p id="gamefixes-status" class="gamefixes-status hidden" role="status"></p>
             <div id="fixed-install-banner" class="fixed-install-banner hidden" role="status" aria-live="polite">
                 <div class="fixed-install-banner-inner">
@@ -1191,10 +1198,13 @@
                     <p class="fixed-install-banner-status" id="fixed-banner-status">—</p>
                 </div>
             </div>
+            <div class="gamefixes-toolbar">
+                <input type="search" id="gamefixes-search" class="gamefixes-search" placeholder="Rechercher un jeu VIP…" autocomplete="off" aria-label="Rechercher un jeu VIP">
+            </div>
             <div id="gamefixes-grid" class="gamefixes-grid" aria-live="polite">
                 <p class="gamefixes-loading">Chargement du catalogue…</p>
             </div>
-            <p class="gamefixes-foot">Les jeux volumineux peuvent prendre du temps. Choisis ton dossier d’installation — les fichiers sont placés dans <code>steamapps/common</code> ou le dossier que tu sélectionnes. 7-Zip ou WinRAR peut être nécessaire pour certaines archives.</p>
+            <div id="gamefixes-pagination" class="grid-pagination hidden" aria-label="Pagination Jeux VIP"></div>
         </section>
 
         <!-- Page: Abonnement -->
@@ -1256,6 +1266,25 @@
                         <li class="feat feat--no">Pas d'accès Catalogue Denuvo « avancé » (Pragmata, Black Myth: Wukong, Crimson Desert…)</li>
                     </ul>
                     <button class="subs-tier-cta subs-tier-cta--secondary" id="subscriptions-open-tarifs-std">Voir les tarifs</button>
+                </div>
+
+                <!-- Triple Monstre à vie -->
+                <div class="subs-tier-card subs-tier-card--triple subs-tier-card--lifetime">
+                    <div class="subs-tier-badge subs-tier-badge--lifetime">À vie</div>
+                    <div class="subs-tier-top">
+                        <span class="subs-tier-icon">♾</span>
+                        <div>
+                            <div class="subs-tier-name">Triple Monstre à vie</div>
+                            <div class="subs-tier-price">19,99 €<span> · une fois</span></div>
+                        </div>
+                    </div>
+                    <ul class="subs-tier-features">
+                        <li class="feat feat--ok">Tout le palier Triple Monstre — sans renouvellement</li>
+                        <li class="feat feat--ok">Accès illimité aux jeux Steam de ton choix</li>
+                        <li class="feat feat--ok">☁ Sauvegardes cloud · Online Fix · Jeux VIP</li>
+                        <li class="feat feat--ok">🎮 Bypass Rockstar · support prioritaire</li>
+                    </ul>
+                    <button class="subs-tier-cta subs-tier-cta--primary" id="subscriptions-open-lifetime">Obtenir à vie</button>
                 </div>
 
                 <!-- Triple Monstre -->
@@ -1871,6 +1900,31 @@
     </div>
 
     <!-- Library Delete Modal -->
+    <div id="steam-ui-repair-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-sd-md">
+            <div class="modal-header">
+                <h2>Réparer l'interface Steam</h2>
+                <button type="button" class="modal-close" id="steam-ui-repair-cancel">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Utilise cette option si Steam reste bloqué sur <strong>« Chargement des données du compte »</strong>.</p>
+                <ul class="modal-choice-desc" style="margin:12px 0;padding-left:1.2em;line-height:1.55;">
+                    <li>Ferme Steam et <strong>steamwebhelper</strong> proprement</li>
+                    <li>Vide le <strong>cache interface</strong> (htmlcache)</li>
+                    <li>Réinitialise les fichiers UI du profil Steam (<code>localconfig</code> / <code>sharedconfig</code>) — une copie est sauvegardée</li>
+                    <li>Relance Steam en <strong>mode normal</strong> (pas via GreenLuma)</li>
+                </ul>
+                <p class="modal-choice-desc"><strong>Tes jeux installés ne sont pas supprimés.</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="steam-ui-repair-confirm" class="btn btn-primary">Réparer et relancer Steam</button>
+                <button type="button" class="btn modal-cancel" id="steam-ui-repair-cancel-footer">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Library Delete Modal -->
     <div id="library-delete-modal" class="modal modal-sd-danger hidden">
         <div class="modal-overlay"></div>
         <div class="modal-content modal-sd-md">
@@ -1879,20 +1933,14 @@
                 <button class="modal-close" id="library-delete-cancel">&times;</button>
             </div>
             <div class="modal-body">
-                <p>Comment veux-tu supprimer <strong id="library-delete-game-name"></strong> ?</p>
-                <div class="modal-choice-stack">
-                    <button type="button" id="library-delete-applist" class="btn btn-primary modal-choice-btn">
-                        <strong>Retirer de l'AppList uniquement</strong>
-                        <span class="modal-choice-desc">Supprime le jeu de l'AppList GreenLuma et tous les profils. Les fichiers restent sur le disque.</span>
-                    </button>
-                    <button type="button" id="library-delete-full" class="btn btn-danger modal-choice-btn">
-                        <strong>Supprimer complètement</strong>
-                        <span class="modal-choice-desc">Ferme Steam, retire de l'AppList, supprime les fichiers du jeu, puis relance Steam. Irréversible.</span>
-                    </button>
-                </div>
+                <p>Es-tu sûr de vouloir supprimer <strong id="library-delete-game-name"></strong> ?</p>
+                <p class="modal-choice-desc" id="library-delete-desc">
+                    Steam sera fermé, le jeu sera retiré de ta bibliothèque Steam et supprimé du disque. Cette action est irréversible.
+                </p>
             </div>
             <div class="modal-footer">
-                <button class="btn modal-cancel" id="library-delete-cancel-footer">Annuler</button>
+                <button type="button" id="library-delete-confirm" class="btn btn-danger">Oui, supprimer</button>
+                <button type="button" class="btn modal-cancel" id="library-delete-cancel-footer">Annuler</button>
             </div>
         </div>
     </div>
@@ -2060,7 +2108,7 @@
     </div>
 
     <!-- Plan FREE : ONLINE FIX (bibliothèque) — abonnement + Discord #avis -->
-    <!-- Pépites — upsell plan non Triple Monstre -->
+    <!-- Jeux VIP — upsell plan non Triple Monstre -->
     <div id="gamefixes-upsell-modal" class="modal modal-bprg-premium hidden" aria-labelledby="gamefixes-upsell-title">
         <div class="modal-overlay"></div>
         <div class="modal-content">
@@ -2068,14 +2116,14 @@
                 <div class="bprg-upsell-heading">
                     <span class="bprg-upsell-badge" aria-hidden="true">💎</span>
                     <div>
-                        <p class="bprg-upsell-kicker">Pépites</p>
+                        <p class="bprg-upsell-kicker">Jeux VIP</p>
                         <h2 id="gamefixes-upsell-title">Triple Monstre requis</h2>
                     </div>
                 </div>
                 <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
             </div>
             <div class="modal-body bprg-upsell-body">
-                <p class="bprg-upsell-lead">Les <strong>Pépites</strong> — jeux rares et récentes sorties — sont réservées au plan <strong>Triple Monstre</strong>.</p>
+                <p class="bprg-upsell-lead">Les <strong>Jeux VIP</strong> — sorties rares et récentes — sont réservés au plan <strong>Triple Monstre</strong>.</p>
                 <p class="bprg-upsell-sub">Passe à Triple Monstre pour accéder à ces titres en téléchargement direct depuis le launcher. Tu peux aussi obtenir un accès <strong>gratuitement</strong> via la communauté Discord.</p>
             </div>
             <div class="modal-footer bprg-upsell-footer">
@@ -2166,6 +2214,25 @@
             <div class="modal-footer fixed-install-footer">
                 <button type="button" class="btn modal-cancel">Annuler</button>
                 <button type="button" class="btn btn-primary" id="fixed-install-confirm" disabled>Lancer le téléchargement</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Jeux fixed — installation terminée -->
+    <div id="fixed-game-success-modal" class="modal modal-sd-update hidden" aria-labelledby="fixed-game-success-title">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-sd-sm">
+            <div class="modal-header fixed-success-header">
+                <h2 id="fixed-game-success-title">Installation terminée</h2>
+                <button class="modal-close" type="button" id="fixed-game-success-close-x" aria-label="Fermer">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="fixed-success-lead"><strong id="fixed-game-success-name">—</strong> est installé.</p>
+                <p class="fixed-success-hint">Retrouve-le dans la <strong>Bibliothèque</strong> du launcher (menu latéral) pour le lancer.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" id="fixed-game-success-dismiss">Fermer</button>
+                <button type="button" class="btn btn-primary" id="fixed-game-success-library">Voir dans la bibliothèque</button>
             </div>
         </div>
     </div>

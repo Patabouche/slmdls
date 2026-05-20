@@ -2558,6 +2558,84 @@ button.modal-cancel {
     backdrop-filter: blur(4px);
 }
 
+.lib-locked-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    color: #fca5a5;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 3px 8px;
+    border-radius: 99px;
+    pointer-events: none;
+    z-index: 2;
+    backdrop-filter: blur(4px);
+}
+
+.lib-ghost-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(251, 191, 36, 0.14);
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    color: #fcd34d;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 3px 8px;
+    border-radius: 99px;
+    pointer-events: none;
+    z-index: 2;
+    backdrop-filter: blur(4px);
+}
+
+.game-card--locked {
+    opacity: 0.72;
+    filter: grayscale(0.35);
+}
+
+.game-card--ghost {
+    opacity: 0.88;
+}
+
+.game-card--ghost .game-card-img-wrap {
+    filter: grayscale(0.25) brightness(0.92);
+}
+
+.lib-ghost-msg {
+    font-size: 11px;
+    line-height: 1.35;
+    color: #fcd34d;
+    margin: 0 0 8px;
+    padding: 0 2px;
+}
+
+.lib-btn--ghost {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.game-card--locked .game-card-img-wrap {
+    position: relative;
+}
+
+.lib-locked-msg {
+    font-size: 11px;
+    line-height: 1.35;
+    color: #fca5a5;
+    margin: 0 0 8px;
+    padding: 0 2px;
+}
+
+.lib-btn--locked,
+.lib-btn--locked:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 /* Bouton lancer Pépites — plus accentué */
 .lib-btn--launch-pepites {
     background: linear-gradient(135deg, #4b7200, #a5e901 80%) !important;
@@ -2938,7 +3016,7 @@ html { scroll-behavior: smooth; }
 /* Grille des paliers */
 .subs-tiers {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 18px;
     padding: 28px 36px;
 }
@@ -3047,6 +3125,27 @@ html { scroll-behavior: smooth; }
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+}
+
+.subs-tier-card--lifetime {
+    border-color: rgba(165, 233, 1, 0.42);
+    background: linear-gradient(150deg, rgba(165, 233, 1, 0.12), rgba(97, 31, 176, 0.18));
+    box-shadow: 0 8px 36px rgba(0, 0, 0, 0.35), 0 0 24px rgba(165, 233, 1, 0.08);
+}
+
+.subs-tier-card--lifetime::before {
+    background: linear-gradient(90deg, #a5e901, #7ec8e3, #c084fc);
+}
+
+.subs-tier-badge--lifetime {
+    background: linear-gradient(90deg, #a5e901, #7ec8e3);
+    color: #0f1a00;
+}
+
+.subs-tier-card--lifetime .subs-tier-price {
+    color: #d9f99d;
+    -webkit-text-fill-color: #d9f99d;
+    background: none;
 }
 
 /* Features list */

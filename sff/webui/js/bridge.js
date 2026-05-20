@@ -213,10 +213,14 @@ window.Bridge = (function() {
                 }
             },
             install_fixed_game: function() {},
+            get_fixed_games_installed: function(cb) {
+                if (cb) cb(JSON.stringify({ installed_ids: [] }));
+            },
             set_active_library: function() {},
             open_file_dialog: function(cb) { if (cb) cb(''); },
             open_log_window: function() {},
             restart_steam: function() {},
+            repair_steam_ui: function() {},
             refresh_library: function(cb) { if (cb) cb('[]'); },
             get_installed_games: function(cb) { if (cb) cb('[]'); },
             scan_cloud_games: function() {},

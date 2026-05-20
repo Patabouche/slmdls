@@ -145,10 +145,16 @@ window.App = (function() {
     function _bindSubscriptionsPage() {
         var btnT    = document.getElementById('subscriptions-open-tarifs');
         var btnTStd = document.getElementById('subscriptions-open-tarifs-std');
+        var btnLife = document.getElementById('subscriptions-open-lifetime');
         var btnD    = document.getElementById('subscriptions-open-discord');
         var btnDRef = document.getElementById('subscriptions-open-discord-ref');
         if (btnTStd) btnTStd.addEventListener('click', function() { Bridge.call('open_url', 'https://slimedeals.fr/#tarifs'); });
         if (btnDRef) btnDRef.addEventListener('click', function() { Bridge.call('open_url', 'https://discord.gg/c2pRJKjvgE'); });
+        if (btnLife) {
+            btnLife.addEventListener('click', function() {
+                Bridge.call('open_url', 'https://slimedeals.fr/abonnement-logiciel?plan=triple_lifetime');
+            });
+        }
         if (btnT) {
             btnT.addEventListener('click', function() {
                 Bridge.call('open_url', 'https://slimedeals.fr/#tarifs');
@@ -589,6 +595,29 @@ window.App = (function() {
                 if (path) document.getElementById('outside-path-display').value = path;
             });
         });
+
+        // Repair Steam UI button
+        var repairSteamBtn = document.getElementById('btn-repair-steam-ui');
+        function _closeSteamUiRepairModal() {
+            Components.hideModal('steam-ui-repair-modal');
+        }
+        ['steam-ui-repair-cancel', 'steam-ui-repair-cancel-footer'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('click', _closeSteamUiRepairModal);
+        });
+        var repairConfirm = document.getElementById('steam-ui-repair-confirm');
+        if (repairConfirm) {
+            repairConfirm.addEventListener('click', function() {
+                _closeSteamUiRepairModal();
+                Components.showToast('info', 'Réparation Steam en cours…');
+                Bridge.call('repair_steam_ui');
+            });
+        }
+        if (repairSteamBtn) {
+            repairSteamBtn.addEventListener('click', function() {
+                Components.showModal('steam-ui-repair-modal');
+            });
+        }
 
         // Restart Steam button
         var restartBtn = document.getElementById('btn-restart-steam');

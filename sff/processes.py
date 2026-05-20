@@ -50,27 +50,89 @@ def is_proc_running(process_name: str):
     return False
 
 
+def _steam_related_running() -> bool:
+    if sys.platform != "win32":
+        return is_proc_running("steam.exe")
+    return any(
+        is_proc_running(name)
+        for name in ("steam.exe", "steamwebhelper.exe", "DLLInjector.exe", "steamservice.exe")
+    )
+
+
 def _kill_steam_exe_windows_silent() -> None:
     """taskkill + psutil, sans print (usage en arriere-plan)."""
-    try:
-        subprocess.run(
-            ["taskkill", "/F", "/IM", "steam.exe"],
-            capture_output=True,
-            timeout=10,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-    except Exception as e:
-        logger.debug("taskkill steam.exe: %s", e)
+    for exe_name in ("steam.exe", "steamwebhelper.exe", "steamservice.exe", "DLLInjector.exe"):
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/IM", exe_name],
+                capture_output=True,
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        except Exception as e:
+            logger.debug("taskkill %s: %s", exe_name, e)
     try:
         for proc in psutil.process_iter(["pid", "name"]):
             try:
                 n = (proc.info.get("name") or "").lower()
-                if n == "steam.exe":
+                if n in ("steam.exe", "steamwebhelper.exe", "steamservice.exe", "dllinjector.exe"):
                     proc.kill()
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
     except Exception as e:
-        logger.debug("psutil kill steam.exe: %s", e)
+        logger.debug("psutil kill steam: %s", e)
+
+
+def _kill_steam_exe_windows_elevated() -> None:
+    """taskkill élevé — nécessaire si Steam a été lancé en admin via GreenLuma/DLLInjector."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        params = (
+            "/F /T /IM steam.exe /IM steamwebhelper.exe "
+            "/IM DLLInjector.exe /IM steamservice.exe"
+        )
+        ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", "taskkill", params, None, 0
+        )
+    except Exception as e:
+        logger.debug("elevated taskkill steam: %s", e)
+
+
+def kill_steam_client_completely(*, try_elevated: bool = True, wait_seconds: float = 14.0) -> bool:
+    """
+    Termine steam.exe, steamwebhelper, DLLInjector et steamservice.
+    Retourne True si plus aucun de ces processus n'est actif.
+    """
+    if sys.platform != "win32":
+        if not is_proc_running("steam.exe"):
+            return True
+        _kill_steam_exe_windows_silent()
+        deadline = time.time() + wait_seconds
+        while time.time() < deadline and is_proc_running("steam.exe"):
+            time.sleep(0.4)
+        return not is_proc_running("steam.exe")
+
+    if not _steam_related_running():
+        return True
+
+    _kill_steam_exe_windows_silent()
+    deadline = time.time() + wait_seconds
+    while time.time() < deadline and _steam_related_running():
+        time.sleep(0.4)
+
+    if _steam_related_running() and try_elevated:
+        _kill_steam_exe_windows_elevated()
+        deadline = time.time() + wait_seconds
+        while time.time() < deadline and _steam_related_running():
+            time.sleep(0.4)
+
+    still = _steam_related_running()
+    if still:
+        logger.warning("Steam: processus encore actifs apres fermeture forcee")
+    return not still
 
 
 def force_close_steam_client(*, wait_seconds: float = 16.0, poll: float = 0.4) -> bool:
@@ -81,14 +143,11 @@ def force_close_steam_client(*, wait_seconds: float = 16.0, poll: float = 0.4) -
     Retourne True si steam.exe (Windows) ou Steam (Linux) semblait actif au depart.
     """
     if sys.platform == "win32":
-        if not is_proc_running("steam.exe"):
+        if not _steam_related_running():
             return False
-        _kill_steam_exe_windows_silent()
-        deadline = time.time() + wait_seconds
-        while time.time() < deadline and is_proc_running("steam.exe"):
-            time.sleep(poll)
-        if is_proc_running("steam.exe"):
-            logger.warning("Steam: steam.exe encore actif apres fermeture forcee")
+        kill_steam_client_completely(try_elevated=True, wait_seconds=wait_seconds)
+        if _steam_related_running():
+            logger.warning("Steam: processus encore actifs apres fermeture forcee")
         else:
             logger.info("Steam: client ferme pour appliquer le verrou d'abonnement")
         return True
@@ -103,6 +162,107 @@ def force_close_steam_client(*, wait_seconds: float = 16.0, poll: float = 0.4) -
     return False
 
 
+def _resolve_applist_folder(steam_path: Path) -> Path | None:
+    try:
+        from sff.storage.settings import get_setting
+        from sff.structs import Settings
+
+        saved = get_setting(Settings.APPLIST_FOLDER)
+        if saved:
+            p = Path(str(saved))
+            if p.is_dir():
+                return p
+    except Exception as e:
+        logger.debug("resolve applist from settings: %s", e)
+    default = steam_path / "AppList"
+    return default if default.is_dir() else None
+
+
+def launch_steam_client(steam_path: Path | str) -> bool:
+    """Relance Steam (DLLInjector GreenLuma ou steam.exe)."""
+    sp = Path(steam_path)
+    if sys.platform == "linux":
+        try:
+            from sff.linux.steam_process import start_steam
+
+            return start_steam() == "SUCCESS"
+        except Exception as e:
+            logger.warning("launch_steam_client linux: %s", e)
+            return False
+
+    if sys.platform != "win32":
+        return False
+
+    if not sp.exists():
+        return False
+
+    applist_folder = _resolve_applist_folder(sp)
+    if not applist_folder:
+        steam_exe = sp / "steam.exe"
+        if steam_exe.is_file():
+            try:
+                subprocess.Popen(
+                    [str(steam_exe)],
+                    cwd=str(sp),
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+                return True
+            except Exception as e:
+                logger.warning("launch steam.exe fallback: %s", e)
+        return False
+
+    steam_proc = SteamProcess(sp, applist_folder)
+    injector = steam_proc.injector_dir / "DLLInjector.exe"
+    if not injector.is_file():
+        injector = sp / "steam.exe"
+    if not injector.is_file():
+        return False
+    injector_path = str(injector.resolve())
+
+    try:
+        import ctypes
+
+        already_admin = bool(ctypes.windll.shell32.IsUserAnAdmin())
+        if already_admin:
+            subprocess.Popen([injector_path], cwd=str(sp))
+            return True
+        ret = ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", injector_path, None, str(sp), 1
+        )
+        if ret > 32:
+            return True
+        subprocess.Popen([injector_path], cwd=str(sp))
+        return True
+    except Exception as e:
+        logger.warning("launch_steam_client: %s", e)
+        return False
+
+
+def restart_steam_for_library_refresh(
+    steam_path: Path | str | None,
+    *,
+    wait_seconds: float = 16.0,
+) -> bool:
+    """
+    Ferme Steam s'il tournait, puis le relance pour recharger bibliothèque / verrou abonnement.
+    Retourne True si Steam a été relancé.
+    """
+    if not steam_path:
+        return False
+    was_running = force_close_steam_client(wait_seconds=wait_seconds)
+    if not was_running:
+        return False
+    time.sleep(1.0)
+    ok = launch_steam_client(steam_path)
+    if ok:
+        logger.info("Steam relancé après mise à jour bibliothèque / abonnement")
+    else:
+        logger.warning(
+            "Steam fermé pour appliquer le changement d'abonnement mais relance échouée"
+        )
+    return ok
+
+
 class SteamProcess:
 
     def __init__(self, steam_path: Path, applist_folder: Path):
@@ -113,9 +273,14 @@ class SteamProcess:
         self.wait_time = 3
 
     def kill(self):
-
+        """Termine steam.exe et steamwebhelper.exe (évite les zombies UI)."""
         print(" ", end="", flush=True)
-        # Use taskkill - works without elevation and is very reliable
+        if sys.platform == "win32":
+            _kill_steam_exe_windows_silent()
+            time.sleep(0.5)
+            if not is_proc_running(self.exe_name):
+                return
+        # Fallback ciblé steam.exe uniquement
         try:
             result = subprocess.run(
                 ["taskkill", "/F", "/IM", self.exe_name],
@@ -123,17 +288,12 @@ class SteamProcess:
                 timeout=10,
                 creationflags=subprocess.CREATE_NO_WINDOW
             )
-            # taskkill returns 0 if successful, 128 if process not found
-            if result.returncode == 0:
-                return  # Success
-            elif result.returncode == 128:
-                # Process not running, that's fine
+            if result.returncode in (0, 128):
                 return
         except subprocess.TimeoutExpired:
             print("(timeout, trying psutil)...", end="", flush=True)
         except Exception as e:
             logger.debug(f"taskkill failed: {e}")
-        # Fallback: Use psutil
         try:
             killed = False
             for proc in psutil.process_iter(['pid', 'name']):

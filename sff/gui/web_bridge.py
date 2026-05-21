@@ -3969,21 +3969,64 @@ class WebBridge(QObject):
         Mirrors search_games so image_url is ready before card rendering.
         """
         def _do():
-            games = json.loads(self.get_installed_games())
+            try:
+                games = json.loads(self._scan_installed_games_json())
+            except Exception as exc:
+                logger.warning("load_library scan failed: %s", exc)
+                return {"games": [], "error": str(exc)}
             if not games:
-                return []
-            app_ids = [g["app_id"] for g in games if g.get("app_id")]
-            image_urls, _ = _fetch_steam_image_urls(app_ids)
+                return {"games": []}
+            app_ids: list[int] = []
+            seen_ids: set[int] = set()
             for g in games:
-                g["image_url"] = image_urls.get(g["app_id"])
-            return games
+                aid = g.get("app_id")
+                try:
+                    aid_int = int(aid)
+                except (TypeError, ValueError):
+                    continue
+                if aid_int <= 0 or aid_int in seen_ids:
+                    continue
+                seen_ids.add(aid_int)
+                app_ids.append(aid_int)
+            image_urls: dict[int, str] = {}
+            chunk_size = 80
+            for i in range(0, len(app_ids), chunk_size):
+                batch_urls, _ = _fetch_steam_image_urls(app_ids[i : i + chunk_size])
+                if batch_urls:
+                    image_urls.update(batch_urls)
+            for g in games:
+                try:
+                    aid_int = int(g.get("app_id") or 0)
+                except (TypeError, ValueError):
+                    aid_int = 0
+                if aid_int > 0:
+                    g["image_url"] = image_urls.get(aid_int)
+            return {"games": games}
 
-        def _on_done(games):
-            self.task_finished.emit(json.dumps({
-                "task": "library_loaded",
-                "success": True,
-                "games": games or [],
-            }))
+        def _on_done(result):
+            try:
+                if isinstance(result, dict):
+                    games = result.get("games") or []
+                    err = (result.get("error") or "").strip()
+                else:
+                    games = []
+                    err = ""
+                payload = {
+                    "task": "library_loaded",
+                    "success": not err,
+                    "games": games,
+                }
+                if err:
+                    payload["message"] = err
+                self.task_finished.emit(json.dumps(payload, ensure_ascii=False))
+            except Exception as exc:
+                logger.exception("load_library emit failed: %s", exc)
+                self.task_finished.emit(json.dumps({
+                    "task": "library_loaded",
+                    "success": False,
+                    "games": [],
+                    "message": str(exc),
+                }))
 
         self._run_async(_do, on_done=_on_done)
 

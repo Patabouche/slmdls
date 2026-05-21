@@ -591,6 +591,7 @@ def _launcher_auth_strictly_free() -> bool:
 class SFFMainWindow(QMainWindow):
     _launcher_banner_payload = pyqtSignal(object)
     _launcher_notifications_payload = pyqtSignal(object)
+    _launcher_mandatory_update_payload = pyqtSignal(object)
 
     def __init__(self, ui, steam_path):
         super().__init__()
@@ -855,6 +856,7 @@ class SFFMainWindow(QMainWindow):
 
         self._launcher_banner_payload.connect(self._apply_launcher_banner_payload)
         self._launcher_notifications_payload.connect(self._apply_launcher_notifications_payload)
+        self._launcher_mandatory_update_payload.connect(self._apply_mandatory_update_payload)
         self._banner_poll_busy = False
         self._banner_poll_timer = QTimer(self)
         self._banner_poll_timer.setInterval(5000)
@@ -1873,6 +1875,17 @@ class SFFMainWindow(QMainWindow):
 
         flush_pending_launcher_update_notice(self)
 
+    def _apply_mandatory_update_payload(self, payload) -> None:
+        """UI uniquement sur le thread principal (évite crash WebEngine)."""
+        if not payload or not isinstance(payload, tuple) or len(payload) != 2:
+            return
+        is_newer, release = payload
+        if not is_newer or not release:
+            return
+        from sff.mandatory_update_gui import notify_launcher_update_available
+
+        notify_launcher_update_available(self, release)
+
     def _on_mandatory_update_poll(self):
         """Revérifie GitHub toutes les 5 min (premier passage ~10 s après ouverture de la fenêtre)."""
         from sff.mandatory_update_gui import update_disabled_by_env
@@ -1885,12 +1898,20 @@ class SFFMainWindow(QMainWindow):
         import threading
 
         def work():
+            payload = None
             try:
-                from sff.mandatory_update_gui import run_mandatory_version_gate_if_outdated
+                from sff.updater import Updater
 
-                run_mandatory_version_gate_if_outdated(self)
+                is_newer, release = Updater.update_available()
+                Updater.log_version_compare(release, is_newer, context="périodique (5 min)")
+                if is_newer and release:
+                    payload = (is_newer, release)
+            except Exception as exc:
+                logging.getLogger(__name__).debug("mandatory update poll: %s", exc)
             finally:
                 self._mandatory_update_poll_busy = False
+            if payload is not None:
+                self._launcher_mandatory_update_payload.emit(payload)
 
         threading.Thread(target=work, daemon=True).start()
 

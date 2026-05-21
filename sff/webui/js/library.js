@@ -163,8 +163,13 @@ window.Library = (function() {
         Bridge.on('task_finished', function(json) {
             try {
                 var data = JSON.parse(json);
-                if (data.task === 'library_loaded' && Array.isArray(data.games)) {
-                    _renderLibrary(data.games);
+                if (data.task === 'library_loaded') {
+                    if (Array.isArray(data.games)) {
+                        _renderLibrary(data.games);
+                    }
+                    if (data.success === false && data.message) {
+                        Components.showToast('error', 'Bibliothèque : ' + data.message);
+                    }
                 }
                 if (data.task === 'delete_game') {
                     if (data.success) {
@@ -392,6 +397,15 @@ window.Library = (function() {
     }
 
     function _applyLibraryFilter(filter) {
+        try {
+            _applyLibraryFilterInner(filter);
+        } catch (err) {
+            console.error('[Library] render error:', err);
+            Components.showToast('error', 'Erreur affichage bibliothèque — réessaie Actualiser.');
+        }
+    }
+
+    function _applyLibraryFilterInner(filter) {
         var games = _libraryGames;
         var grid = document.getElementById('library-grid');
         var empty = document.getElementById('library-empty');
@@ -575,6 +589,7 @@ window.Library = (function() {
     return {
         init: init,
         onPageEnter: onPageEnter,
+        refresh: _refreshLibrary,
         ensureOnlineFixFreeModalBindings: ensureOnlineFixFreeModalBindings
     };
 })();

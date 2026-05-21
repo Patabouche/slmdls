@@ -501,6 +501,22 @@ body.sd-modal-open {
     color: #a5e901;
 }
 
+.launcher-update-defender {
+    font-size: 12px;
+    line-height: 1.55;
+    text-align: left;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(251, 146, 60, 0.12);
+    border: 1px solid rgba(251, 146, 60, 0.35);
+    color: rgba(254, 243, 199, 0.95);
+    margin: 0 0 12px;
+}
+
+.launcher-update-defender strong {
+    color: #fdba74;
+}
+
 .launcher-update-hint {
     font-size: 13px;
     line-height: 1.55;
@@ -521,6 +537,23 @@ body.sd-modal-open {
     flex: 1 1 auto;
     min-width: 200px;
     box-shadow: 0 6px 22px rgba(165, 233, 1, 0.22);
+}
+
+body.sd-launcher-update-blocked #app-shell,
+body.sd-launcher-update-blocked .sidebar,
+body.sd-launcher-update-blocked .main-content,
+body.sd-launcher-update-blocked .auth-card,
+body.sd-launcher-update-blocked #auth-card {
+    pointer-events: none;
+    user-select: none;
+}
+
+#launcher-update-modal.launcher-update-mandatory {
+    z-index: 20000;
+}
+
+#launcher-update-modal.launcher-update-mandatory .modal-overlay {
+    background: rgba(4, 6, 12, 0.92);
 }
 
 /* Multiplayer result header dynamique */

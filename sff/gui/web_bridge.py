@@ -53,6 +53,8 @@ from PyQt6.QtWidgets import QFileDialog
 
 logger = logging.getLogger(__name__)
 
+from sff.mandatory_update_gui import LAUNCHER_UPDATE_BLOCK_MSG, launcher_update_blocks_usage
+
 # ── Launcher auth helpers ────────────────────────────────────────────────────
 _API_BASE   = os.getenv("SLIMEDEALS_API", "https://slimedeals.fr")
 _AUTH_FILE  = Path.home() / ".slimedeals" / "auth.json"
@@ -584,8 +586,31 @@ class WebBridge(QObject):
 
     # ── helpers ──────────────────────────────────────────────────
 
+    def _launcher_update_blocks_usage(self) -> bool:
+        return launcher_update_blocks_usage(self.parent())
+
+    def _reject_launcher_update_required(self, task: str = "") -> bool:
+        if not self._launcher_update_blocks_usage():
+            return False
+        if task:
+            self._emit_task_result(task, False, LAUNCHER_UPDATE_BLOCK_MSG)
+        return True
+
     def _run_async(self, func, *args, on_done=None, on_error=None, **kwargs):
         """Spawn a QThread worker for the given function (slots UI via QueuedConnection)."""
+        if self._launcher_update_blocks_usage():
+            blocked = (False, LAUNCHER_UPDATE_BLOCK_MSG)
+
+            def _emit_blocked():
+                if on_done:
+                    on_done(blocked)
+                elif on_error:
+                    on_error(LAUNCHER_UPDATE_BLOCK_MSG)
+
+            from PyQt6.QtCore import QTimer
+
+            QTimer.singleShot(0, _emit_blocked)
+            return
         parent = self.parent()
         stream = getattr(parent, '_stream_emitter', None) if parent else None
         if stream is not None:
@@ -671,6 +696,9 @@ class WebBridge(QObject):
     def auth_check_saved(self) -> None:
         """Called by auth.html on load — checks saved token in background.
         Emits auth_done(token) if valid, or auth_done('') to show login form."""
+        if self._launcher_update_blocks_usage():
+            self.auth_done.emit("")
+            return
         def _check():
             return launcher_verify_saved_token()
 
@@ -688,6 +716,8 @@ class WebBridge(QObject):
     @pyqtSlot(str, str, result=str)
     def auth_login(self, username: str, password: str) -> str:
         """Called from auth.html — performs login and returns JSON with token."""
+        if self._launcher_update_blocks_usage():
+            return json.dumps({"ok": False, "error": LAUNCHER_UPDATE_BLOCK_MSG})
         hwid   = _get_hwid()
         result = _api_post("/api/launcher/login", {
             "username": username.strip().lower(),
@@ -708,6 +738,8 @@ class WebBridge(QObject):
     @pyqtSlot(str, str, result=str)
     def auth_register(self, username: str, password: str) -> str:
         """Called from auth.html — creates account and returns JSON with token."""
+        if self._launcher_update_blocks_usage():
+            return json.dumps({"ok": False, "error": LAUNCHER_UPDATE_BLOCK_MSG})
         hwid   = _get_hwid()
         result = _api_post("/api/launcher/register", {
             "username": username.strip().lower(),
@@ -730,6 +762,8 @@ class WebBridge(QObject):
         """Called from auth.html with the session token.
         Python re-verifies the token + HWID with the server — no bypass possible.
         If valid, loads the main UI. If invalid, stays on auth page silently."""
+        if self._launcher_update_blocks_usage():
+            return
         if not token or len(token) < 16:
             logger.warning("[Auth] auth_success called with empty/short token — ignored")
             return

@@ -2281,26 +2281,28 @@
         </div>
     </div>
 
-    <!-- Mise à jour du launcher -->
-    <div id="launcher-update-modal" class="modal modal-sd-update hidden" aria-labelledby="launcher-update-title">
-        <div class="modal-overlay"></div>
+    <!-- Mise à jour obligatoire du launcher (non fermable) -->
+    <div id="launcher-update-modal" class="modal modal-sd-update launcher-update-mandatory hidden" aria-labelledby="launcher-update-title" role="alertdialog" aria-modal="true">
+        <div class="modal-overlay" data-no-close="1"></div>
         <div class="modal-content modal-sd-sm">
             <div class="modal-header">
-                <h2 id="launcher-update-title">Mise à jour disponible</h2>
-                <button class="modal-close" type="button" data-tooltip="Fermer">&times;</button>
+                <h2 id="launcher-update-title">Mise à jour obligatoire</h2>
             </div>
             <div class="modal-body launcher-update-body">
-                <p class="launcher-update-lead">Nouvelle mise à jour du launcher détectée.</p>
+                <p class="launcher-update-lead">Une nouvelle version du launcher est disponible. Tu dois la télécharger pour continuer à utiliser SlimeDeals.</p>
                 <p class="launcher-update-versions">
                     Ta version : <strong id="launcher-update-current"></strong>
                     &middot; Dernière : <strong id="launcher-update-remote"></strong>
                 </p>
+                <p class="launcher-update-defender" role="note">
+                    <strong>Important — avant l’installation :</strong> désactive <strong>Windows Defender</strong> (protection en temps réel).
+                    Le launcher installe des jeux et applique le correctif Steam pour les titres encore marqués «&nbsp;Acheter&nbsp;» dans ta bibliothèque — Defender peut bloquer ou supprimer ces fichiers (faux positifs). Réactive-le après l’installation si tu veux, en ajoutant une exclusion pour le dossier SlimeDeals.
+                </p>
                 <p class="launcher-update-hint">
-                    Télécharge la nouvelle version sur le site officiel SlimeDeals. Aucune installation automatique depuis l'application.
+                    Télécharge et installe la nouvelle version depuis le site officiel. Aucune mise à jour automatique depuis l'application.
                 </p>
             </div>
             <div class="modal-footer launcher-update-footer">
-                <button type="button" class="btn modal-cancel">Plus tard</button>
                 <button type="button" class="btn btn-primary" id="launcher-update-download-btn">
                     Télécharger sur slimedeals.fr
                 </button>

@@ -118,8 +118,24 @@ window.Bridge = (function() {
         });
     }
 
+    var _UPDATE_ALLOWLIST = {
+        open_url: true,
+        get_app_version: true
+    };
+
+    function _blockedByLauncherUpdate(method) {
+        return !!(
+            window.__SLIMEDEALS_LAUNCHER_UPDATE_REQUIRED__ &&
+            !_UPDATE_ALLOWLIST[method]
+        );
+    }
+
     // Call a bridge method (async slot — no return value, results via signals)
     function call(method /*, ...args */) {
+        if (_blockedByLauncherUpdate(method)) {
+            console.warn('[Bridge] Bloqué — mise à jour launcher obligatoire:', method);
+            return;
+        }
         if (!_py) {
             console.warn('[Bridge] Not connected, queuing call:', method);
             onReady(function() { call.apply(null, arguments); });
@@ -135,6 +151,10 @@ window.Bridge = (function() {
 
     // Call a sync bridge method (with callback — because Qt6 QWebChannel is always async)
     function callSync(method, callback) {
+        if (_blockedByLauncherUpdate(method)) {
+            console.warn('[Bridge] Bloqué — mise à jour launcher obligatoire:', method);
+            return;
+        }
         if (!_py) {
             onReady(function() { callSync(method, callback); });
             return;
@@ -148,6 +168,10 @@ window.Bridge = (function() {
 
     // Call with args + trailing callback (for sync slots with parameters)
     function callWithCallback(method /*, arg1, arg2, ..., callback */) {
+        if (_blockedByLauncherUpdate(method)) {
+            console.warn('[Bridge] Bloqué — mise à jour launcher obligatoire:', method);
+            return;
+        }
         if (!_py) {
             onReady(function() { callWithCallback.apply(null, arguments); });
             return;

@@ -865,13 +865,16 @@ class SFFMainWindow(QMainWindow):
         QTimer.singleShot(350, self._poll_launcher_banner_tick)
 
         self._mandatory_update_poll_busy = False
-        self._launcher_update_notice_tag = None
+        self._launcher_update_required = False
         self._pending_launcher_update_release = None
         self._mandatory_update_timer = QTimer(self)
         self._mandatory_update_timer.setInterval(MANDATORY_UPDATE_POLL_INTERVAL_MS)
         self._mandatory_update_timer.timeout.connect(self._on_mandatory_update_poll)
         QTimer.singleShot(MANDATORY_UPDATE_FIRST_POLL_MS, self._on_mandatory_update_poll)
         self._mandatory_update_timer.start()
+        from sff.mandatory_update_gui import apply_startup_outdated_state
+
+        apply_startup_outdated_state(self)
 
         # ── Classic tab UI (hidden by default — new UI is primary) ──
         self.tabs = QTabWidget()
@@ -910,6 +913,7 @@ class SFFMainWindow(QMainWindow):
         self._web_bridge = WebBridge(ui=ui, steam_path=steam_path, parent=self)
         self._web_channel.registerObject("bridge", self._web_bridge)
         self._web_view.page().setWebChannel(self._web_channel)
+        self._web_view.loadFinished.connect(self._on_web_page_loaded)
         # Allow loading Steam CDN images from local file:// page
         self._web_view.page().settings().setAttribute(
             QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True
@@ -1908,6 +1912,13 @@ class SFFMainWindow(QMainWindow):
                 "Impossible d’afficher les notifications. Consulte la console du launcher ou les logs.",
             )
 
+    def _on_web_page_loaded(self, ok: bool) -> None:
+        if not ok:
+            return
+        from sff.mandatory_update_gui import flush_pending_launcher_update_notice
+
+        QTimer.singleShot(50, lambda: flush_pending_launcher_update_notice(self))
+
     def _flush_pending_launcher_update_notice(self) -> None:
         from sff.mandatory_update_gui import flush_pending_launcher_update_notice
 
@@ -1918,10 +1929,14 @@ class SFFMainWindow(QMainWindow):
         if not payload or not isinstance(payload, tuple) or len(payload) != 2:
             return
         is_newer, release = payload
-        if not is_newer or not release:
-            return
-        from sff.mandatory_update_gui import notify_launcher_update_available
+        from sff.mandatory_update_gui import (
+            clear_launcher_update_required,
+            notify_launcher_update_available,
+        )
 
+        if not is_newer or not release:
+            clear_launcher_update_required(self)
+            return
         notify_launcher_update_available(self, release)
 
     def _on_mandatory_update_poll(self):

@@ -231,10 +231,22 @@ window.Components = (function() {
         requestAnimationFrame(function() { _animateModalContent(modal); });
     }
 
+    function _isMandatoryLauncherUpdateModal(modal) {
+        return !!(
+            modal &&
+            modal.id === 'launcher-update-modal' &&
+            (modal.classList.contains('launcher-update-mandatory') ||
+                window.__SLIMEDEALS_LAUNCHER_UPDATE_REQUIRED__)
+        );
+    }
+
     function hideModal(modalId) {
         var modal = modalId && modalId.classList
             ? modalId
             : document.getElementById(modalId);
+        if (_isMandatoryLauncherUpdateModal(modal)) {
+            return;
+        }
         if (modal) modal.classList.add('hidden');
         _syncModalOpenState();
     }
@@ -304,6 +316,9 @@ window.Components = (function() {
         document.querySelectorAll('.modal-close, .modal-cancel').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 var modal = this.closest('.modal');
+                if (_isMandatoryLauncherUpdateModal(modal)) {
+                    return;
+                }
                 if (modal) hideModal(modal);
             });
         });
@@ -311,9 +326,21 @@ window.Components = (function() {
         document.querySelectorAll('.modal-overlay:not([data-no-close])').forEach(function(overlay) {
             overlay.addEventListener('click', function() {
                 var modal = this.closest('.modal');
+                if (_isMandatoryLauncherUpdateModal(modal)) {
+                    return;
+                }
                 if (modal) hideModal(modal);
             });
         });
+
+        document.addEventListener('keydown', function(ev) {
+            if (ev.key !== 'Escape') return;
+            var modal = document.getElementById('launcher-update-modal');
+            if (_isMandatoryLauncherUpdateModal(modal) && !modal.classList.contains('hidden')) {
+                ev.preventDefault();
+                ev.stopPropagation();
+            }
+        }, true);
     }
 
     // Custom styled dropdown that wraps a hidden <select> via MutationObserver.

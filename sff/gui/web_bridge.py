@@ -102,7 +102,7 @@ def _api_post(path: str, payload: dict) -> dict:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=12) as resp:
+        with urllib.request.urlopen(req, timeout=25) as resp:
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         try:
@@ -127,7 +127,7 @@ def _notify_launcher_gen_activity(
     source: str = "",
     game_name: str = "",
 ) -> None:
-    """Notifie Discord (salon activité ; + salon avis si Jeux VIP) après une installation réussie."""
+    """Notifie Discord (salon activité) — embed « un joueur a obtenu… »."""
 
     def _u(msg: str) -> None:
         if ui_log:
@@ -3371,6 +3371,22 @@ class WebBridge(QObject):
 
         expected_dl = required_bytes_for_game(entry)
 
+        steam_app_id = str((entry or {}).get("app_id") or "").strip()
+        if steam_app_id.isdigit():
+            notify_payload = json.dumps(
+                {
+                    "app_id": steam_app_id,
+                    "source": "fixed_vip",
+                    "game_name": display or (entry or {}).get("name") or gid,
+                },
+                ensure_ascii=False,
+            )
+            self._log_fixed(
+                f"Notification Discord Jeux VIP (démarrage téléchargement) app_id={steam_app_id} "
+                f"jeu={display!r}"
+            )
+            self.request_notify_gen.emit(notify_payload)
+
         def _do():
             _last_journal_pct = [-1]
 
@@ -3462,21 +3478,6 @@ class WebBridge(QObject):
                 message,
                 app_id=gid,
             )
-            steam_app_id = str((entry or {}).get("app_id") or "").strip()
-            if ok and steam_app_id.isdigit() and sys.platform == "win32":
-                notify_payload = json.dumps(
-                    {
-                        "app_id": steam_app_id,
-                        "source": "fixed_vip",
-                        "game_name": display or (entry or {}).get("name") or gid,
-                    },
-                    ensure_ascii=False,
-                )
-                self._log_fixed(
-                    f"Notification Discord Jeux VIP (installation OK) app_id={steam_app_id} "
-                    f"jeu={display!r}"
-                )
-                self.request_notify_gen.emit(notify_payload)
 
         def _on_error(msg: str) -> None:
             self._log_fixed(f"Exception critique worker : {msg}")

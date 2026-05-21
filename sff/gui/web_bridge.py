@@ -123,8 +123,11 @@ def _notify_launcher_gen_activity(
     app_id: str,
     ui_log: Optional[Callable[[str], None]] = None,
     steam_path: Optional[Path] = None,
+    *,
+    source: str = "",
+    game_name: str = "",
 ) -> None:
-    """Notifie Discord (salon activité) après une installation — FREE, Monstre ou Triple Monstre uniquement."""
+    """Notifie Discord (salon activité ; + salon avis si Jeux VIP) après une installation réussie."""
 
     def _u(msg: str) -> None:
         if ui_log:
@@ -145,6 +148,11 @@ def _notify_launcher_gen_activity(
         return
     _u("Envoi de la notification d’activité sur Discord…")
     payload: dict = {"token": token, "hwid": _get_hwid(), "app_id": aid}
+    src = (source or "").strip().lower()
+    if src in ("fixed_vip", "jeux_vip", "vip"):
+        payload["source"] = "fixed_vip"
+        if (game_name or "").strip():
+            payload["game_name"] = str(game_name).strip()
     if steam_path is not None:
         try:
             from sff.premium_manifest_lock import paid_distinct_game_count_for_steam
@@ -539,9 +547,27 @@ class WebBridge(QObject):
         self._log_vip((message or "").strip())
 
     @pyqtSlot(str)
-    def _deliver_notify_gen(self, app_id: str) -> None:
+    def _deliver_notify_gen(self, payload_json: str) -> None:
         self._log_ui("Préparation de la notification d’activité sur Discord…")
-        _notify_launcher_gen_activity(app_id, ui_log=self._log_ui, steam_path=self._steam_path)
+        aid = str(payload_json or "").strip()
+        source = ""
+        game_name = ""
+        if aid.startswith("{"):
+            try:
+                blob = json.loads(aid)
+                if isinstance(blob, dict):
+                    aid = str(blob.get("app_id") or "").strip()
+                    source = str(blob.get("source") or "").strip()
+                    game_name = str(blob.get("game_name") or "").strip()
+            except Exception:
+                pass
+        _notify_launcher_gen_activity(
+            aid,
+            ui_log=self._log_ui,
+            steam_path=self._steam_path,
+            source=source,
+            game_name=game_name,
+        )
 
     @pyqtSlot(str)
     def notify_gen_activity(self, app_id: str) -> None:
@@ -3436,6 +3462,21 @@ class WebBridge(QObject):
                 message,
                 app_id=gid,
             )
+            steam_app_id = str((entry or {}).get("app_id") or "").strip()
+            if ok and steam_app_id.isdigit() and sys.platform == "win32":
+                notify_payload = json.dumps(
+                    {
+                        "app_id": steam_app_id,
+                        "source": "fixed_vip",
+                        "game_name": display or (entry or {}).get("name") or gid,
+                    },
+                    ensure_ascii=False,
+                )
+                self._log_fixed(
+                    f"Notification Discord Jeux VIP (installation OK) app_id={steam_app_id} "
+                    f"jeu={display!r}"
+                )
+                self.request_notify_gen.emit(notify_payload)
 
         def _on_error(msg: str) -> None:
             self._log_fixed(f"Exception critique worker : {msg}")
@@ -3445,13 +3486,6 @@ class WebBridge(QObject):
                 "Erreur interne pendant l’installation. Consulte le journal.",
                 app_id=gid,
             )
-
-        steam_app_id = str((entry or {}).get("app_id") or "").strip()
-        if steam_app_id.isdigit() and sys.platform == "win32":
-            self._log_fixed(
-                f"Notification Discord activité (démarrage téléchargement) app_id={steam_app_id}"
-            )
-            self.request_notify_gen.emit(steam_app_id)
 
         self._run_async(_do, on_done=_on_done, on_error=_on_error)
 

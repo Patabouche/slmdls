@@ -9,7 +9,7 @@ import re
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _STRINGS = os.path.join(_HERE, "..", "sff", "strings.py")
 
-_version = "1.1.0"
+_version = "1.1.1"
 try:
     _spec = importlib.util.spec_from_file_location("_sff_strings", _STRINGS)
     if _spec and _spec.loader:

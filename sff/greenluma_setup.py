@@ -233,6 +233,8 @@ def patch_dll_injector_ini(ini_path: str, steam_exe: str, dll_path: str) -> None
 
     lines = text.splitlines(keepends=True)
     result = []
+    has_create_files = False
+    has_file_to_create = False
     for line in lines:
         stripped = line.strip()
         key = stripped.split("=")[0].strip() if "=" in stripped else stripped
@@ -246,14 +248,39 @@ def patch_dll_injector_ini(ini_path: str, steam_exe: str, dll_path: str) -> None
             indent = line[: len(line) - len(line.lstrip())]
             result.append(f"{indent}Dll = {dll_path}\r\n")
         elif key == "CreateFiles":
+            has_create_files = True
             indent = line[: len(line) - len(line.lstrip())]
             result.append(f"{indent}CreateFiles = 1\r\n")
         elif key == "FileToCreate_1":
+            has_file_to_create = True
             indent = line[: len(line) - len(line.lstrip())]
             result.append(f"{indent}FileToCreate_1 = NoQuestion.bin\r\n")
         else:
             result.append(line)
+    if not has_create_files:
+        result.append("CreateFiles = 1\r\n")
+    if not has_file_to_create:
+        result.append("FileToCreate_1 = NoQuestion.bin\r\n")
     p.write_text("".join(result), encoding="utf-8")
+
+
+def ensure_greenluma_silent_launch(steam_dir: str | Path, injector_dir: str | Path | None = None) -> None:
+    """
+    Prépare un lancement silencieux de DLLInjector (sans invite CMD App ID).
+    GreenLuma saute les questions si NoQuestion.bin est présent à côté de l'injecteur.
+    """
+    root = Path(steam_dir)
+    base = Path(injector_dir) if injector_dir else root
+    for folder in {root, base}:
+        if not folder.is_dir():
+            continue
+        marker = folder / "NoQuestion.bin"
+        try:
+            if not marker.is_file():
+                marker.write_bytes(b"")
+                _gl(f"NoQuestion.bin créé : {marker}")
+        except OSError as exc:
+            log.debug("[GreenLuma] NoQuestion.bin %s : %s", marker, exc)
 
 
 def apply_greenluma_settings_option2(steam_dir: str | Path) -> tuple[bool, str]:
@@ -279,6 +306,8 @@ def apply_greenluma_settings_option2(steam_dir: str | Path) -> tuple[bool, str]:
         patch_dll_injector_ini(str(ini_path), str(steam_exe), dll)
     except Exception as exc:
         return False, f"Échec patch DLLInjector.ini : {exc}"
+
+    ensure_greenluma_silent_launch(root, ini_path.parent)
 
     _gl(
         f"GreenLumaSettings (option 2) appliqué — "

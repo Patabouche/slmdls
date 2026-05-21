@@ -2677,21 +2677,22 @@ class WebBridge(QObject):
         def _do():
             if sys.platform == "win32":
                 import time
-                import subprocess
-                from sff.processes import SteamProcess, is_proc_running, kill_steam_client_completely
+                import shutil
+                from sff.processes import (
+                    is_proc_running,
+                    kill_steam_client_completely,
+                    launch_steam_client,
+                )
 
                 if not self._steam_path:
                     return (False, "Chemin Steam non configuré")
 
-                applist_folder = None
-                if hasattr(self._ui, 'app_list_man') and self._ui.app_list_man:
-                    applist_folder = self._ui.app_list_man.applist_folder
-                if not applist_folder:
-                    return (False, "Dossier AppList introuvable")
-
                 # Kill Steam + webhelper + DLLInjector (UAC si Steam tournait en admin)
-                if is_proc_running("steam.exe") or is_proc_running("steamwebhelper.exe") or is_proc_running("DLLInjector.exe"):
-                    print("Killing Steam...", end="", flush=True)
+                if (
+                    is_proc_running("steam.exe")
+                    or is_proc_running("steamwebhelper.exe")
+                    or is_proc_running("DLLInjector.exe")
+                ):
                     closed = kill_steam_client_completely(try_elevated=True, wait_seconds=14.0)
                     if not closed:
                         return (
@@ -2700,42 +2701,17 @@ class WebBridge(QObject):
                             "Ferme tous les processus Steam / steamwebhelper / DLLInjector "
                             "dans le Gestionnaire des tâches, puis réessaie."
                         )
-                    print(" Done!")
                     time.sleep(1.0)
                     try:
-                        import shutil
                         cache = Path.home() / "AppData" / "Local" / "Steam" / "htmlcache"
                         if cache.is_dir():
                             shutil.rmtree(cache, ignore_errors=True)
                     except Exception:
                         pass
 
-                steam_proc = SteamProcess(self._steam_path, applist_folder)
-
-                # Relance via injecteur GreenLuma (AppList)
-                injector = steam_proc.injector_dir / "DLLInjector.exe"
-                if not injector.exists():
-                    injector = self._steam_path / "steam.exe"
-                if not injector.exists():
-                    return (False, "DLLInjector.exe and steam.exe not found")
-
-                print(f"Launching {injector.name}...")
-                try:
-                    import ctypes as _ctypes
-                    already_admin = bool(_ctypes.windll.shell32.IsUserAnAdmin())
-                    if already_admin:
-                        subprocess.Popen([str(injector)], cwd=str(self._steam_path))
-                        return (True, "Steam launched successfully")
-                    # Not admin — request UAC elevation via ShellExecuteW runas
-                    ret = _ctypes.windll.shell32.ShellExecuteW(
-                        None, "runas", str(injector), None, str(self._steam_path), 1)
-                    if ret > 32:
-                        return (True, "Steam launched successfully")
-                    # Elevation declined/failed — try without elevation as fallback
-                    subprocess.Popen([str(injector)], cwd=str(self._steam_path))
-                    return (True, "Steam launched (elevation skipped)")
-                except Exception as e:
-                    return (False, f"Failed to launch: {e}")
+                if launch_steam_client(self._steam_path):
+                    return (True, "Steam relancé avec GreenLuma (mode silencieux).")
+                return (False, "Impossible de relancer Steam (DLLInjector ou AppList manquant).")
 
             else:
                 from sff.linux.steam_process import kill_steam, start_steam
@@ -4286,47 +4262,13 @@ class WebBridge(QObject):
                 return True, "Steam relancé."
             return False, f"Échec relance Steam : {result}"
 
-        import subprocess
-        import time
-        from sff.processes import SteamProcess, is_proc_running
+        from sff.processes import launch_steam_client
 
         if not self._steam_path:
             return False, "Chemin Steam inconnu."
-
-        applist_folder = None
-        if hasattr(self._ui, "app_list_man") and self._ui.app_list_man:
-            applist_folder = self._ui.app_list_man.applist_folder
-        if not applist_folder:
-            steam_exe = Path(self._steam_path) / "steam.exe"
-            if steam_exe.exists():
-                subprocess.Popen([str(steam_exe)], cwd=str(self._steam_path))
-                return True, "Steam relancé."
-            return False, "Dossier AppList introuvable."
-
-        steam_proc = SteamProcess(self._steam_path, applist_folder)
-        injector = steam_proc.injector_dir / "DLLInjector.exe"
-        if not injector.exists():
-            injector = Path(self._steam_path) / "steam.exe"
-        if not injector.exists():
-            return False, "steam.exe introuvable."
-
-        try:
-            import ctypes as _ctypes
-
-            already_admin = bool(_ctypes.windll.shell32.IsUserAnAdmin())
-            if already_admin:
-                subprocess.Popen([str(injector)], cwd=str(self._steam_path))
-                return True, "Steam relancé."
-            ret = _ctypes.windll.shell32.ShellExecuteW(
-                None, "runas", str(injector), None, str(self._steam_path), 1
-            )
-            if ret > 32:
-                return True, "Steam relancé."
-            subprocess.Popen([str(injector)], cwd=str(self._steam_path))
+        if launch_steam_client(self._steam_path):
             return True, "Steam relancé."
-        except Exception as e:
-            logger.warning("_launch_steam_client: %s", e)
-            return False, f"Relance Steam impossible : {e}"
+        return False, "Relance Steam impossible (DLLInjector ou AppList manquant)."
 
     @pyqtSlot(str, str, str)
     def delete_game(self, app_id, game_path, mode):

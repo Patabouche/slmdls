@@ -212,6 +212,16 @@ def load_fixed_games_catalog(*, force: bool = False) -> list[dict]:
 
     remote = _fetch_remote_catalog()
     if remote:
+        local = _load_local_catalog()
+        if local and len(remote) < len(local):
+            log.warning(
+                "[Jeux VIP] catalogue API (%s jeux) < local (%s) — conservation du catalogue local",
+                len(remote),
+                len(local),
+            )
+            _catalog_cache = local
+            _catalog_cache_ts = now
+            return local
         _catalog_cache = remote
         _catalog_cache_ts = now
         if remote_rev is not None:

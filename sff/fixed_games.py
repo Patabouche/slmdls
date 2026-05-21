@@ -180,6 +180,18 @@ def invalidate_fixed_games_catalog_cache() -> None:
     _catalog_cache_rev = 0
 
 
+def load_fixed_games_catalog_fast() -> list[dict]:
+    """Cache mémoire ou fichier local — jamais de réseau (safe pour le thread UI Qt)."""
+    global _catalog_cache, _catalog_cache_ts
+    if _catalog_cache is not None:
+        return _catalog_cache
+    result = _load_local_catalog()
+    if result:
+        _catalog_cache = result
+        _catalog_cache_ts = time.monotonic()
+    return result
+
+
 def load_fixed_games_catalog(*, force: bool = False) -> list[dict]:
     global _catalog_cache, _catalog_cache_ts, _catalog_cache_rev
     now = time.monotonic()
@@ -229,7 +241,7 @@ def get_fixed_game(game_id: str) -> dict | None:
 
     gid = (game_id or "").strip().lower()
 
-    for g in load_fixed_games_catalog():
+    for g in load_fixed_games_catalog_fast():
 
         if str(g.get("id", "")).strip().lower() == gid:
 
@@ -404,14 +416,9 @@ def resolve_install_directory(target: str | Path) -> Path:
 
 
 
-def _partial_download_info(game_id: str) -> dict:
-
-    """Retourne les infos du téléchargement partiel existant pour un jeu (taille, %)."""
-
-    entry = get_fixed_game(game_id)
-
+def _partial_download_info_for_entry(entry: dict | None) -> dict:
+    """Partiel BuzzHeavier pour une entrée catalogue (sans recharger le catalogue)."""
     if not entry:
-
         return {"partial_bytes": 0, "partial_pct": 0, "partial_human": ""}
 
     url = (entry.get("url") or "").strip()
@@ -469,38 +476,187 @@ def _partial_download_info(game_id: str) -> dict:
         return {"partial_bytes": 0, "partial_pct": 0, "partial_human": ""}
 
 
+def _partial_download_info(game_id: str) -> dict:
+    """Retourne les infos du téléchargement partiel existant pour un jeu (taille, %)."""
+    return _partial_download_info_for_entry(get_fixed_game(game_id))
 
+
+def get_all_partials_from_catalog(catalog: list[dict]) -> dict:
+    """Partiels pour un catalogue déjà chargé (évite N× lookup)."""
+    result: dict = {}
+    for entry in catalog:
+        if not isinstance(entry, dict):
+            continue
+        gid = (entry.get("id") or "").strip()
+        if not gid:
+            continue
+        info = _partial_download_info_for_entry(entry)
+        if info.get("partial_bytes", 0) > 0:
+            result[gid] = info
+    return result
 
 
 def get_all_partials() -> dict:
-
     """Retourne les infos de téléchargement partiel pour tous les jeux du catalogue."""
-
-    result = {}
-
     try:
-
-        catalog = load_fixed_games_catalog()
-
-        for entry in catalog:
-
-            gid = entry.get("id", "")
-
-            if not gid:
-
-                continue
-
-            info = _partial_download_info(gid)
-
-            if info.get("partial_bytes", 0) > 0:
-
-                result[gid] = info
-
+        return get_all_partials_from_catalog(load_fixed_games_catalog_fast())
     except Exception:
+        return {}
 
-        pass
 
+def get_installed_fixed_catalog_ids_from_catalog(catalog: list[dict]) -> list[str]:
+    """IDs catalogue des Pépites installées, à partir d’un catalogue déjà en mémoire."""
+    app_to_catalog: dict[str, str] = {}
+    for entry in catalog:
+        if not isinstance(entry, dict):
+            continue
+        cid = (entry.get("id") or "").strip()
+        aid = str(entry.get("app_id") or "").strip()
+        if cid and aid.isdigit():
+            app_to_catalog[aid] = cid
+    installed: list[str] = []
+    seen: set[str] = set()
+    for sg in get_sideloaded_games():
+        aid = str(sg.get("app_id") or "").strip()
+        cid = app_to_catalog.get(aid)
+        if cid and cid not in seen:
+            seen.add(cid)
+            installed.append(cid)
+    return installed
+
+
+def _steam_header_image_url(app_id: str) -> str:
+    aid = str(app_id or "").strip()
+    if not aid.isdigit():
+        return ""
+    return f"https://cdn.cloudflare.steamstatic.com/steam/apps/{aid}/header.jpg"
+
+
+def _fetch_steam_header_urls_batch(app_ids: list[int]) -> dict[int, str]:
+    """URLs d’assets Steam officielles (IStoreBrowseService) — Pragmata et jeux récents."""
+    if not app_ids:
+        return {}
+    import json as _json
+    import urllib.parse as _urlparse
+    import urllib.request as _req
+
+    result: dict[int, str] = {}
+    try:
+        payload = {
+            "ids": [{"appid": aid} for aid in app_ids],
+            "context": {"language": "english", "country_code": "US"},
+            "data_request": {"include_assets": True},
+        }
+        url = (
+            "https://api.steampowered.com/IStoreBrowseService/GetItems/v1?input_json="
+            + _urlparse.quote(_json.dumps(payload, separators=(",", ":")))
+        )
+        request = _req.Request(url, headers={"User-Agent": "SlimeDeals/5.4.0"})
+        with _req.urlopen(request, timeout=8) as resp:
+            data = _json.loads(resp.read())
+        for item in data.get("response", {}).get("store_items", []):
+            appid = item.get("appid")
+            header = (item.get("assets") or {}).get("header", "")
+            if appid and header:
+                result[int(appid)] = (
+                    f"https://shared.steamstatic.com/store_item_assets/steam/apps/"
+                    f"{appid}/{header}"
+                )
+        log.info("[Jeux VIP] GetItems OK — %s/%s jaquettes", len(result), len(app_ids))
+    except Exception as exc:
+        log.warning("[Jeux VIP] Steam GetItems batch échoué : %s", exc)
     return result
+
+
+def _fetch_steam_store_header_image(app_id: int) -> str:
+    """Fallback store.steampowered.com/api/appdetails (header_image)."""
+    try:
+        import json as _json
+        import urllib.request as _req
+
+        url = (
+            f"https://store.steampowered.com/api/appdetails?appids={app_id}&l=english"
+        )
+        request = _req.Request(url, headers={"User-Agent": "SlimeDeals/5.4.0"})
+        with _req.urlopen(request, timeout=10) as resp:
+            data = _json.loads(resp.read())
+        block = data.get(str(app_id), {})
+        if block.get("success") and isinstance(block.get("data"), dict):
+            hdr = (block["data"].get("header_image") or "").strip()
+            if hdr.startswith("http"):
+                return hdr.split("?")[0]
+    except Exception as exc:
+        log.debug("[Jeux VIP] appdetails %s : %s", app_id, exc)
+    return ""
+
+
+def enrich_catalog_header_images(catalog: list[dict]) -> list[dict]:
+    """header_image via API Steam (prioritaire) puis CDN générique."""
+    app_ids: list[int] = []
+    for entry in catalog:
+        if not isinstance(entry, dict):
+            continue
+        aid = str(entry.get("app_id") or "").strip()
+        if aid.isdigit():
+            app_ids.append(int(aid))
+    steam_urls = _fetch_steam_header_urls_batch(app_ids)
+
+    out: list[dict] = []
+    for entry in catalog:
+        if not isinstance(entry, dict):
+            continue
+        row = dict(entry)
+        aid = str(row.get("app_id") or "").strip()
+        aid_int = int(aid) if aid.isdigit() else 0
+        eid = (row.get("id") or "?").strip()
+        if aid_int and aid_int in steam_urls:
+            row["header_image"] = steam_urls[aid_int]
+        elif aid_int:
+            store_hdr = _fetch_steam_store_header_image(aid_int)
+            if store_hdr:
+                row["header_image"] = store_hdr
+                log.info("[Jeux VIP] %s appdetails → %s", eid, store_hdr[:72])
+            elif not (row.get("header_image") or row.get("image_url")):
+                url = _steam_header_image_url(aid)
+                if url:
+                    row["header_image"] = url
+        elif not (row.get("header_image") or row.get("image_url")):
+            url = _steam_header_image_url(aid)
+            if url:
+                row["header_image"] = url
+        out.append(row)
+    return out
+
+
+def collect_gamefixes_page_state(*, fetch_remote: bool = False) -> dict:
+    """Tout le travail I/O Jeux VIP — à exécuter hors du thread UI Qt."""
+    catalog = load_fixed_games_catalog_fast()
+    if fetch_remote:
+        try:
+            remote = load_fixed_games_catalog(force=True)
+            if remote:
+                catalog = remote
+        except Exception:
+            log.debug("collect_gamefixes_page_state remote", exc_info=True)
+    catalog = enrich_catalog_header_images(catalog)
+    for entry in catalog:
+        if not isinstance(entry, dict):
+            continue
+        eid = entry.get("id", "?")
+        aid = entry.get("app_id", "")
+        hdr = bool(entry.get("header_image") or entry.get("image_url"))
+        hdr_url = (entry.get("header_image") or entry.get("image_url") or "")[:80]
+        log.info(
+            "[Jeux VIP] catalogue %s app_id=%s image=%s",
+            eid,
+            aid,
+            hdr_url or "(aucune)",
+        )
+    return {
+        "catalog": catalog,
+        "installed_ids": get_installed_fixed_catalog_ids_from_catalog(catalog),
+        "partials": get_all_partials_from_catalog(catalog),
+    }
 
 
 
@@ -765,21 +921,7 @@ def _register_sideloaded_game(app_id: str | int, name: str, game_folder: Path) -
 
 def get_installed_fixed_catalog_ids() -> list[str]:
     """IDs catalogue (ex. subnautica2) des Pépites déjà installées (registre sideloaded)."""
-    app_to_catalog: dict[str, str] = {}
-    for entry in load_fixed_games_catalog():
-        cid = (entry.get("id") or "").strip()
-        aid = str(entry.get("app_id") or "").strip()
-        if cid and aid.isdigit():
-            app_to_catalog[aid] = cid
-    installed: list[str] = []
-    seen: set[str] = set()
-    for sg in get_sideloaded_games():
-        aid = str(sg.get("app_id") or "").strip()
-        cid = app_to_catalog.get(aid)
-        if cid and cid not in seen:
-            seen.add(cid)
-            installed.append(cid)
-    return installed
+    return get_installed_fixed_catalog_ids_from_catalog(load_fixed_games_catalog_fast())
 
 
 _FIXED_GAMES_BACKUP_ROOT = Path.home() / ".slimedeals" / "FixedGames_Backup"

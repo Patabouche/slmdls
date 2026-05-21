@@ -186,7 +186,7 @@ window.Bridge = (function() {
                         {
                             id: 'pragmata',
                             name: 'Pragmata',
-                            app_id: '3124140',
+                            app_id: '3357650',
                             size_label: '34,9 Go',
                             tags: ['Jeu complet', 'Correctifs intégrés']
                         },
@@ -216,6 +216,9 @@ window.Bridge = (function() {
             get_fixed_games_installed: function(cb) {
                 if (cb) cb(JSON.stringify({ installed_ids: [] }));
             },
+            prepare_gamefixes_page: function() {},
+            refresh_fixed_games_catalog: function() {},
+            log_vip: function(msg) { console.log('[Jeux VIP]', msg); },
             set_active_library: function() {},
             open_file_dialog: function(cb) { if (cb) cb(''); },
             open_log_window: function() {},

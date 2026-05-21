@@ -24,5 +24,19 @@
       "Correctifs intégrés"
     ],
     "folder_hint": "Subnautica-2-SteamRIP.com"
+  },
+  {
+    "id": "planetzoo",
+    "name": "Planet Zoo",
+    "app_id": "703080",
+    "url": "https://bzzhr.to/czn0geghuw2l",
+    "size_label": "8,9 Go",
+    "tags": [
+      "Jeu complet",
+      "Correctifs intégrés"
+    ],
+    "folder_hint": "Planet-Zoo-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/703080/header.jpg",
+    "size_bytes": 9556302233
   }
 ]

@@ -480,9 +480,11 @@ class WebBridge(QObject):
         self._api_key = None
         self._store_client = None
         self._workers = []  # prevent GC of running workers
+        self._async_jobs: list[dict] = []  # {thread, worker} — évite QThread destroyed while running
         self._installed_games_cache: str = ""
         self._installed_games_cache_ts: float = 0.0
         self._installed_games_cache_ttl: float = 45.0
+        self._gamefixes_prepare_token: int = 0
         self.request_notify_gen.connect(self._deliver_notify_gen, Qt.ConnectionType.QueuedConnection)
         if ui is not None and hasattr(ui, "post_install_notify"):
             def _post_install_hook(aid: str, br=self) -> None:
@@ -518,6 +520,24 @@ class WebBridge(QObject):
             logger.info("[Jeux fixed] %s", safe)
         logger.info("[Jeux fixed] %s", safe)
 
+    def _log_vip(self, msg: str) -> None:
+        """Journal onglet Jeux VIP (couvertures, catalogue, re-renders)."""
+        try:
+            safe = redact_sensitive_log_text(msg)
+        except Exception:
+            safe = msg
+        try:
+            ts = time.strftime("%H:%M:%S")
+            self.log_message.emit(f"[{ts}] [Jeux VIP] {safe}")
+        except Exception:
+            logger.info("[Jeux VIP] %s", safe)
+        logger.info("[Jeux VIP] %s", safe)
+
+    @pyqtSlot(str)
+    def log_vip(self, message: str) -> None:
+        """Slot WebChannel — logs JS → panneau Journaux."""
+        self._log_vip((message or "").strip())
+
     @pyqtSlot(str)
     def _deliver_notify_gen(self, app_id: str) -> None:
         self._log_ui("Préparation de la notification d’activité sur Discord…")
@@ -539,16 +559,15 @@ class WebBridge(QObject):
     # ── helpers ──────────────────────────────────────────────────
 
     def _run_async(self, func, *args, on_done=None, on_error=None, **kwargs):
-        """Spawn a QThread worker for the given function."""
-        # Forward stdout/stderr from the background thread to the parent window's
-        # StreamEmitter so that print() output appears in the Modern UI log panel.
-        # Classic UI's _start_worker does this too; we mirror that behaviour here.
+        """Spawn a QThread worker for the given function (slots UI via QueuedConnection)."""
         parent = self.parent()
         stream = getattr(parent, '_stream_emitter', None) if parent else None
         if stream is not None:
             _orig_func = func
-            def func(*_a, **_kw):   # noqa: E731
+
+            def func(*_a, **_kw):  # noqa: E731
                 import sys as _sys
+
                 _old_out, _old_err = _sys.stdout, _sys.stderr
                 _sys.stdout = stream
                 _sys.stderr = stream
@@ -557,45 +576,56 @@ class WebBridge(QObject):
                 finally:
                     _sys.stdout = _old_out
                     _sys.stderr = _old_err
+
         thread = QThread()
         worker = _Worker(func, *args, **kwargs)
         worker.moveToThread(thread)
+        job = {"thread": thread, "worker": worker}
+        self._async_jobs.append(job)
+        self._workers.append(worker)
 
-        def _cleanup(result):
+        def _drop_job():
+            if job in self._async_jobs:
+                self._async_jobs.remove(job)
+            if worker in self._workers:
+                self._workers.remove(worker)
+
+        def _handle_result(result):
             try:
                 if on_done:
                     on_done(result)
             finally:
-                if worker in self._workers:
-                    self._workers.remove(worker)
                 thread.quit()
 
-        def _on_error(msg):
-            if worker in self._workers:
-                self._workers.remove(worker)
+        def _handle_error(msg):
             try:
-                safe_msg = redact_sensitive_log_text(str(msg))
-            except Exception:
-                safe_msg = str(msg)
-            try:
-                ts = time.strftime("%H:%M:%S")
-                self.log_message.emit(f"[{ts}] [Worker] Erreur : {safe_msg}")
-            except Exception:
-                logger.warning("[Worker] Erreur : %s", safe_msg)
-            if on_error:
-                on_error(safe_msg)
-            else:
-                self.task_finished.emit(json.dumps({
-                    "task": "unknown", "success": False, "message": safe_msg
-                }))
-            thread.quit()
+                try:
+                    safe_msg = redact_sensitive_log_text(str(msg))
+                except Exception:
+                    safe_msg = str(msg)
+                try:
+                    ts = time.strftime("%H:%M:%S")
+                    self.log_message.emit(f"[{ts}] [Worker] Erreur : {safe_msg}")
+                except Exception:
+                    logger.warning("[Worker] Erreur : %s", safe_msg)
+                if on_error:
+                    on_error(safe_msg)
+                else:
+                    self.task_finished.emit(
+                        json.dumps({"task": "unknown", "success": False, "message": safe_msg})
+                    )
+            finally:
+                thread.quit()
 
-        worker.finished.connect(_cleanup)
-        worker.error.connect(_on_error)
-        thread.finished.connect(thread.deleteLater)
-        worker.finished.connect(worker.deleteLater)
+        def _thread_finished():
+            _drop_job()
+            worker.deleteLater()
+            thread.deleteLater()
+
+        worker.finished.connect(_handle_result, Qt.ConnectionType.QueuedConnection)
+        worker.error.connect(_handle_error, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(_thread_finished)
         thread.started.connect(worker.run)
-        self._workers.append(worker)
         thread.start()
 
     def _emit_task_result(self, task_name, success, message="", **extra):
@@ -788,52 +818,57 @@ class WebBridge(QObject):
             rank = result.get("rank", "free")
             claimed = result.get("free_claimed")
             _save_auth(tok, uname, rank, claimed, result.get("rank_expires_at"))
-            try:
-                from sff.premium_manifest_lock import apply_rank_transition
+            steam_path = self._steam_path
+            rank_expires_at = result.get("rank_expires_at")
 
-                apply_rank_transition(self._steam_path, rank)
-            except Exception as _e:
-                logger.warning("premium_manifest_lock (sync): %s", _e)
-            try:
-                from sff.premium_manifest_lock import run_startup_check
-
-                run_startup_check(self._steam_path)
-            except Exception:
-                pass
-            try:
-                from sff.premium_manifest_lock import paid_distinct_game_count_for_steam
-
-                b = _launcher_rank_bucket(rank)
-                if b in ("monstre", "pass24h", "triple") and self._steam_path:
-                    ms_used = paid_distinct_game_count_for_steam(self._steam_path)
-                    if b == "triple":
-                        ms_max = None
-                    elif b == "pass24h":
-                        ms_max = PASS24H_MAX_DISTINCT_INSTALLS
-                    else:
-                        ms_max = MONSTRE_MAX_DISTINCT_INSTALLS
-                else:
-                    ms_used = ms_max = None
-            except Exception:
+            def _heavy():
                 ms_used = ms_max = None
-            self.launcher_profile_synced.emit(
-                json.dumps(
-                    {
-                        "ok": True,
-                        "rank": rank,
-                        "free_claimed": claimed,
-                        "username": uname,
-                        "rank_expires_at": result.get("rank_expires_at"),
-                        "cloud_saves_enabled": cloud_saves_launcher_allowed_for_rank(rank),
-                        "monstre_slots_used": ms_used,
-                        "monstre_slots_max": ms_max,
-                    }
-                )
-            )
-            parent = self.parent()
-            if parent and getattr(parent, "_authenticated", False):
-                if hasattr(parent, "_apply_rank_from_server"):
-                    parent._apply_rank_from_server(uname, rank)
+                try:
+                    from sff.premium_manifest_lock import (
+                        apply_rank_transition,
+                        paid_distinct_game_count_for_steam,
+                        run_startup_check,
+                    )
+
+                    apply_rank_transition(steam_path, rank)
+                    run_startup_check(steam_path)
+                    b = _launcher_rank_bucket(rank)
+                    if b in ("monstre", "pass24h", "triple") and steam_path:
+                        ms_used = paid_distinct_game_count_for_steam(steam_path)
+                        if b == "triple":
+                            ms_max = None
+                        elif b == "pass24h":
+                            ms_max = PASS24H_MAX_DISTINCT_INSTALLS
+                        else:
+                            ms_max = MONSTRE_MAX_DISTINCT_INSTALLS
+                except Exception as _e:
+                    logger.warning("premium_manifest_lock (sync): %s", _e)
+                return {
+                    "ok": True,
+                    "rank": rank,
+                    "free_claimed": claimed,
+                    "username": uname,
+                    "rank_expires_at": rank_expires_at,
+                    "cloud_saves_enabled": cloud_saves_launcher_allowed_for_rank(rank),
+                    "monstre_slots_used": ms_used,
+                    "monstre_slots_max": ms_max,
+                }
+
+            def _emit_profile(payload):
+                if not payload:
+                    return
+                try:
+                    self.launcher_profile_synced.emit(
+                        json.dumps(payload, ensure_ascii=False)
+                    )
+                except Exception:
+                    pass
+                parent = self.parent()
+                if parent and getattr(parent, "_authenticated", False):
+                    if hasattr(parent, "_apply_rank_from_server"):
+                        parent._apply_rank_from_server(uname, rank)
+
+            self._run_async(_heavy, on_done=_emit_profile)
 
         self._run_async(_do, on_done=_done)
 
@@ -3163,17 +3198,72 @@ class WebBridge(QObject):
 
     @pyqtSlot(str, result=str)
     def get_fixed_games_catalog(self, force: str = "0") -> str:
-        """Catalogue des jeux fixed (BuzzHeavier) pour l’onglet Jeux fixed."""
-        from sff.fixed_games import load_fixed_games_catalog
-
+        """Catalogue Jeux VIP — retour immédiat (cache/local). Réseau via refresh_fixed_games_catalog."""
         try:
-            refresh = str(force or "0").strip().lower() in ("1", "true", "yes")
+            from sff.fixed_games import enrich_catalog_header_images, load_fixed_games_catalog_fast
+
+            if str(force or "0").strip().lower() in ("1", "true", "yes"):
+                self.refresh_fixed_games_catalog()
             return json.dumps(
-                load_fixed_games_catalog(force=refresh),
+                enrich_catalog_header_images(load_fixed_games_catalog_fast()),
                 ensure_ascii=False,
             )
         except Exception:
             return "[]"
+
+    @pyqtSlot()
+    def prepare_gamefixes_page(self) -> None:
+        """Async : catalogue + installés + partiels (un seul worker, hors thread UI)."""
+        self._gamefixes_prepare_token += 1
+        token = self._gamefixes_prepare_token
+        self._log_vip(f"prepare_gamefixes_page démarré (token={token})")
+
+        def _do():
+            from sff.fixed_games import collect_gamefixes_page_state
+
+            return collect_gamefixes_page_state(fetch_remote=True)
+
+        def _on_done(state):
+            if token != self._gamefixes_prepare_token:
+                self._log_vip(f"prepare ignoré — token périmé {token}")
+                return
+            if not isinstance(state, dict):
+                state = {}
+            catalog = state.get("catalog") or []
+            n = len(catalog)
+            with_img = sum(
+                1
+                for g in catalog
+                if isinstance(g, dict)
+                and (g.get("header_image") or g.get("image_url") or g.get("app_id"))
+            )
+            self._log_vip(
+                f"prepare terminé — {n} jeu(x), {with_img} avec image/app_id "
+                f"(partiels={len(state.get('partials') or {})}, "
+                f"installés={len(state.get('installed_ids') or [])}, token={token})"
+            )
+            try:
+                self.task_finished.emit(
+                    json.dumps(
+                        {
+                            "task": "gamefixes_page_ready",
+                            "success": True,
+                            "catalog": state.get("catalog") or [],
+                            "installed_ids": state.get("installed_ids") or [],
+                            "partials": state.get("partials") or {},
+                        },
+                        ensure_ascii=False,
+                    )
+                )
+            except Exception as exc:
+                logger.exception("prepare_gamefixes_page emit: %s", exc)
+
+        self._run_async(_do, on_done=_on_done)
+
+    @pyqtSlot()
+    def refresh_fixed_games_catalog(self) -> None:
+        """Alias — même pipeline que prepare_gamefixes_page."""
+        self.prepare_gamefixes_page()
 
     @pyqtSlot(result=str)
     def get_fixed_games_partials(self) -> str:

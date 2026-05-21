@@ -17,9 +17,39 @@ window.GameFixes = (function() {
     var _progressModalOpen = false;
     var _vipPage = 1;
     var _vipSearch = '';
+    var _pageActive = false;
+    var _renderGen = 0;
+    var _renderTimer = null;
+    var _lastPrepareMs = 0;
     var EL = 'd' + 'iv';
 
     var _UI_BLOCKLIST = /\b(buzzheavier|steamrip|steam\s*rip|repack|fafda\.to)\b/gi;
+
+    var _STEAM_COVER_CDN = [
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{id}/library_600x900.jpg',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{id}/header.jpg',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{id}/library_header.jpg',
+        'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{id}/capsule_616x353.jpg',
+        'https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{id}/library_600x900.jpg',
+        'https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{id}/header.jpg',
+        'https://shared.steamstatic.com/store_item_assets/steam/apps/{id}/header.jpg',
+        'https://cdn.akamai.steamstatic.com/steam/apps/{id}/header.jpg',
+        'https://cdn.cloudflare.steamstatic.com/steam/apps/{id}/header.jpg'
+    ];
+
+    function _vipLog(msg) {
+        var line = String(msg || '');
+        try {
+            if (typeof Bridge !== 'undefined' && Bridge.call) {
+                Bridge.call('log_vip', line);
+            }
+        } catch (e) {}
+        try {
+            if (typeof console !== 'undefined' && console.log) {
+                console.log('[Jeux VIP]', line);
+            }
+        } catch (e2) {}
+    }
 
     function _tripleAllowed() {
         var r = String(_userRank || '').toLowerCase().replace(/\s+/g, '_');
@@ -38,51 +68,107 @@ window.GameFixes = (function() {
     }
 
     function _coverUrlsForGame(g) {
-        if (!g || typeof Components === 'undefined') return [];
-        var canonical = g.header_image || g.image_url || '';
+        if (!g) return [];
+        var canonical = (g.header_image || g.image_url || '').trim();
         var appId = String(g.app_id || '').trim();
         var urls = [];
-        if (canonical) urls.push(String(canonical).split('?')[0]);
-        if (appId) {
-            var fromCdn = Components.getCoverUrls(appId);
-            if (Array.isArray(fromCdn)) {
-                fromCdn.forEach(function(u) {
-                    if (u && urls.indexOf(u) === -1) urls.push(u);
-                });
+        var seen = {};
+        function add(u) {
+            u = String(u || '').split('?')[0];
+            if (u && !seen[u]) {
+                seen[u] = true;
+                urls.push(u);
             }
+        }
+        if (canonical) add(canonical);
+        if (appId) {
+            _STEAM_COVER_CDN.forEach(function(t) {
+                add(t.replace('{id}', appId));
+            });
         }
         return urls;
     }
 
-    function _applyCoverBackground(coverEl, urls) {
-        if (!coverEl) return;
-        if (!urls || !urls.length) {
-            coverEl.className = 'fixed-game-card-cover fixed-game-card-cover--placeholder';
-            coverEl.style.backgroundImage = '';
-            coverEl.textContent = '🎮';
+    function _coverStillValid(imgEl, gen) {
+        return !!(imgEl && gen === _renderGen && _pageActive);
+    }
+
+    function _showCoverPlaceholder(wrapEl, reason, gameId) {
+        if (!wrapEl) return;
+        wrapEl.className = 'fixed-game-card-cover fixed-game-card-cover--placeholder';
+        wrapEl.textContent = '🎮';
+        wrapEl.style.backgroundImage = '';
+        var old = wrapEl.querySelector('img');
+        if (old) old.remove();
+        if (reason) {
+            _vipLog('Placeholder ' + (gameId || '?') + ' — ' + reason);
+        }
+    }
+
+    function _wrapHasVisibleCover(wrap) {
+        if (!wrap || wrap.classList.contains('fixed-game-card-cover--placeholder')) {
+            return false;
+        }
+        var img = wrap.querySelector('img.fixed-game-card-img');
+        if (!img || !img.src) return false;
+        if (img.complete && img.naturalWidth > 0) return true;
+        if (!img.complete && img.src.indexOf('http') === 0) return true;
+        return false;
+    }
+
+    /** Même logique que Components.createGameCard — <img> + chaîne CDN Steam. */
+    function _applyCoverImage(wrapEl, urls, gen, altText, gameId) {
+        if (!wrapEl) return;
+        if (!_coverStillValid(wrapEl, gen)) {
+            _vipLog(
+                'Cover annulée ' + (gameId || altText || '?') +
+                ' (gen=' + gen + ' courant=' + _renderGen + ' actif=' + _pageActive + ')'
+            );
             return;
         }
-        var idx = 0;
+        if (_wrapHasVisibleCover(wrapEl)) {
+            return;
+        }
+        if (!urls || !urls.length) {
+            _showCoverPlaceholder(wrapEl, 'aucune URL', gameId);
+            return;
+        }
+        var oldImg = wrapEl.querySelector('img');
+        if (oldImg) oldImg.remove();
+        wrapEl.className = 'fixed-game-card-cover';
+        wrapEl.textContent = '';
+        var img = document.createElement('img');
+        img.className = 'fixed-game-card-img';
+        img.alt = altText || '';
+        img.loading = 'lazy';
+        var urlIdx = 0;
         function tryNext() {
-            if (idx >= urls.length) {
-                coverEl.className = 'fixed-game-card-cover fixed-game-card-cover--placeholder';
-                coverEl.style.backgroundImage = '';
-                coverEl.textContent = '🎮';
+            if (!_coverStillValid(wrapEl, gen)) {
+                _vipLog('Cover interrompue ' + (gameId || '?') + ' — re-render (gen ' + gen + '→' + _renderGen + ')');
                 return;
             }
-            var probe = new Image();
-            probe.onload = function() {
-                coverEl.className = 'fixed-game-card-cover';
-                coverEl.textContent = '';
-                coverEl.style.backgroundImage = 'url("' + urls[idx].replace(/"/g, '\\"') + '")';
-            };
-            probe.onerror = function() {
-                idx += 1;
-                tryNext();
-            };
-            probe.src = urls[idx];
+            urlIdx += 1;
+            if (urlIdx < urls.length) {
+                img.onerror = tryNext;
+                img.src = urls[urlIdx];
+            } else {
+                img.onerror = null;
+                _showCoverPlaceholder(wrapEl, 'toutes URLs en échec (' + urls.length + ')', gameId);
+            }
         }
-        tryNext();
+        img.onload = function() {
+            if (!_coverStillValid(wrapEl, gen)) {
+                _vipLog('Cover OK puis ignorée ' + (gameId || '?') + ' (gen obsolète)');
+                return;
+            }
+            wrapEl.className = 'fixed-game-card-cover';
+            wrapEl.textContent = '';
+            _vipLog('Cover OK ' + (gameId || '?') + ' ← ' + (img.src || '').split('/').pop());
+        };
+        img.onerror = tryNext;
+        wrapEl.appendChild(img);
+        _vipLog('Cover démarrage ' + (gameId || '?') + ' (' + urls.length + ' URL, gen=' + gen + ')');
+        img.src = urls[0];
     }
 
     function _setStatus(msg, isError) {
@@ -208,7 +294,7 @@ window.GameFixes = (function() {
             } catch (e) {
                 _installedIds = {};
             }
-            _renderCards();
+            _scheduleRender();
             if (typeof cb === 'function') cb();
         });
     }
@@ -362,7 +448,7 @@ window.GameFixes = (function() {
         if (gid && _progress[gid] && !_progress[gid].active) {
             delete _progress[gid];
             _activeProgressGameId = null;
-            _renderCards();
+            _scheduleRender();
         }
     }
 
@@ -400,7 +486,7 @@ window.GameFixes = (function() {
         if (!gid || !_progress[gid] || !_progress[gid].active) return;
         var card = document.querySelector('.fixed-game-card[data-game-id="' + gid + '"]');
         if (!card) {
-            _renderCards();
+            _scheduleRender();
             return;
         }
         var prog = _progress[gid];
@@ -767,11 +853,129 @@ window.GameFixes = (function() {
         });
     }
 
-    function _renderCards() {
+    function _refreshPlaceholderCoversOnly() {
+        if (!_pageActive || !_catalog.length) return;
+        var gen = _renderGen;
+        var n = 0;
+        _catalog.forEach(function(g) {
+            var id = g.id || '';
+            if (!id) return;
+            var card = document.querySelector('.fixed-game-card[data-game-id="' + id + '"]');
+            if (!card) return;
+            var wrap = card.querySelector('.fixed-game-card-cover');
+            if (!wrap) return;
+            if (_wrapHasVisibleCover(wrap)) return;
+            if (!wrap.classList.contains('fixed-game-card-cover--placeholder')) return;
+            var urls = _coverUrlsForGame(g);
+            if (!urls.length) return;
+            n += 1;
+            _vipLog('Retry cover (placeholder) ' + id);
+            _applyCoverImage(wrap, urls, gen, g.name || id, id);
+        });
+        if (n) {
+            _vipLog('Retry couvertures : ' + n + ' carte(s) en placeholder');
+        }
+    }
+
+    function _domGameSignature() {
+        var ids = [];
+        document.querySelectorAll('.fixed-game-card[data-game-id]').forEach(function(card) {
+            var id = card.getAttribute('data-game-id');
+            if (id) ids.push(String(id).toLowerCase());
+        });
+        return ids.sort().join('\n');
+    }
+
+    function _scheduleRender(reason) {
+        if (!_pageActive) return;
+        if (_renderTimer) clearTimeout(_renderTimer);
+        _renderTimer = setTimeout(function() {
+            _renderTimer = null;
+            if (!_pageActive) return;
+            _renderGen += 1;
+            var gen = _renderGen;
+            _vipLog('Re-render grille gen=' + gen + (reason ? ' (' + reason + ')' : ''));
+            var run = function() {
+                if (!_pageActive || gen !== _renderGen) return;
+                _renderCards(gen);
+                _applyPartialsToCards();
+            };
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(run);
+            } else {
+                run();
+            }
+        }, 32);
+    }
+
+    function _applyPageState(data, source) {
+        if (!_pageActive || !data) return;
+        var catalog = data.catalog || [];
+        var partials = data.partials || {};
+        var installed = data.installed_ids || [];
+        var snapshot = _buildPageSnapshot(catalog, partials, installed);
+        if (snapshot === _catalogSnapshot) {
+            _vipLog('État ignoré (' + (source || '?') + ') — snapshot identique');
+            return;
+        }
+
+        var newGameSig = _catalogGameSignature(catalog);
+        var gamesUnchanged = !!newGameSig && newGameSig === _catalogGameSig;
+        var domSig = _domGameSignature();
+        var domMatches = !!newGameSig && newGameSig === domSig;
+
+        _vipLog(
+            'État ' + (source || '?') + ' — jeux=' + (catalog.length) +
+            ' sig=' + (newGameSig ? newGameSig.split('\n').length : 0) +
+            ' inchangé=' + gamesUnchanged +
+            ' dom=' + (domSig ? domSig.split('\n').length : 0) +
+            ' domOK=' + domMatches
+        );
+
+        _catalogSnapshot = snapshot;
+        _catalogGameSig = newGameSig;
+        _catalog = catalog;
+        _partials = partials;
+        _installedIds = {};
+        installed.forEach(function(id) {
+            if (id) _installedIds[id] = true;
+        });
+
+        if (gamesUnchanged || domMatches) {
+            _vipLog('Pas de re-render — partiels/installés seulement');
+            _applyPartialsToCards();
+            _patchInstalledBadges();
+            if (source === 'prepare_serveur') {
+                _refreshPlaceholderCoversOnly();
+            }
+            return;
+        }
+        _scheduleRender('catalogue modifié via ' + (source || '?'));
+    }
+
+    function _applyCatalogPayload(payload) {
+        if (!_pageActive) return;
+        var catalog = [];
+        try {
+            catalog = JSON.parse(payload || '[]');
+        } catch (e) {
+            catalog = [];
+        }
+        _applyPageState({
+            catalog: catalog,
+            partials: _partials,
+            installed_ids: Object.keys(_installedIds)
+        }, 'catalogue_local');
+    }
+
+    function _renderCards(renderGen) {
+        var gen = renderGen == null ? _renderGen : renderGen;
+        if (!_pageActive || gen !== _renderGen) return;
         var grid = document.getElementById('gamefixes-grid');
         if (!grid) return;
 
         if (!_catalog.length) {
+            _vipLog('Grille vide — catalogue length=0 (gen=' + gen + ')');
             grid.innerHTML = '<p class="gamefixes-empty">Aucun jeu dans le catalogue pour le moment.</p>';
             Components.renderGridPagination('gamefixes-pagination', null);
             return;
@@ -788,6 +992,10 @@ window.GameFixes = (function() {
         _vipPage = pageState.page;
 
         grid.innerHTML = '';
+        _vipLog(
+            'Grille ' + pageState.items.length + '/' + filtered.length +
+            ' cartes (page ' + pageState.page + ', gen=' + gen + ')'
+        );
         pageState.items.forEach(function(g) {
             var id = g.id || '';
             var name = g.name || id;
@@ -803,8 +1011,9 @@ window.GameFixes = (function() {
             var coverEl = document.createElement(EL);
             coverEl.className = 'fixed-game-card-cover fixed-game-card-cover--placeholder';
             coverEl.textContent = '🎮';
-            _applyCoverBackground(coverEl, _coverUrlsForGame(g));
             card.appendChild(coverEl);
+            var coverUrls = _coverUrlsForGame(g);
+            _applyCoverImage(coverEl, coverUrls, gen, name, id);
 
             var body = document.createElement(EL);
             body.className = 'fixed-game-card-body';
@@ -886,13 +1095,15 @@ window.GameFixes = (function() {
 
         Components.renderGridPagination('gamefixes-pagination', pageState, function(p) {
             _vipPage = p;
-            _renderCards();
+            _scheduleRender();
             if (grid) {
                 grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
 
-        _applyPartialsToCards();
+        if (gen === _renderGen) {
+            _applyPartialsToCards();
+        }
     }
 
     function _startInstall(gameId) {
@@ -944,42 +1155,69 @@ window.GameFixes = (function() {
         });
     }
 
-    function _loadPartials() {
-        Bridge.callWithCallback('get_fixed_games_partials', function(json) {
-            try {
-                _partials = JSON.parse(json || '{}');
-            } catch (e) {
-                _partials = {};
+    var _catalogPollTimer = null;
+    var _catalogSnapshot = '';
+    var _catalogGameSig = '';
+
+    function _catalogGameSignature(catalog) {
+        return (catalog || []).map(function(g) {
+            return String((g && g.id) || '').trim().toLowerCase();
+        }).filter(Boolean).sort().join('\n');
+    }
+
+    function _buildPageSnapshot(catalog, partials, installedIds) {
+        var ids = (installedIds || []).slice().sort();
+        return _catalogGameSignature(catalog) + '|' + JSON.stringify(partials || {}) + '|' + JSON.stringify(ids);
+    }
+
+    function _patchInstalledBadges() {
+        document.querySelectorAll('.fixed-game-card[data-game-id]').forEach(function(card) {
+            var id = card.getAttribute('data-game-id');
+            var body = card.querySelector('.fixed-game-card-body');
+            if (!body) return;
+            var existing = body.querySelector('.fixed-game-installed-badge');
+            if (_isGameInstalled(id)) {
+                if (existing) return;
+                var installedBadge = document.createElement('p');
+                installedBadge.className = 'fixed-game-installed-badge';
+                installedBadge.textContent = '✓ Jeu installé';
+                var btn = body.querySelector('.fixed-game-download-btn');
+                if (btn) body.insertBefore(installedBadge, btn);
+                else body.appendChild(installedBadge);
+            } else if (existing) {
+                existing.remove();
             }
-            _applyPartialsToCards();
         });
     }
 
-    var _catalogPollTimer = null;
-    var _catalogSnapshot = '';
-
-    function _loadCatalog(forceRefresh) {
+    function _showCatalogLocalFast() {
+        _vipLog('Chargement catalogue local (rapide)…');
         Bridge.callWithCallback('get_fixed_games_catalog', function(json) {
-            var payload = json || '[]';
-            if (!forceRefresh && payload === _catalogSnapshot) {
-                return;
-            }
-            _catalogSnapshot = payload;
-            try {
-                _catalog = JSON.parse(payload);
-            } catch (e) {
-                _catalog = [];
-            }
-            _renderCards();
-            _loadPartials();
-        }, forceRefresh ? '1' : '0');
+            if (!_pageActive) return;
+            var n = 0;
+            try { n = JSON.parse(json || '[]').length; } catch (e) {}
+            _vipLog('Catalogue local reçu — ' + n + ' jeu(x)');
+            _applyCatalogPayload(json || '[]');
+        }, '0');
+    }
+
+    function _preparePageRemote() {
+        if (!_pageActive) return;
+        var now = Date.now();
+        if (now - _lastPrepareMs < 1000) {
+            _vipLog('prepare_gamefixes_page ignoré (debounce 1s)');
+            return;
+        }
+        _lastPrepareMs = now;
+        _vipLog('Appel prepare_gamefixes_page (serveur)…');
+        Bridge.call('prepare_gamefixes_page');
     }
 
     function _startCatalogPoll() {
         _stopCatalogPoll();
         _catalogPollTimer = setInterval(function() {
-            _loadCatalog(false);
-        }, 60000);
+            if (_pageActive) _preparePageRemote();
+        }, 120000);
     }
 
     function _stopCatalogPoll() {
@@ -1033,7 +1271,7 @@ window.GameFixes = (function() {
             searchInp.addEventListener('input', function() {
                 _vipSearch = this.value;
                 _vipPage = 1;
-                _renderCards();
+                _scheduleRender();
             });
         }
 
@@ -1051,6 +1289,24 @@ window.GameFixes = (function() {
         Bridge.on('task_finished', function(json) {
             try {
                 var data = JSON.parse(json);
+                if (data.task === 'gamefixes_page_ready') {
+                    if (!_pageActive) return;
+                    _vipLog('task_finished gamefixes_page_ready');
+                    _applyPageState(data, 'prepare_serveur');
+                    return;
+                }
+                if (data.task === 'fixed_games_catalog') {
+                    if (!_pageActive) return;
+                    if (data.catalog) {
+                        _vipLog('task_finished fixed_games_catalog');
+                        _applyPageState({
+                            catalog: data.catalog,
+                            partials: _partials,
+                            installed_ids: Object.keys(_installedIds)
+                        }, 'refresh_catalog');
+                    }
+                    return;
+                }
                 if (data.task !== 'install_fixed_game') return;
                 var gid = data.app_id || '';
                 var msg = _sanitizeUserMessage(data.message || '');
@@ -1067,7 +1323,7 @@ window.GameFixes = (function() {
                     });
                     _setStatus('', false);
                 } else {
-                    _renderCards();
+                    _scheduleRender();
                     Components.showToast('error', msg || 'Installation échouée.');
                     _setStatus(msg || 'Installation échouée.', true);
                 }
@@ -1076,11 +1332,13 @@ window.GameFixes = (function() {
     }
 
     function onPageEnter() {
+        _pageActive = true;
+        _renderGen += 1;
+        _vipLog('—— onPageEnter —— gen=' + _renderGen);
         init();
         _refreshRank();
-        Bridge.call('sync_launcher_profile');
-        _loadCatalog(true);
-        _loadInstalled();
+        _showCatalogLocalFast();
+        _preparePageRemote();
         _startCatalogPoll();
         if (_activeProgressGameId && _progress[_activeProgressGameId] && !_progressModalOpen) {
             _updateInstallBanner(_activeProgressGameId);
@@ -1088,6 +1346,15 @@ window.GameFixes = (function() {
     }
 
     function onPageLeave() {
+        _vipLog('—— onPageLeave ——');
+        _pageActive = false;
+        _renderGen += 1;
+        _catalogSnapshot = '';
+        _catalogGameSig = '';
+        if (_renderTimer) {
+            clearTimeout(_renderTimer);
+            _renderTimer = null;
+        }
         _stopCatalogPoll();
         if (_progressModalOpen && _activeProgressGameId) {
             var prog = _progress[_activeProgressGameId];

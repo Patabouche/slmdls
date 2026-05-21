@@ -75,15 +75,21 @@ except Exception as e:
     sys.exit(1)
 
 logger = logging.getLogger("sff")
-logger.setLevel(logging.DEBUG)
-fh = logging.FileHandler("debug.log", encoding="utf-8")
-fh.setFormatter(
-    logging.Formatter(
-        "%(asctime)s::%(name)s::%(levelname)s::%(message)s",
-        datefmt="%m/%d/%Y %I:%M:%S %p",
+try:
+    from sff.debug_crash import install_debug_crash_logging
+
+    _debugcrash_path = install_debug_crash_logging(logger=logger)
+except Exception:
+    _debugcrash_path = None
+    logger.setLevel(logging.DEBUG)
+    fh = logging.FileHandler("debug.log", encoding="utf-8")
+    fh.setFormatter(
+        logging.Formatter(
+            "%(asctime)s::%(name)s::%(levelname)s::%(message)s",
+            datefmt="%m/%d/%Y %I:%M:%S %p",
+        )
     )
-)
-logger.addHandler(fh)
+    logger.addHandler(fh)
 
 
 def get_steam_path_gui():
@@ -128,19 +134,12 @@ def main():
     app.setApplicationDisplayName(f"SlimeDeals {VERSION}")
     app.setApplicationVersion(VERSION)
 
-    def _qt_excepthook(exc_type, exc_val, exc_tb):
-        import traceback as _tb
-        msg = "".join(_tb.format_exception(exc_type, exc_val, exc_tb))
-        logger.critical("Exception non gérée:\n%s", msg)
-        try:
-            with open("crash.log", "a", encoding="utf-8") as f:
-                f.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
-                f.write(msg)
-        except Exception:
-            pass
+    try:
+        from sff.debug_crash import install_qt_message_logging
 
-    import time
-    sys.excepthook = _qt_excepthook
+        install_qt_message_logging()
+    except Exception:
+        pass
 
     from sff.single_instance import SingleInstanceGuard
     _guard = SingleInstanceGuard()
@@ -252,10 +251,16 @@ def _show_error_and_exit(msg, log_path = "crash.log"):
 if __name__ == "__main__":
     try:
         main()
-    except Exception as e:
+    except Exception:
         import traceback
         msg = traceback.format_exc()
         logger.exception("Uncaught exception in GUI")
+        try:
+            from sff.debug_crash import write_crash_report
+
+            write_crash_report("main_uncaught", msg)
+        except Exception:
+            pass
         try:
             with open("crash.log", "w", encoding="utf-8") as f:
                 f.write(msg)

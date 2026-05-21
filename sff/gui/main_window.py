@@ -914,6 +914,44 @@ class SFFMainWindow(QMainWindow):
         self._web_view.page().settings().setAttribute(
             QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True
         )
+        try:
+            from sff.debug_crash import write_crash_report
+
+            def _on_js_console(level, message, line, source):
+                try:
+                    from PyQt6.QtWebEngineCore import QWebEnginePage as _QWEP
+
+                    warn = _QWEP.JavaScriptConsoleMessageLevel.WarningMessageLevel
+                    err = _QWEP.JavaScriptConsoleMessageLevel.ErrorMessageLevel
+                    if level not in (warn, err):
+                        return
+                except Exception:
+                    pass
+                write_crash_report(
+                    "webengine_js",
+                    f"[{level}] {source}:{line} {message}",
+                )
+
+            self._web_view.page().javaScriptConsoleMessage.connect(_on_js_console)
+        except Exception:
+            pass
+        try:
+            from sff.debug_crash import write_crash_report
+
+            def _on_render_terminated(status, exit_code):
+                write_crash_report(
+                    "webengine_render_crash",
+                    f"renderProcessTerminated status={status!r} exit_code={exit_code}",
+                )
+                logger.critical(
+                    "WebEngine render process terminated: status=%s exit=%s",
+                    status,
+                    exit_code,
+                )
+
+            self._web_view.page().renderProcessTerminated.connect(_on_render_terminated)
+        except Exception:
+            pass
         self._web_ui_active = True
         self._web_ui_loaded = False
         self._authenticated = False       # set only after server-verified auth

@@ -21,6 +21,9 @@ window.GameFixes = (function() {
     var _renderGen = 0;
     var _renderTimer = null;
     var _lastPrepareMs = 0;
+    var _awaitingRemoteCatalog = false;
+    var _vipCatalogSyncedOnce = false;
+    var _catalogLoadFallbackTimer = null;
     var EL = 'd' + 'iv';
 
     var _UI_BLOCKLIST = /\b(buzzheavier|steamrip|steam\s*rip|repack|fafda\.to)\b/gi;
@@ -892,6 +895,39 @@ window.GameFixes = (function() {
         return ids.sort().join('\n');
     }
 
+    function _showCatalogLoading(message) {
+        var grid = document.getElementById('gamefixes-grid');
+        if (!grid) return;
+        var msg = message || 'Chargement des jeux VIP…';
+        grid.innerHTML =
+            '<div class="gamefixes-loading-wrap">' +
+            '<div class="gamefixes-loading-spinner" aria-hidden="true"></div>' +
+            '<p class="gamefixes-loading">' + msg + '</p>' +
+            '</div>';
+        Components.renderGridPagination('gamefixes-pagination', null);
+    }
+
+    function _clearCatalogLoadFallback() {
+        if (_catalogLoadFallbackTimer) {
+            clearTimeout(_catalogLoadFallbackTimer);
+            _catalogLoadFallbackTimer = null;
+        }
+    }
+
+    function _scheduleCatalogLoadFallback() {
+        _clearCatalogLoadFallback();
+        _catalogLoadFallbackTimer = setTimeout(function() {
+            _catalogLoadFallbackTimer = null;
+            if (!_pageActive || !_awaitingRemoteCatalog) return;
+            _vipLog('Fallback catalogue (délai API dépassé)');
+            _awaitingRemoteCatalog = false;
+            Bridge.callWithCallback('get_fixed_games_catalog', function(json) {
+                if (!_pageActive) return;
+                _applyCatalogPayload(json || '[]');
+            }, '0');
+        }, 20000);
+    }
+
     function _scheduleRender(reason) {
         if (!_pageActive) return;
         if (_renderTimer) clearTimeout(_renderTimer);
@@ -916,6 +952,16 @@ window.GameFixes = (function() {
 
     function _applyPageState(data, source) {
         if (!_pageActive || !data) return;
+        if (source === 'catalogue_local' && _awaitingRemoteCatalog) {
+            var nLocal = (data.catalog || []).length;
+            _vipLog('Catalogue local ignoré (sync serveur en cours) — ' + nLocal + ' jeu(x)');
+            return;
+        }
+        if (source === 'prepare_serveur' || source === 'refresh_catalog') {
+            _awaitingRemoteCatalog = false;
+            _clearCatalogLoadFallback();
+            _vipCatalogSyncedOnce = true;
+        }
         var catalog = data.catalog || [];
         var partials = data.partials || {};
         var installed = data.installed_ids || [];
@@ -1223,7 +1269,7 @@ window.GameFixes = (function() {
         _stopCatalogPoll();
         _catalogPollTimer = setInterval(function() {
             if (_pageActive) _preparePageRemote();
-        }, 120000);
+        }, 15000);
     }
 
     function _stopCatalogPoll() {
@@ -1343,7 +1389,16 @@ window.GameFixes = (function() {
         _vipLog('—— onPageEnter —— gen=' + _renderGen);
         init();
         _refreshRank();
-        _showCatalogLocalFast();
+        if (!_vipCatalogSyncedOnce) {
+            _awaitingRemoteCatalog = true;
+            _catalogSnapshot = '';
+            _catalogGameSig = '';
+            _showCatalogLoading('Chargement des jeux VIP depuis le serveur…');
+            _scheduleCatalogLoadFallback();
+        } else {
+            _awaitingRemoteCatalog = false;
+            _showCatalogLocalFast();
+        }
         _preparePageRemote();
         _startCatalogPoll();
         if (_activeProgressGameId && _progress[_activeProgressGameId] && !_progressModalOpen) {
@@ -1355,6 +1410,8 @@ window.GameFixes = (function() {
         _vipLog('—— onPageLeave ——');
         _pageActive = false;
         _renderGen += 1;
+        _awaitingRemoteCatalog = false;
+        _clearCatalogLoadFallback();
         _catalogSnapshot = '';
         _catalogGameSig = '';
         if (_renderTimer) {

@@ -101,26 +101,68 @@ def sanitize_user_message(msg: str) -> str:
 _CATALOG_PATH = Path(__file__).resolve().parent / "data" / "fixed_games.json"
 _CATALOG_REMOTE_URL = os.getenv("SLIMEDEALS_API", "https://slimedeals.fr") + "/api/fixed-games/catalog"
 _CATALOG_REV_URL = os.getenv("SLIMEDEALS_API", "https://slimedeals.fr") + "/api/fixed-games/rev"
-_CATALOG_CACHE_TTL = 15  # secondes — rafraîchissement quasi live depuis l’admin
+_CATALOG_CACHE_TTL = 15  # secondes — aligné avec le polling UI Jeux VIP
+_SLIMEDEALS_USER_DIR = Path.home() / ".slimedeals"
 _catalog_cache: list[dict] | None = None
 _catalog_cache_ts: float = 0.0
 _catalog_cache_rev: int = 0
 
 
+def _slimedeals_user_dir() -> Path:
+    """Données persistantes par utilisateur Windows (hors dossier du .exe distribué)."""
+    _SLIMEDEALS_USER_DIR.mkdir(parents=True, exist_ok=True)
+    return _SLIMEDEALS_USER_DIR
 
+
+def _catalog_user_cache_path() -> Path:
+    return _slimedeals_user_dir() / "fixed_games_catalog.json"
+
+
+def _legacy_catalog_paths() -> list[Path]:
+    """Ancien cache à côté de l’exe — ne plus utiliser (URLs de téléchargement exposées)."""
+    return [root_folder(outside_internal=True) / "fixed_games" / "catalog.json"]
+
+
+def _migrate_legacy_catalog_if_needed() -> None:
+    dest = _catalog_user_cache_path()
+    if dest.is_file():
+        return
+    for legacy in _legacy_catalog_paths():
+        if not legacy.is_file():
+            continue
+        try:
+            shutil.copy2(legacy, dest)
+            log.info("[Jeux VIP] Catalogue migré vers %s", dest)
+        except OSError:
+            log.exception("[Jeux VIP] Migration catalogue vers %s", dest)
+        break
+
+
+def _retire_legacy_catalog_files() -> None:
+    for legacy in _legacy_catalog_paths():
+        if not legacy.is_file():
+            continue
+        try:
+            legacy.unlink()
+            if legacy.parent.is_dir() and not any(legacy.parent.iterdir()):
+                legacy.parent.rmdir()
+        except OSError:
+            pass
 
 
 def _catalog_path_writable() -> Path:
-    """Catalogue embarqué ou copie utilisateur."""
-    base = root_folder(outside_internal=True) / "fixed_games"
-    user_copy = base / "catalog.json"
-    if user_copy.is_file():
-        return user_copy
-    return _CATALOG_PATH
+    """Cache utilisateur (~/.slimedeals) ou repli embarqué (_internal/sff/data) sans écriture dans dist/."""
+    _migrate_legacy_catalog_if_needed()
+    user_cache = _catalog_user_cache_path()
+    if user_cache.is_file():
+        return user_cache
+    if _CATALOG_PATH.is_file():
+        return _CATALOG_PATH
+    return user_cache
 
 
 def _catalog_user_copy_path() -> Path:
-    return root_folder(outside_internal=True) / "fixed_games" / "catalog.json"
+    return _catalog_user_cache_path()
 
 
 def _load_local_catalog() -> list[dict]:
@@ -212,16 +254,6 @@ def load_fixed_games_catalog(*, force: bool = False) -> list[dict]:
 
     remote = _fetch_remote_catalog()
     if remote:
-        local = _load_local_catalog()
-        if local and len(remote) < len(local):
-            log.warning(
-                "[Jeux VIP] catalogue API (%s jeux) < local (%s) — conservation du catalogue local",
-                len(remote),
-                len(local),
-            )
-            _catalog_cache = local
-            _catalog_cache_ts = now
-            return local
         _catalog_cache = remote
         _catalog_cache_ts = now
         if remote_rev is not None:
@@ -233,8 +265,10 @@ def load_fixed_games_catalog(*, force: bool = False) -> list[dict]:
                 json.dumps(remote, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+            _retire_legacy_catalog_files()
         except Exception:
-            pass
+            log.debug("[Jeux VIP] écriture cache catalogue", exc_info=True)
+        log.info("[Jeux VIP] catalogue API synchronisé — %s jeu(x)", len(remote))
         return remote
 
     if not force and _catalog_cache is not None:
@@ -447,7 +481,7 @@ def _partial_download_info_for_entry(entry: dict | None) -> dict:
 
             return {"partial_bytes": 0, "partial_pct": 0, "partial_human": ""}
 
-        dl_dir = root_folder(outside_internal=True) / "fixed_downloads" / file_id.strip().lower()
+        dl_dir = _slimedeals_user_dir() / "fixed_downloads" / file_id.strip().lower()
 
         if not dl_dir.is_dir():
 
@@ -818,7 +852,7 @@ def _persistent_download_dir(file_id: str) -> Path:
 
     """Dossier persistant pour reprendre un gros téléchargement après coupure."""
 
-    p = root_folder(outside_internal=True) / "fixed_downloads" / (file_id or "unknown").strip().lower()
+    p = _slimedeals_user_dir() / "fixed_downloads" / (file_id or "unknown").strip().lower()
 
     p.mkdir(parents=True, exist_ok=True)
 
@@ -851,8 +885,20 @@ def _steam_common_dir(library_path: str | Path) -> Path:
 
 
 def _sideloaded_registry_path() -> Path:
+    return _slimedeals_user_dir() / "sideloaded_games.json"
 
-    return root_folder(outside_internal=True) / "sideloaded_games.json"
+
+def _migrate_legacy_sideloaded_registry() -> None:
+    dest = _sideloaded_registry_path()
+    if dest.is_file():
+        return
+    legacy = root_folder(outside_internal=True) / "sideloaded_games.json"
+    if legacy.is_file():
+        try:
+            shutil.copy2(legacy, dest)
+            legacy.unlink()
+        except OSError:
+            log.debug("[Jeux VIP] migration sideloaded_games.json", exc_info=True)
 
 
 
@@ -862,6 +908,7 @@ def get_sideloaded_games() -> list[dict]:
 
     """Retourne la liste des jeux Pépites installés (registre local JSON)."""
 
+    _migrate_legacy_sideloaded_registry()
     p = _sideloaded_registry_path()
 
     if not p.exists():

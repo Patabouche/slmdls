@@ -3224,14 +3224,20 @@ class WebBridge(QObject):
 
     @pyqtSlot(str, result=str)
     def get_fixed_games_catalog(self, force: str = "0") -> str:
-        """Catalogue Jeux VIP — retour immédiat (cache/local). Réseau via refresh_fixed_games_catalog."""
+        """Catalogue Jeux VIP — cache ~/.slimedeals ; sync API admin (force=1)."""
         try:
-            from sff.fixed_games import enrich_catalog_header_images, load_fixed_games_catalog_fast
+            from sff.fixed_games import (
+                enrich_catalog_header_images,
+                load_fixed_games_catalog,
+                load_fixed_games_catalog_fast,
+            )
 
             if str(force or "0").strip().lower() in ("1", "true", "yes"):
-                self.refresh_fixed_games_catalog()
+                catalog = load_fixed_games_catalog(force=True)
+            else:
+                catalog = load_fixed_games_catalog_fast()
             return json.dumps(
-                enrich_catalog_header_images(load_fixed_games_catalog_fast()),
+                enrich_catalog_header_images(catalog),
                 ensure_ascii=False,
             )
         except Exception:

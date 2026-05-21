@@ -314,8 +314,22 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 _version_info = None
 if sys.platform == 'win32' and os.path.isfile(_version_info_path):
-    _version_info = _version_info_path
-    print(f"Including Windows version_info: {_version_info_path}")
+    try:
+        import importlib.util
+
+        _vi_spec = importlib.util.spec_from_file_location(
+            "_slimedeals_version_info", _version_info_path
+        )
+        if _vi_spec and _vi_spec.loader:
+            _vi_mod = importlib.util.module_from_spec(_vi_spec)
+            _vi_spec.loader.exec_module(_vi_mod)
+            _version_info = getattr(_vi_mod, "version_info", None)
+            if _version_info is not None:
+                print(f"Including Windows version_info: {_version_info_path}")
+            else:
+                print(f"Warning: version_info.py has no 'version_info' object")
+    except Exception as _vi_exc:
+        print(f"Warning: could not load version_info.py: {_vi_exc}")
 
 _app_manifest = _app_manifest_path if (
     sys.platform == 'win32' and os.path.isfile(_app_manifest_path)

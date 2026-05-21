@@ -162,7 +162,13 @@ window.GameFixes = (function() {
                 return;
             }
             wrapEl.className = 'fixed-game-card-cover';
-            wrapEl.textContent = '';
+            /* Ne pas utiliser textContent = '' : ça supprime l’<img> enfant (Cover OK puis image invisible). */
+            var node = wrapEl.firstChild;
+            while (node) {
+                var next = node.nextSibling;
+                if (node.nodeType === 3) wrapEl.removeChild(node);
+                node = next;
+            }
             _vipLog('Cover OK ' + (gameId || '?') + ' ← ' + (img.src || '').split('/').pop());
         };
         img.onerror = tryNext;

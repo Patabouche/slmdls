@@ -4,5 +4,12 @@
     "name": "Subnautica 2",
     "path": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Subnautica 2",
     "source": "fixed"
+  },
+  {
+    "app_id": 703080,
+    "name": "Planet Zoo",
+    "path": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Planet Zoo",
+    "source": "fixed",
+    "install_date": "2026-05-21T15:58:02"
   }
 ]

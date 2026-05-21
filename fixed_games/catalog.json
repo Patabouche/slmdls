@@ -1,41 +1,189 @@
 [
   {
+    "id": "blackmythwukong",
+    "name": "Black Myth: Wukong",
+    "app_id": "2358720",
+    "url": "https://bzzhr.to/d5zjplf317y4",
+    "size_label": "135,9 Go",
+    "tags": [
+      "Jeu complet",
+      "Correctifs intégrés"
+    ],
+    "folder_hint": "Black-Myth-Wukong-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/2358720/header.jpg",
+    "size_bytes": 145921513881
+  },
+  {
+    "id": "thecrew2",
+    "name": "The Crew 2",
+    "app_id": "646910",
+    "url": "https://bzzhr.to/c6rxxe3rmrty",
+    "size_label": "31,3 Go",
+    "tags": [
+      "Jeu complet",
+      "Correctifs intégrés"
+    ],
+    "folder_hint": "The-Crew-2-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/646910/header.jpg",
+    "size_bytes": 33608119091
+  },
+  {
+    "id": "rust",
+    "name": "Rust",
+    "app_id": "252490",
+    "url": "https://bzzhr.to/7z4ekhcrtmzb",
+    "size_label": "27,6 Go",
+    "tags": [
+      "Jeu complet",
+      "Correctifs intégrés",
+      "(online)"
+    ],
+    "folder_hint": "RUST-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/252490/header.jpg",
+    "size_bytes": 29635274342
+  },
+  {
+    "id": "ghostoftsushimadirectorscut",
+    "name": "Ghost of Tsushima DIRECTOR'S CUT",
+    "app_id": "2215430",
+    "url": "https://bzzhr.to/hzlc2xrzui6r",
+    "size_label": "46,0 Go",
+    "tags": [
+      "Jeu complet",
+      "Correctifs intégrés"
+    ],
+    "folder_hint": "Ghost-O-sushima-DC-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/2215430/header.jpg",
+    "size_bytes": 49392123904
+  },
+  {
+    "id": "godofwar",
+    "name": "God of War",
+    "app_id": "1593500",
+    "url": "https://bzzhr.to/i3t0797hahst",
+    "size_label": "94,3 Go",
+    "tags": [
+      "Jeu complet",
+      "Correctifs intégrés"
+    ],
+    "folder_hint": "God-of-War-R-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/1593500/header.jpg",
+    "size_bytes": 101253854003
+  },
+  {
+    "id": "palworld",
+    "name": "Palworld",
+    "app_id": "1623730",
+    "url": "https://bzzhr.to/hut5tm9ud5vb",
+    "size_label": "25,1 Go",
+    "tags": [
+      "Jeu complet",
+      "Correctifs intégrés",
+      "(online)"
+    ],
+    "folder_hint": "Palworld-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/1623730/header.jpg",
+    "size_bytes": 26950919782
+  },
+  {
+    "id": "callofdutyblackopsii",
+    "name": "Call of Duty: Black Ops II",
+    "app_id": "202970",
+    "url": "https://bzzhr.to/b65jhpnucnac",
+    "size_label": "30,8 Go",
+    "tags": [
+      "Jeu complet",
+      "Correctifs intégrés",
+      "(online)"
+    ],
+    "folder_hint": "COD-BO-II-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/202970/header.jpg",
+    "size_bytes": 33071248179
+  },
+  {
+    "id": "hogwartslegacy",
+    "name": "Hogwarts Legacy",
+    "app_id": "990080",
+    "url": "https://bzzhr.to/sqsvm6qwnpnf",
+    "size_label": "72,4 Go",
+    "tags": [
+      "Jeu complet",
+      "Correctifs intégrés"
+    ],
+    "folder_hint": "Hogwarts-Legacy-DE-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/990080/header.jpg",
+    "size_bytes": 77738908057
+  },
+  {
     "id": "pragmata",
-    "name": "Pragmata",
+    "name": "PRAGMATA",
     "app_id": "3357650",
-    "url": "https://buzzheavier.com/j5gj3v4tdxwl",
+    "url": "https://bzzhr.to/j5gj3v4tdxwl",
     "size_label": "34,9 Go",
-    "size_bytes": 37500000000,
     "tags": [
       "Jeu complet",
       "Correctifs intégrés"
     ],
-    "folder_hint": "PRAGMATA-SteamRIP.com"
+    "folder_hint": "PRAGMATA-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/3357650/header.jpg",
+    "size_bytes": 37473589657
   },
   {
-    "id": "subnautica2",
-    "name": "Subnautica 2",
-    "app_id": "1962700",
-    "url": "https://bzzhr.to/bb6y947gh4t6",
-    "size_label": "13,1 Go",
-    "size_bytes": 14070000000,
+    "id": "residentevilrequiem",
+    "name": "Resident Evil Requiem",
+    "app_id": "3764200",
+    "url": "https://bzzhr.to/an2jlvvr9vne",
+    "size_label": "76,7 Go",
     "tags": [
       "Jeu complet",
       "Correctifs intégrés"
     ],
-    "folder_hint": "Subnautica-2-SteamRIP.com"
+    "folder_hint": "RE9-Requiem-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/3764200/header.jpg",
+    "size_bytes": 82355997900
   },
   {
-    "id": "planetzoo",
-    "name": "Planet Zoo",
-    "app_id": "703080",
-    "url": "https://bzzhr.to/czn0geghuw2l",
-    "size_label": "8,9 Go",
-    "size_bytes": 9556302233,
+    "id": "outbound",
+    "name": "Outbound",
+    "app_id": "2681030",
+    "url": "https://bzzhr.to/9dv5hsshjao0",
+    "size_label": "5,3 Go",
+    "tags": [
+      "Jeu complet",
+      "Correctifs intégrés",
+      "(online)"
+    ],
+    "folder_hint": "Outbound-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/2681030/header.jpg",
+    "size_bytes": 5690831667
+  },
+  {
+    "id": "thesims4",
+    "name": "The Sims™ 4",
+    "app_id": "1222670",
+    "url": "https://bzzhr.to/8ymzte2pu7u3",
+    "size_label": "76,9 Go",
     "tags": [
       "Jeu complet",
       "Correctifs intégrés"
     ],
-    "folder_hint": "Planet-Zoo-SteamRIP.com"
+    "folder_hint": "Da-Sims-4-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/1222670/header.jpg",
+    "size_bytes": 82570746265
+  },
+  {
+    "id": "eurotrucksimulator2",
+    "name": "Euro Truck Simulator 2",
+    "app_id": "227300",
+    "url": "https://bzzhr.to/wrmh12auln1b",
+    "size_label": "34,3 Go",
+    "tags": [
+      "Jeu complet",
+      "Correctifs intégrés",
+      "(online)"
+    ],
+    "folder_hint": "Euro-Truck-Sim-2-SteamRIP.com",
+    "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/227300/header.jpg",
+    "size_bytes": 36829344563
   }
 ]
